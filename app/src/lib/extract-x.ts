@@ -70,7 +70,7 @@ export async function extractFromX(rawUrl: string): Promise<ExtractResult> {
       signal: ctrl.signal,
       headers: {
         accept: "application/json",
-        "user-agent": "Glean/1.0 (+https://github.com/; extractor)",
+        "user-agent": "Glean/1.0 (+https://github.com/coderdevin/glean; extractor)",
       },
     });
   } catch (err) {
