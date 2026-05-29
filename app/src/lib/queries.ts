@@ -168,7 +168,7 @@ export async function weeklyByNumber(db: DB, number: number): Promise<typeof wee
   const result = await db
     .select()
     .from(weeklyIssues)
-    .where(eq(weeklyIssues.number, number))
+    .where(and(eq(weeklyIssues.number, number), sql`${weeklyIssues.publishedAt} is not null`))
     .limit(1);
   return result[0] ?? null;
 }
@@ -197,11 +197,13 @@ export async function allWeeklies(
       coverImageKey: weeklyIssues.coverImageKey,
       publishedAt: weeklyIssues.publishedAt,
       createdAt: weeklyIssues.createdAt,
+      layoutJson: weeklyIssues.layoutJson,
       pick_count: sql<number>`(select count(*) from picks p where p.weekly_issue_id = weekly_issues.id)`,
       read_minutes: sql<number>`(select coalesce(sum(read_minutes), 0) from picks p where p.weekly_issue_id = weekly_issues.id)`,
-      section_count: sql<number>`(select count(distinct category) from picks p where p.weekly_issue_id = weekly_issues.id)`,
+      section_count: sql<number>`json_array_length(coalesce(weekly_issues.layout_json, '[]'))`,
     })
     .from(weeklyIssues)
+    .where(sql`${weeklyIssues.publishedAt} is not null`)
     .orderBy(desc(weeklyIssues.number));
   return result as any;
 }
@@ -389,6 +391,23 @@ export async function allTagsWithCounts(db: DB): Promise<{ slug: string; name_zh
     .from(tagsTable)
     .orderBy(tagsTable.slug);
   return result as any;
+}
+
+/** Admin: all issues incl. drafts, newest first. */
+export async function allWeekliesAdmin(db: DB): Promise<(typeof weeklyIssues.$inferSelect)[]> {
+  return db.select().from(weeklyIssues).orderBy(desc(weeklyIssues.number));
+}
+
+/** Admin: single issue by id (draft or published). */
+export async function weeklyById(db: DB, id: string): Promise<typeof weeklyIssues.$inferSelect | null> {
+  const r = await db.select().from(weeklyIssues).where(eq(weeklyIssues.id, id)).limit(1);
+  return r[0] ?? null;
+}
+
+/** Max issue number across all issues (for number = max+1). 0 if none. */
+export async function maxWeeklyNumber(db: DB): Promise<number> {
+  const r = await db.select({ m: sql<number>`coalesce(max(number), 0)` }).from(weeklyIssues);
+  return r[0]?.m ?? 0;
 }
 
 /** Today's lead + 2 supporting for the homepage strip. */
