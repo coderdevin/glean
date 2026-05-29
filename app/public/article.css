@@ -434,6 +434,17 @@
       }
       .av2-modebar__source:hover { color: var(--c-primary-active); }
 
+      /* Keyboard focus ring — match the site-wide :focus-visible treatment in
+         styles.css (2px solid coral, 2px offset) so article controls don't fall
+         back to the inconsistent browser default. Radius is left to the element
+         so the pill-shaped modebar buttons keep their shape. */
+      .av2-modebar__btn:focus-visible,
+      .av2-toc__list a:focus-visible,
+      .av2-row__num.is-button:focus-visible {
+        outline: 2px solid var(--c-primary);
+        outline-offset: 2px;
+      }
+
       /* ---------- Bilingual body ---------- */
       .av2-body { margin: 0 0 var(--s-xxl); }
       .av2-row {

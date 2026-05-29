@@ -27,6 +27,9 @@ const todayLabel = new Date(feed.date).toLocaleDateString("en-US", {
   day: "numeric",
   year: "numeric",
 });
+// Host shown in the hero curl example. Derived from Astro.site so it tracks
+// the deployed domain (set via SITE_URL) instead of a hardcoded placeholder.
+const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example").host;
 ---
 <Site
   title="Glean · 拾遗 — A bilingual tech zine"
@@ -58,11 +61,11 @@ const todayLabel = new Date(feed.date).toLocaleDateString("en-US", {
             )}
             <a href="/daily" class="btn btn-secondary">
               <span class="lang-zh">看今日日刊</span>
-              <span class="lang-en">See today's daily</span>
+              <span class="lang-en">See today’s daily</span>
             </a>
             <a href="#subscribe" class="btn btn-text" style="padding: 0 8px">
-              <span class="lang-zh">每周一送到邮箱 ↓</span>
-              <span class="lang-en">Get it Mondays in email ↓</span>
+              <span class="lang-zh">开刊先通知你 ↓</span>
+              <span class="lang-en">Get notified at launch ↓</span>
             </a>
           </div>
           <p class="t-body-sm text-muted">
@@ -80,7 +83,7 @@ const todayLabel = new Date(feed.date).toLocaleDateString("en-US", {
             </div>
             <span class="t-code text-muted-soft">~/work/glean</span>
           </div>
-          <pre class="t-code" style="margin: 0; color: var(--c-on-dark); line-height: 1.65; white-space: pre-wrap; word-break: break-all"><span style="color: var(--c-accent-amber)">$</span> curl -X POST your-domain.example/api/submit <span style="color: var(--c-muted-soft)">\</span>
+          <pre class="t-code" style="margin: 0; color: var(--c-on-dark); line-height: 1.65; white-space: pre-wrap; word-break: break-all"><span style="color: var(--c-accent-amber)">$</span> curl -X POST {apiHost}/api/submit <span style="color: var(--c-muted-soft)">\</span>
     -H <span style="color: var(--c-accent-teal)">"Content-Type: application/json"</span> <span style="color: var(--c-muted-soft)">\</span>
     -d <span style="color: var(--c-accent-teal)">'&#123;"url":"https://blog.cloudflare.com/durable-objects-2026/",
         "note":"DO 终于支持跨地域副本",
@@ -139,7 +142,7 @@ const todayLabel = new Date(feed.date).toLocaleDateString("en-US", {
           <div>
             <span class="eyebrow">
               <span class="lang-zh">最新周刊</span>
-              <span class="lang-en">This week's issue</span>
+              <span class="lang-en">This week’s issue</span>
             </span>
             <h2 class="section-head__title" style="margin-top: 8px">
               <span class="lang-zh">每周一</span>
@@ -198,16 +201,16 @@ const todayLabel = new Date(feed.date).toLocaleDateString("en-US", {
       <div class="subscribe-card">
         <div class="subscribe-card__lead">
           <span class="eyebrow">
-            <span class="lang-zh">订阅周刊</span>
-            <span class="lang-en">Subscribe</span>
+            <span class="lang-zh">周刊筹备中</span>
+            <span class="lang-en">Weekly · coming soon</span>
           </span>
           <h2 class="balance">
             <span class="lang-zh">每周一早上 · 一封邮件</span>
             <span class="lang-en">Mondays · one email</span>
           </h2>
           <p>
-            <span class="lang-zh">上周最有意思的 6–10 条 + 一段编辑首语。随时取消，没有广告。</span>
-            <span class="lang-en">Past week's top 6–10 picks + a short editor's note. Unsubscribe any time. No ads.</span>
+            <span class="lang-zh">上周最有意思的 6–10 条 + 一段编辑首语。留个邮箱，开刊第一时间通知你，没有广告。</span>
+            <span class="lang-en">Past week’s top 6–10 picks + a short editor’s note. Leave your email and we’ll tell you the moment it launches. No ads.</span>
           </p>
         </div>
         <form class="subscribe-card__form" data-subscribe-form>
@@ -223,18 +226,18 @@ const todayLabel = new Date(feed.date).toLocaleDateString("en-US", {
             />
             <button type="submit" class="btn btn-primary">
               <span class="subscribe-card__cta-default">
-                <span class="lang-zh">订阅</span>
-                <span class="lang-en">Subscribe</span>
+                <span class="lang-zh">通知我</span>
+                <span class="lang-en">Notify me</span>
               </span>
               <span class="subscribe-card__cta-done" aria-hidden="true">
-                <span class="lang-zh">✓ 已订阅</span>
-                <span class="lang-en">✓ Subscribed</span>
+                <span class="lang-zh">✓ 已登记</span>
+                <span class="lang-en">✓ On the list</span>
               </span>
             </button>
           </div>
           <p class="subscribe-card__status" role="status" aria-live="polite"></p>
           <div class="subscribe-card__channels">
-            <a href="/rss/daily.xml">RSS</a>
+            <a href="/rss/daily.xml">RSS · Daily</a>
             <a href="/rss/weekly.xml">RSS · Weekly</a>
           </div>
         </form>

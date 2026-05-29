@@ -24,6 +24,9 @@ const isActive = (prefix: string): boolean => {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {/* Mobile address-bar tint tracks --c-canvas (warm-50 light / ink-900 dark). */}
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf9f6" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1c1b1a" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <link rel="canonical" href={canonical} />
@@ -210,8 +213,8 @@ const isActive = (prefix: string): boolean => {
               if (status) {
                 const lang = document.body.getAttribute("data-lang") || "zh";
                 status.textContent = lang === "zh"
-                  ? "已订阅。下周一早上会收到第一封。"
-                  : "Subscribed. The next weekly lands Monday morning.";
+                  ? "登记好了，到时第一时间通知你。"
+                  : "You’re on the list — we’ll be in touch.";
               }
             } catch (err) {
               if (status) status.textContent = String(err.message ?? err);

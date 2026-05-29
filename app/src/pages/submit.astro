@@ -13,6 +13,9 @@ const errorLabels: Record<string, { zh: string; en: string }> = {
   server:      { zh: "服务器出错。请稍后重试。",           en: "Server error. Try again later." },
 };
 const errorCopy = submitError ? errorLabels[submitError] : null;
+// Host shown in the curl example — derived from Astro.site (SITE_URL) so it
+// matches the deployed domain rather than a hardcoded placeholder.
+const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example").host;
 ---
 <Site
   title="提交链接 · Submit — Glean · 拾遗"
@@ -159,11 +162,11 @@ const errorCopy = submitError ? errorLabels[submitError] : null;
               <div>
                 <div class="t-title-md">
                   <span class="lang-zh">进当日日刊</span>
-                  <span class="lang-en">Lands in today's daily</span>
+                  <span class="lang-en">Lands in today’s daily</span>
                 </div>
                 <p class="t-body-sm text-body" style="margin: 4px 0 0">
                   <span class="lang-zh">通过即公开 · 高分会进下周一的周刊。</span>
-                  <span class="lang-en">Public on approval · top picks land in Monday's weekly.</span>
+                  <span class="lang-en">Public on approval · top picks land in Monday’s weekly.</span>
                 </p>
               </div>
             </li>
@@ -174,7 +177,7 @@ const errorCopy = submitError ? errorLabels[submitError] : null;
               <span class="lang-zh">命令行用户</span>
               <span class="lang-en">Terminal-first?</span>
             </div>
-            <pre class="t-code" style="margin: 0; color: var(--c-on-dark); line-height: 1.65; white-space: pre-wrap; word-break: break-all"><span style="color: var(--c-accent-amber)">$</span> curl -X POST your-domain.example/api/submit <span style="color: var(--c-muted-soft)">\</span>
+            <pre class="t-code" style="margin: 0; color: var(--c-on-dark); line-height: 1.65; white-space: pre-wrap; word-break: break-all"><span style="color: var(--c-accent-amber)">$</span> curl -X POST {apiHost}/api/submit <span style="color: var(--c-muted-soft)">\</span>
     -H <span style="color: var(--c-accent-teal)">"Content-Type: application/json"</span> <span style="color: var(--c-muted-soft)">\</span>
     -d <span style="color: var(--c-accent-teal)">'&#123;"url":"https://example.com/article"&#125;'</span></pre>
             <p class="t-body-sm" style="margin: 10px 0 0; color: var(--c-on-dark-soft)">
