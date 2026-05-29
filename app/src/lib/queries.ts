@@ -41,6 +41,7 @@ function rowsToCardPicks(
   tagMap: Map<string, { slug: string; name_zh: string; name_en: string; family: "infra" | "data" | "code" }[]>,
 ): ArticleCardPick[] {
   return rows.map((r) => ({
+    id: r.id,
     slug: r.slug,
     title_zh: r.title_zh,
     title_en: r.title_en,
@@ -280,6 +281,7 @@ export async function pickBySlug(db: DB, slug: string): Promise<
     .orderBy(articleAnnotations.position);
 
   return {
+    id: row.id,
     slug: row.slug,
     title_zh: row.titleZh,
     title_en: row.titleEn,
