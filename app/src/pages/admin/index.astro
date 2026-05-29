@@ -4,8 +4,8 @@ import Admin from "~/layouts/Admin.astro";
 import StatusPill from "~/components/StatusPill.astro";
 import { db } from "~/db/client";
 import { submissions, type SubmissionStatus } from "~/db/schema";
-import { asc, desc, eq, inArray } from "drizzle-orm";
-import { formatTimeHM, siteTz } from "~/lib/datetime";
+import { and, desc, inArray, like, or, sql } from "drizzle-orm";
+import { formatDateISO, formatTimeHM, siteTz, todayInSiteTz } from "~/lib/datetime";
 
 const env = Astro.locals.runtime.env;
 const filterParam = Astro.url.searchParams.get("status");
@@ -32,13 +32,62 @@ const filterKey: FilterKey = (() => {
   return "active";
 })();
 
+// Flat browse views (published / rejected / failed / pending / all) get
+// server-side search + sort + pagination. The composite "active"/"ready"
+// triage dashboards keep their bounded single-shot query.
+const isFlatList = filterKey !== "active" && filterKey !== "ready";
+const PAGE_SIZE = 50;
+const q = (Astro.url.searchParams.get("q") ?? "").trim();
+const sortParam: "newest" | "score" =
+  Astro.url.searchParams.get("sort") === "score" ? "score" : "newest";
+const page = Math.max(1, Number.parseInt(Astro.url.searchParams.get("page") ?? "1", 10) || 1);
+
 const drizzle = db(env.DB);
-const rows = await drizzle
-  .select()
+
+// One grouped query powers the per-tab counts on the filter nav.
+const statusCountRows = await drizzle
+  .select({ status: submissions.status, n: sql<number>`count(*)` })
   .from(submissions)
-  .where(inArray(submissions.status, FILTERS[filterKey]))
-  .orderBy(desc(submissions.createdAt))
-  .limit(200);
+  .groupBy(submissions.status);
+const countByStatus = new Map(statusCountRows.map((r) => [r.status, Number(r.n)]));
+const tabCount = (key: FilterKey) =>
+  FILTERS[key].reduce((sum, st) => sum + (countByStatus.get(st) ?? 0), 0);
+
+// Free-text search across title (zh/en), source host, and submitter.
+const searchWhere = q
+  ? or(
+      like(submissions.aiTitleZh, `%${q}%`),
+      like(submissions.aiTitleEn, `%${q}%`),
+      like(submissions.url, `%${q}%`),
+      like(submissions.submitterName, `%${q}%`),
+    )
+  : undefined;
+
+let rows;
+let totalRows: number;
+if (isFlatList) {
+  const where = and(inArray(submissions.status, FILTERS[filterKey]), searchWhere);
+  const [countRow] = await drizzle
+    .select({ n: sql<number>`count(*)` })
+    .from(submissions)
+    .where(where);
+  totalRows = Number(countRow?.n ?? 0);
+  rows = await drizzle
+    .select()
+    .from(submissions)
+    .where(where)
+    .orderBy(sortParam === "score" ? desc(submissions.aiScore) : desc(submissions.createdAt))
+    .limit(PAGE_SIZE)
+    .offset((page - 1) * PAGE_SIZE);
+} else {
+  rows = await drizzle
+    .select()
+    .from(submissions)
+    .where(inArray(submissions.status, FILTERS[filterKey]))
+    .orderBy(desc(submissions.createdAt))
+    .limit(200);
+  totalRows = rows.length;
+}
 
 // Sort the "Ready" list oldest-first so the top one is also the oldest —
 // matches what `/publish` uses for "next" navigation.
@@ -56,12 +105,47 @@ const upNext = readyOldestFirst[0] ?? null;
 const restReady = readyOldestFirst.slice(1);
 
 const tz = siteTz(env);
+const today = todayInSiteTz(tz);
 const hms = (d: Date | null) => formatTimeHM(d, tz);
+// Time-only for items from today; "MM-DD" otherwise — a multi-day browse list
+// would otherwise be all ambiguous "13:06"-style times with no date context.
+const whenLabel = (d: Date | null) => {
+  if (!d) return "";
+  const iso = formatDateISO(d, tz);
+  return iso === today ? hms(d) : iso.slice(5);
+};
+const whenTitle = (d: Date | null) => (d ? `${formatDateISO(d, tz)} ${hms(d)}` : "");
 const minutesAgo = (d: Date | null) => d ? Math.floor((Date.now() - new Date(d).getTime()) / 60000) : 0;
 const host = (url: string) => { try { return new URL(url).host; } catch { return url; } };
 const parseTags = (json: string | null): string[] => { try { return JSON.parse(json ?? "[]"); } catch { return []; } };
 
-const totalActive = inFlight.length + readyOldestFirst.length;
+// Score quality bands: <0.4 reads as low, ≥0.75 as high — so a published list
+// can be scanned for outliers ("why did this low score ship?").
+const scoreClass = (s: number | null | undefined) => {
+  if (s === null || s === undefined) return "";
+  const n = Number(s);
+  if (n < 0.4) return " q2-row__score--low";
+  if (n >= 0.75) return " q2-row__score--high";
+  return "";
+};
+
+// Pagination math (flat-list views only).
+const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+const pageStart = totalRows === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+const pageEnd = Math.min(page * PAGE_SIZE, totalRows);
+// Build a nav href, preserving status/q/sort and applying overrides.
+const pageHref = (overrides: { page?: number; sort?: "newest" | "score" } = {}) => {
+  const p = new URLSearchParams();
+  if (filterKey !== "active") p.set("status", filterKey);
+  if (q) p.set("q", q);
+  const s = overrides.sort ?? sortParam;
+  if (s === "score") p.set("sort", "score");
+  const pg = overrides.page ?? page;
+  if (pg > 1) p.set("page", String(pg));
+  const qs = p.toString();
+  return qs ? `/admin?${qs}` : "/admin";
+};
+const clearSearchHref = filterKey === "active" ? "/admin" : `/admin?status=${filterKey}`;
 
 Astro.response.headers.set("Cache-Control", "no-store");
 ---
@@ -75,22 +159,48 @@ Astro.response.headers.set("Cache-Control", "no-store");
             <p class="q2-header__sub">
               {filterKey === "active" ? (
                 <>{readyOldestFirst.length} ready · {inFlight.length} in flight</>
+              ) : q ? (
+                <>{totalRows} {totalRows === 1 ? "result" : "results"} · “{q}”</>
               ) : (
-                <>{rows.length} {filterKey} · newest first</>
+                <>{`${totalRows} ${filterKey}`} · {sortParam === "score" ? "by score" : "newest first"}</>
               )}
             </p>
           </div>
           <nav class="q2-filters" aria-label="Filter">
-            <a href="/admin" class={filterKey === "active" ? "is-active" : ""}>Active</a>
-            <a href="/admin?status=ready" class={filterKey === "ready" ? "is-active" : ""}>Ready</a>
-            <a href="/admin?status=pending" class={filterKey === "pending" ? "is-active" : ""}>In flight</a>
-            <a href="/admin?status=published" class={filterKey === "published" ? "is-active" : ""}>Published</a>
-            <a href="/admin?status=rejected" class={filterKey === "rejected" ? "is-active" : ""}>Rejected</a>
-            <a href="/admin?status=failed" class={filterKey === "failed" ? "is-active" : ""}>Failed</a>
-            <a href="/admin?status=all" class={filterKey === "all" ? "is-active" : ""}>All</a>
+            <a href="/admin" class={filterKey === "active" ? "is-active" : ""}>Active <span class="q2-filters__n">{tabCount("active")}</span></a>
+            <a href="/admin?status=ready" class={filterKey === "ready" ? "is-active" : ""}>Ready <span class="q2-filters__n">{tabCount("ready")}</span></a>
+            <a href="/admin?status=pending" class={filterKey === "pending" ? "is-active" : ""}>In flight <span class="q2-filters__n">{tabCount("pending")}</span></a>
+            <a href="/admin?status=published" class={filterKey === "published" ? "is-active" : ""}>Published <span class="q2-filters__n">{tabCount("published")}</span></a>
+            <a href="/admin?status=rejected" class={filterKey === "rejected" ? "is-active" : ""}>Rejected <span class="q2-filters__n">{tabCount("rejected")}</span></a>
+            <a href="/admin?status=failed" class={filterKey === "failed" ? "is-active" : ""}>Failed <span class="q2-filters__n">{tabCount("failed")}</span></a>
+            <a href="/admin?status=all" class={filterKey === "all" ? "is-active" : ""}>All <span class="q2-filters__n">{tabCount("all")}</span></a>
           </nav>
         </div>
       </header>
+
+      {isFlatList && (
+        <div class="q2-toolbar">
+          <form class="q2-search" method="get" action="/admin" role="search">
+            <input type="hidden" name="status" value={filterKey} />
+            {sortParam === "score" && <input type="hidden" name="sort" value="score" />}
+            <input
+              type="search"
+              name="q"
+              value={q}
+              placeholder="搜索标题 / 域名 / 提交人…"
+              aria-label="Search submissions"
+              class="q2-search__input"
+            />
+            <button type="submit" class="q2-search__btn">搜索</button>
+            {q && <a class="q2-search__clear" href={clearSearchHref}>清除</a>}
+          </form>
+          <div class="q2-sort" role="group" aria-label="Sort">
+            <span class="q2-sort__label">排序</span>
+            <a href={pageHref({ sort: "newest", page: 1 })} class={sortParam === "newest" ? "is-active" : ""}>最新</a>
+            <a href={pageHref({ sort: "score", page: 1 })} class={sortParam === "score" ? "is-active" : ""}>分数</a>
+          </div>
+        </div>
+      )}
 
       {(filterKey === "active" || filterKey === "ready") && (
         <>
@@ -226,33 +336,67 @@ Astro.response.headers.set("Cache-Control", "no-store");
         </details>
       )}
 
-      {/* When a specific status is filtered (not "active"), list flat. */}
-      {filterKey !== "active" && filterKey !== "ready" && rows.length > 0 && (
+      {/* When a specific status is filtered (not "active"), list flat with
+          server-side search / sort / pagination and inline row actions. */}
+      {isFlatList && rows.length > 0 && (
         <section class="q2-section">
           <header class="q2-section__head">
             <h2 class="q2-section__title">{filterKey}</h2>
-            <span class="q2-section__count">{rows.length}</span>
+            <span class="q2-section__count">{totalRows}</span>
           </header>
           <div class="q2-section__list">
-            {rows.map((r) => (
-              <a href={`/admin/${r.id}`} class="q2-row">
-                <span class="q2-row__title">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
-                <span class="q2-row__meta">
-                  <StatusPill status={r.status} />
-                  <span>{host(r.url)}</span>
-                </span>
-                <span class="q2-row__score">{r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}</span>
-                <span class="q2-row__time">{hms(r.createdAt)}</span>
-              </a>
-            ))}
+            {rows.map((r) => {
+              const title = r.aiTitleZh || r.aiTitleEn || r.url;
+              return (
+                <div class="q2-row q2-row--browse" data-href={`/admin/${r.id}`}>
+                  <a class="q2-row__title" href={`/admin/${r.id}`} title={title}>{title}</a>
+                  <span class="q2-row__meta">
+                    {filterKey === "all" && <StatusPill status={r.status} />}
+                    <span>{host(r.url)}</span>
+                  </span>
+                  <span class={`q2-row__score${scoreClass(r.aiScore)}`}>
+                    {r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}
+                  </span>
+                  <span class="q2-row__time" title={whenTitle(r.createdAt)}>{whenLabel(r.createdAt)}</span>
+                  <span class="q2-row__actions">
+                    <a class="q2-row__action" href={r.url} target="_blank" rel="noopener noreferrer" title="打开原文" aria-label="打开原文">↗</a>
+                    <button type="button" class="q2-row__action" data-copy={r.url} title="复制链接" aria-label="复制链接">⧉</button>
+                  </span>
+                </div>
+              );
+            })}
           </div>
+          {totalPages > 1 && (
+            <nav class="q2-pager" aria-label="Pagination">
+              {page > 1 ? (
+                <a class="q2-pager__btn" href={pageHref({ page: page - 1 })} rel="prev">← 上一页</a>
+              ) : (
+                <span class="q2-pager__btn is-disabled" aria-disabled="true">← 上一页</span>
+              )}
+              <span class="q2-pager__status">{pageStart}–{pageEnd} / {totalRows} · 第 {page}/{totalPages} 页</span>
+              {page < totalPages ? (
+                <a class="q2-pager__btn" href={pageHref({ page: page + 1 })} rel="next">下一页 →</a>
+              ) : (
+                <span class="q2-pager__btn is-disabled" aria-disabled="true">下一页 →</span>
+              )}
+            </nav>
+          )}
         </section>
       )}
 
       {rows.length === 0 && (
         <div class="q2-empty">
-          <span class="lang-zh">没有符合筛选的提交。</span>
-          <span class="lang-en">No submissions match this filter.</span>
+          {q ? (
+            <>
+              <span class="lang-zh">没有匹配“{q}”的提交。<a href={clearSearchHref}>清除搜索</a></span>
+              <span class="lang-en">No submissions match “{q}”. <a href={clearSearchHref}>Clear search</a></span>
+            </>
+          ) : (
+            <>
+              <span class="lang-zh">没有符合筛选的提交。</span>
+              <span class="lang-en">No submissions match this filter.</span>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -280,6 +424,32 @@ Astro.response.headers.set("Cache-Control", "no-store");
           e.preventDefault();
           location.href = `/admin/${upNextId}`;
         }
+      });
+
+      // Browse rows are <div>s (real links/buttons nest inside) — clicking
+      // empty space navigates to the detail page; clicks on the title link or
+      // an action button are handled by those elements directly.
+      document.querySelectorAll(".q2-row--browse").forEach((row) => {
+        row.addEventListener("click", (e) => {
+          if (e.target.closest("a, button")) return;
+          const href = row.getAttribute("data-href");
+          if (href) location.href = href;
+        });
+      });
+
+      // Inline "copy link" buttons.
+      document.querySelectorAll("[data-copy]").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            await navigator.clipboard.writeText(btn.getAttribute("data-copy"));
+            const prev = btn.textContent;
+            btn.textContent = "✓";
+            btn.classList.add("is-copied");
+            setTimeout(() => { btn.textContent = prev; btn.classList.remove("is-copied"); }, 1200);
+          } catch {}
+        });
       });
     })();
   </script>
