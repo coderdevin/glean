@@ -4,6 +4,7 @@ import Site from "~/layouts/Site.astro";
 import { eq } from "drizzle-orm";
 import { db } from "~/db/client";
 import { submissions } from "~/db/schema";
+import { successView } from "~/lib/submissionStatus";
 
 const id = Astro.url.searchParams.get("id");
 if (!id || !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(id)) {
@@ -21,22 +22,10 @@ if (!row) return Astro.redirect("/submit", 303);
 
 Astro.response.headers.set("Cache-Control", "no-store");
 
-const stepIndex = (() => {
-  switch (row.status) {
-    case "pending":    return 1;
-    case "analyzing":  return 2;
-    case "composing":  return 2;
-    case "failed":     return 2; // AI hiccup — editor retries; keep polling
-    case "ready":      return 3;
-    case "published":  return 4;
-    case "rejected":   return -1;
-    default:           return 1;
-  }
-})();
-const isTerminal = row.status === "published" || row.status === "rejected";
-if (!isTerminal) {
-  Astro.response.headers.set("Refresh", "6");
-}
+// Initial view rendered server-side; the client polls /api/submit/status and
+// updates this in place (no full-page refresh) until the status is terminal.
+const view = successView(row);
+const { stepIndex, isTerminal, headline: headlineCopy, sub: subCopy } = view;
 const isDup = Astro.url.searchParams.get("dup") === "1";
 
 const rel = (d: Date) => {
@@ -47,16 +36,6 @@ const rel = (d: Date) => {
   return `${Math.floor(s / 86400)}d ago`;
 };
 
-const headlineCopy = (() => {
-  if (row.status === "published") return { zh: "已发布 · 看一眼", en: "Published — go read it" };
-  if (row.status === "rejected")  return { zh: "未通过 · 改天再战", en: "Didn't make it — try another" };
-  return { zh: "收到了，谢谢。", en: "Got it — thanks." };
-})();
-const subCopy = (() => {
-  if (row.status === "published") return { zh: "通过 · 已上日刊。", en: "Approved · live on today's daily." };
-  if (row.status === "rejected")  return { zh: row.rejectReason ?? "未通过 · 谢谢支持。", en: row.rejectReason ?? "Not selected — thanks for trying." };
-  return { zh: "已入队 · 编辑通常 1 小时内读一眼。", en: "In the queue · usually read within an hour." };
-})();
 ---
 <Site title="收到 · Queued — Glean" noindex>
   <div class="container" style="padding-top: 64px; padding-bottom: 96px">
@@ -71,32 +50,37 @@ const subCopy = (() => {
       </div>
     )}
 
-    <div class="success-card">
+    <noscript>
+      <p style="text-align: center; margin-bottom: 16px" class="t-body-sm text-muted">
+        <span class="lang-zh">开启 JavaScript 可自动刷新状态，或 <a href={`/submit/success?id=${row.id}`}>手动刷新</a>。</span>
+        <span class="lang-en">Enable JavaScript for live status, or <a href={`/submit/success?id=${row.id}`}>refresh</a>.</span>
+      </p>
+    </noscript>
+
+    <div class="success-card" data-submission-id={row.id} data-terminal={String(isTerminal)}>
       <div class="success-card__check" aria-hidden="true">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 12 l5 5 l9-11" />
         </svg>
       </div>
       <span class="eyebrow"><span class="lang-zh">投稿已入队</span><span class="lang-en">Queued</span></span>
-      <h1 style="font-family: var(--f-display); font-weight: 500; font-size: 40px; letter-spacing: -0.6px; margin: 12px 0 8px">
+      <h1 id="js-success-headline" style="font-family: var(--f-display); font-weight: 500; font-size: 40px; letter-spacing: -0.6px; margin: 12px 0 8px">
         <span class="lang-zh">{headlineCopy.zh}</span>
         <span class="lang-en">{headlineCopy.en}</span>
       </h1>
-      <p class="t-body-md text-body" style="max-width: 50ch; margin: 0 auto">
+      <p id="js-success-sub" class="t-body-md text-body" style="max-width: 50ch; margin: 0 auto">
         <span class="lang-zh">{subCopy.zh}</span>
         <span class="lang-en">{subCopy.en}</span>
       </p>
       <div class="success-card__id" aria-label="Queue ID">
         <span class="lang-zh">ID · </span><span class="lang-en">ID · </span>{row.id}
       </div>
-      {row.status === "published" && row.linkedPickId && (
-        <p style="margin-top: 24px">
-          <a href={`/daily`} class="btn btn-primary">
-            <span class="lang-zh">看今日日刊 →</span>
-            <span class="lang-en">See today’s daily →</span>
-          </a>
-        </p>
-      )}
+      <p id="js-success-cta" style="margin-top: 24px" hidden={!view.hasPick}>
+        <a href={`/daily`} class="btn btn-primary">
+          <span class="lang-zh">看今日日刊 →</span>
+          <span class="lang-en">See today’s daily →</span>
+        </a>
+      </p>
     </div>
 
     <div class="progress-steps" style="max-width: 760px; margin-left: auto; margin-right: auto">
@@ -114,7 +98,7 @@ const subCopy = (() => {
             : idx === stepIndex ? "is-current"
             : "";
         return (
-          <div class={`progress-steps__cell ${cls}`}>
+          <div class={`progress-steps__cell ${cls}`} data-step={idx}>
             <div class="n">{s.n}</div>
             <div class="name"><span class="lang-zh">{s.zh}</span><span class="lang-en">{s.en}</span></div>
             <div class="note"><span class="lang-zh">{s.note_zh}</span><span class="lang-en">{s.note_en}</span></div>
@@ -124,7 +108,7 @@ const subCopy = (() => {
     </div>
 
     {!isTerminal && (
-      <div style="max-width: 480px; margin: 48px auto 0">
+      <div id="js-success-track" style="max-width: 480px; margin: 48px auto 0">
         <div class="card card--canvas" style="padding: 24px">
           <span class="eyebrow"><span class="lang-zh">想知道结果？</span><span class="lang-en">Track it?</span></span>
           <h3 style="font-family: var(--f-display); font-size: 22px; margin: 8px 0 12px">
@@ -161,4 +145,74 @@ const subCopy = (() => {
       </a>
     </div>
   </div>
+
+  <script is:inline>
+    // Live status polling. Replaces the old full-page <meta refresh> so the
+    // "notify me" email field isn't wiped every few seconds. Updates the
+    // headline, sub-copy, progress strip, and pick CTA in place, then stops
+    // once the submission reaches a terminal state.
+    (function () {
+      const root = document.querySelector(".success-card[data-submission-id]");
+      if (!root || root.getAttribute("data-terminal") === "true") return;
+      const id = root.getAttribute("data-submission-id");
+      const headline = document.getElementById("js-success-headline");
+      const sub = document.getElementById("js-success-sub");
+      const cta = document.getElementById("js-success-cta");
+      const track = document.getElementById("js-success-track");
+      const cells = document.querySelectorAll(".progress-steps__cell");
+
+      const setCopy = (el, zh, en) => {
+        if (!el) return;
+        const z = el.querySelector(".lang-zh");
+        const e = el.querySelector(".lang-en");
+        if (z) z.textContent = zh;
+        if (e) e.textContent = en;
+      };
+
+      const apply = (v) => {
+        if (v.headline) setCopy(headline, v.headline.zh, v.headline.en);
+        if (v.sub) setCopy(sub, v.sub.zh, v.sub.en);
+        cells.forEach((c, i) => {
+          const idx = i + 1;
+          c.classList.remove("is-done", "is-current");
+          if (v.status === "rejected") {
+            if (idx === 1) c.classList.add("is-done");
+          } else if (idx < v.stepIndex) {
+            c.classList.add("is-done");
+          } else if (idx === v.stepIndex) {
+            c.classList.add("is-current");
+          }
+        });
+        if (cta) cta.hidden = !v.hasPick;
+        if (v.isTerminal) {
+          if (track) track.hidden = true;
+          root.setAttribute("data-terminal", "true");
+        }
+      };
+
+      let timer = null;
+      const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+      const poll = async () => {
+        try {
+          const res = await fetch("/api/submit/status?id=" + encodeURIComponent(id), {
+            headers: { accept: "application/json" },
+          });
+          if (!res.ok) return; // transient (404 race / 5xx) — keep polling
+          const v = await res.json();
+          apply(v);
+          if (v.isTerminal) stop();
+        } catch (_) { /* network blip — keep polling */ }
+      };
+
+      timer = setInterval(poll, 6000);
+      // Don't poll a hidden tab; resume (and fetch once) when it's visible again.
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) { stop(); return; }
+        if (!timer && root.getAttribute("data-terminal") !== "true") {
+          poll();
+          timer = setInterval(poll, 6000);
+        }
+      });
+    })();
+  </script>
 </Site>

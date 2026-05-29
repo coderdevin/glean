@@ -23,7 +23,7 @@ export const GET: APIRoute = async (ctx) => {
   }).where(eq(subscribers.email, email));
 
   return new Response(
-    `<!doctype html><html lang=zh-CN><meta charset=utf-8><title>已确认 · Confirmed</title><link rel=stylesheet href=/styles.css><body data-lang=zh><main class=container style="padding-top:96px"><h1>已确认订阅 · Subscribed</h1><p>下周一早上会收到第一封。</p><p><a href="/" class="btn btn-primary">回到首页 →</a></p></main>`,
+    `<!doctype html><html lang=zh-CN><meta charset=utf-8><title>已确认 · Confirmed</title><link rel=stylesheet href=/styles.css><body data-lang=zh><main class=container style="padding-top:96px"><h1>已确认订阅 · Subscribed</h1><p>开刊时第一时间通知你。</p><p><a href="/" class="btn btn-primary">回到首页 →</a></p></main>`,
     { headers: { "content-type": "text/html; charset=utf-8" } },
   );
 };
