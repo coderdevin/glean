@@ -1,0 +1,286 @@
+---
+export const prerender = false;
+import Admin from "~/layouts/Admin.astro";
+import StatusPill from "~/components/StatusPill.astro";
+import { db } from "~/db/client";
+import { submissions, type SubmissionStatus } from "~/db/schema";
+import { asc, desc, eq, inArray } from "drizzle-orm";
+import { formatTimeHM, siteTz } from "~/lib/datetime";
+
+const env = Astro.locals.runtime.env;
+const filterParam = Astro.url.searchParams.get("status");
+type FilterKey = "active" | "ready" | "pending" | "published" | "rejected" | "failed" | "all";
+const FILTERS: Record<FilterKey, ("pending"|"analyzing"|"composing"|"ready"|"published"|"rejected"|"failed")[]> = {
+  active:    ["pending", "analyzing", "composing", "ready"],
+  ready:     ["ready"],
+  pending:   ["pending", "analyzing", "composing"],
+  published: ["published"],
+  rejected:  ["rejected"],
+  failed:    ["failed"],
+  all:       ["pending", "analyzing", "composing", "ready", "published", "rejected", "failed"],
+};
+const filterKey: FilterKey = (() => {
+  if (!filterParam) return "active";
+  if (filterParam in FILTERS) return filterParam as FilterKey;
+  // Backwards compat: comma list passed in (old links).
+  const parts = filterParam.split(",").filter(Boolean) as SubmissionStatus[];
+  if (parts.length === 1 && parts[0] === "ready") return "ready";
+  if (parts.length === 1 && parts[0] === "published") return "published";
+  if (parts.length === 1 && parts[0] === "rejected") return "rejected";
+  if (parts.length === 1 && parts[0] === "failed") return "failed";
+  if (parts.length >= 2 && parts.includes("pending")) return "pending";
+  return "active";
+})();
+
+const drizzle = db(env.DB);
+const rows = await drizzle
+  .select()
+  .from(submissions)
+  .where(inArray(submissions.status, FILTERS[filterKey]))
+  .orderBy(desc(submissions.createdAt))
+  .limit(200);
+
+// Sort the "Ready" list oldest-first so the top one is also the oldest —
+// matches what `/publish` uses for "next" navigation.
+const readyOldestFirst = [...rows].filter((r) => r.status === "ready").sort((a, b) => {
+  const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  return at - bt;
+});
+const inFlight = rows.filter((r) => r.status === "pending" || r.status === "analyzing" || r.status === "composing");
+const published = rows.filter((r) => r.status === "published");
+const rejected = rows.filter((r) => r.status === "rejected");
+const failed = rows.filter((r) => r.status === "failed");
+
+const upNext = readyOldestFirst[0] ?? null;
+const restReady = readyOldestFirst.slice(1);
+
+const tz = siteTz(env);
+const hms = (d: Date | null) => formatTimeHM(d, tz);
+const minutesAgo = (d: Date | null) => d ? Math.floor((Date.now() - new Date(d).getTime()) / 60000) : 0;
+const host = (url: string) => { try { return new URL(url).host; } catch { return url; } };
+const parseTags = (json: string | null): string[] => { try { return JSON.parse(json ?? "[]"); } catch { return []; } };
+
+const totalActive = inFlight.length + readyOldestFirst.length;
+
+Astro.response.headers.set("Cache-Control", "no-store");
+---
+<Admin title={`审核队列 · ${rows.length}`}>
+  <main id="main" class="q2">
+    <div class="container">
+      <header class="q2-header">
+        <div class="row row--between" style="align-items: end; flex-wrap: wrap; gap: 12px">
+          <div>
+            <h1>Review queue</h1>
+            <p class="q2-header__sub">
+              {filterKey === "active" ? (
+                <>{readyOldestFirst.length} ready · {inFlight.length} in flight</>
+              ) : (
+                <>{rows.length} {filterKey} · newest first</>
+              )}
+            </p>
+          </div>
+          <nav class="q2-filters" aria-label="Filter">
+            <a href="/admin" class={filterKey === "active" ? "is-active" : ""}>Active</a>
+            <a href="/admin?status=ready" class={filterKey === "ready" ? "is-active" : ""}>Ready</a>
+            <a href="/admin?status=pending" class={filterKey === "pending" ? "is-active" : ""}>In flight</a>
+            <a href="/admin?status=published" class={filterKey === "published" ? "is-active" : ""}>Published</a>
+            <a href="/admin?status=rejected" class={filterKey === "rejected" ? "is-active" : ""}>Rejected</a>
+            <a href="/admin?status=failed" class={filterKey === "failed" ? "is-active" : ""}>Failed</a>
+            <a href="/admin?status=all" class={filterKey === "all" ? "is-active" : ""}>All</a>
+          </nav>
+        </div>
+      </header>
+
+      {(filterKey === "active" || filterKey === "ready") && (
+        <>
+          {upNext ? (
+            <a href={`/admin/${upNext.id}`} class="q2-hero" id="q2-upnext">
+              <div style="min-width: 0">
+                <div class="q2-hero__eyebrow">
+                  <span><strong>Up next</strong> · oldest ready</span>
+                  <span>Ready · {readyOldestFirst.length} total</span>
+                </div>
+                <h2 class="q2-hero__title">{upNext.aiTitleZh || upNext.aiTitleEn || upNext.url}</h2>
+                <div class="q2-hero__meta">
+                  <span>{host(upNext.url)}</span>
+                  {parseTags(upNext.aiTagsJson).slice(0, 3).map((t) => <span class="chip" style="cursor: inherit">{t}</span>)}
+                  {upNext.aiScore !== null && upNext.aiScore !== undefined && <span>· score {Number(upNext.aiScore).toFixed(2)}</span>}
+                  <span>· by {upNext.submitterName?.trim() || "Devin"}</span>
+                  <span>· {hms(upNext.createdAt)}</span>
+                </div>
+              </div>
+              <span class="q2-hero__cta">Review → <kbd>R</kbd></span>
+            </a>
+          ) : (
+            <div class="q2-hero q2-hero--empty">
+              <span class="lang-zh">没有 ready 的提交。</span>
+              <span class="lang-en">No ready submissions.</span>
+            </div>
+          )}
+        </>
+      )}
+
+      {restReady.length > 0 && (
+        <section class="q2-section">
+          <header class="q2-section__head">
+            <h2 class="q2-section__title">Ready</h2>
+            <span class="q2-section__count">{restReady.length} more</span>
+          </header>
+          <div class="q2-section__list">
+            {restReady.map((r) => (
+              <a href={`/admin/${r.id}`} class="q2-row">
+                <span class="q2-row__title">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
+                <span class="q2-row__meta">{host(r.url)}</span>
+                <span class="q2-row__score">{r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}</span>
+                <span class="q2-row__time">{hms(r.createdAt)}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {inFlight.length > 0 && (filterKey === "active" || filterKey === "pending") && (
+        <section class="q2-section">
+          <header class="q2-section__head">
+            <h2 class="q2-section__title">In flight</h2>
+            <span class="q2-section__count">{inFlight.length}</span>
+          </header>
+          <div class="q2-section__list">
+            {inFlight.map((r) => {
+              const stage: "extract" | "llm" = !r.rawR2Key ? "extract" : "llm";
+              const mins = minutesAgo(r.processingStartedAt ?? r.createdAt);
+              const stalled = stage === "extract" ? mins >= 2 : mins >= 12;
+              return (
+                <a href={`/admin/${r.id}`} class={`q2-row${stalled ? " q2-row--stalled" : ""}`}>
+                  <span class="q2-row__title">
+                    ⏳ {stage === "extract" ? "抓取中" : "AI 分析中"} · {host(r.url)}
+                  </span>
+                  <span class="q2-row__meta">
+                    {stalled && <span class="q2-row__stall-pill">卡了 {mins}min</span>}
+                  </span>
+                  <span class="q2-row__score">{mins || "<1"}min</span>
+                  <span class="q2-row__time">{hms(r.createdAt)}</span>
+                </a>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {filterKey === "active" && published.length > 0 && (
+        <details class="q2-collapse">
+          <summary>
+            Published <span class="q2-collapse__count">{published.length}</span>
+          </summary>
+          <div class="q2-section__list" style="margin-top: 12px">
+            {published.map((r) => (
+              <a href={`/admin/${r.id}`} class="q2-row">
+                <span class="q2-row__title" style="color: var(--c-muted)">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
+                <span class="q2-row__meta">{host(r.url)}</span>
+                <span class="q2-row__score">{r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}</span>
+                <span class="q2-row__time">{hms(r.createdAt)}</span>
+              </a>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {filterKey === "active" && rejected.length > 0 && (
+        <details class="q2-collapse">
+          <summary>
+            Rejected <span class="q2-collapse__count">{rejected.length}</span>
+          </summary>
+          <div class="q2-section__list" style="margin-top: 12px">
+            {rejected.map((r) => (
+              <a href={`/admin/${r.id}`} class="q2-row">
+                <span class="q2-row__title" style="color: var(--c-muted); text-decoration: line-through; text-decoration-color: var(--c-muted-soft)">
+                  {r.aiTitleZh || r.aiTitleEn || r.url}
+                </span>
+                <span class="q2-row__meta">{r.rejectReason ?? host(r.url)}</span>
+                <span class="q2-row__score">—</span>
+                <span class="q2-row__time">{hms(r.createdAt)}</span>
+              </a>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {filterKey === "active" && failed.length > 0 && (
+        <details class="q2-collapse">
+          <summary>
+            Failed <span class="q2-collapse__count">{failed.length}</span>
+          </summary>
+          <div class="q2-section__list" style="margin-top: 12px">
+            {failed.map((r) => (
+              <a href={`/admin/${r.id}`} class="q2-row">
+                <span class="q2-row__title" style="color: var(--c-muted)">
+                  {r.aiTitleZh || r.aiTitleEn || r.url}
+                </span>
+                <span class="q2-row__meta">{host(r.url)}</span>
+                <span class="q2-row__score">—</span>
+                <span class="q2-row__time">{hms(r.createdAt)}</span>
+              </a>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {/* When a specific status is filtered (not "active"), list flat. */}
+      {filterKey !== "active" && filterKey !== "ready" && rows.length > 0 && (
+        <section class="q2-section">
+          <header class="q2-section__head">
+            <h2 class="q2-section__title">{filterKey}</h2>
+            <span class="q2-section__count">{rows.length}</span>
+          </header>
+          <div class="q2-section__list">
+            {rows.map((r) => (
+              <a href={`/admin/${r.id}`} class="q2-row">
+                <span class="q2-row__title">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
+                <span class="q2-row__meta">
+                  <StatusPill status={r.status} />
+                  <span>{host(r.url)}</span>
+                </span>
+                <span class="q2-row__score">{r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}</span>
+                <span class="q2-row__time">{hms(r.createdAt)}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {rows.length === 0 && (
+        <div class="q2-empty">
+          <span class="lang-zh">没有符合筛选的提交。</span>
+          <span class="lang-en">No submissions match this filter.</span>
+        </div>
+      )}
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__bottom" style="margin-top: 0; border: 0; padding-top: 0">
+        <span class="t-body-sm" style="color: var(--c-on-dark-soft)">
+          admin · CF Access protected
+        </span>
+        <span class="t-code">{Astro.locals.adminEmail ?? "—"}</span>
+      </div>
+    </div>
+  </footer>
+
+  <script is:inline define:vars={{ upNextId: upNext?.id ?? null }}>
+    (() => {
+      // R key opens the up-next item.
+      document.addEventListener("keydown", (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        const a = document.activeElement;
+        if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable)) return;
+        if ((e.key === "r" || e.key === "R") && upNextId) {
+          e.preventDefault();
+          location.href = `/admin/${upNextId}`;
+        }
+      });
+    })();
+  </script>
+</Admin>

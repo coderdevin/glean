@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Edge · 标签 — Glean · 拾遗</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <!-- Top nav -->
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="index.html" class="brand">
+          <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+        </a>
+        <nav class="nav-links" id="primary-nav" aria-label="主导航">
+          <a class="nav-link" href="index.html">首页</a>
+          <a class="nav-link" href="weekly-list.html">周刊</a>
+          <a class="nav-link" href="daily.html">日刊</a>
+          <a class="nav-link" aria-current="page" href="tag-edge.html">标签</a>
+          <a class="nav-link" href="about.html">关于</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <div class="lang-toggle" role="tablist" aria-label="Language">
+            <button type="button" data-lang-set="zh" class="is-active" role="tab" aria-selected="true">中</button>
+            <button type="button" data-lang-set="en" role="tab" aria-selected="false">EN</button>
+          </div>
+          <a href="submit.html" class="nav-link nav-link--cta">
+            <span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span>
+          </a>
+        </div>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-banner">
+        <div class="container">
+          <span class="eyebrow"><span class="lang-zh">标签</span><span class="lang-en">Tag</span></span>
+          <div class="tag-hero">
+            <h1 class="tag-hero__name">Edge</h1>
+            <span class="tag-hero__count">88 picks · 12 issues</span>
+          </div>
+          <p style="max-width: 60ch; margin-top: 16px">
+            <span class="lang-zh">边缘计算 · CDN · 边缘数据库 · Workers / Fly / Deno 周边。</span>
+            <span class="lang-en">Edge compute · CDN · edge databases · Workers / Fly / Deno.</span>
+          </p>
+          <div class="tag-related">
+            <a href="#">Cloudflare · 34</a>
+            <a href="#">CDN · 18</a>
+            <a href="#">DurableObjects · 12</a>
+            <a href="#">Fly · 11</a>
+            <a href="#">Workers · 28</a>
+            <a href="#">Deno · 9</a>
+            <a href="#">Database · 76</a>
+            <a href="#">Distributed · 21</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section--tight" style="padding-top: 16px">
+        <div class="container">
+          <div class="section-head">
+            <div>
+              <span class="eyebrow"><span class="lang-zh">最近收录</span><span class="lang-en">Recent picks</span></span>
+              <h2 class="section-head__title" style="margin-top: 8px"><span class="lang-zh">88 条 · 按时间</span><span class="lang-en">88 picks · chronological</span></h2>
+            </div>
+          </div>
+
+          <div class="feed">
+            <article class="feed-row">
+              <div class="feed-row__time">05-25</div>
+              <div class="feed-row__main">
+                <h2 class="feed-row__title"><a href="article.html"><span class="lang-zh">Durable Objects 跨区域副本正式 GA</span><span class="lang-en">Durable Objects now ship cross-region replicas</span></a></h2>
+                <p class="feed-row__summary"><span class="lang-zh">DO 的强一致性扩展到多区域副本，写延迟保持在 100ms 内，读路径自动就近。</span><span class="lang-en">DO extends strong consistency to multi-region; sub-100ms writes, nearest-replica reads.</span></p>
+                <div class="feed-row__bar"><span class="feed-domain">blog.cloudflare.com</span><span>·</span><span>12 min</span><span>·</span><a class="feed-tag" href="#">Edge</a><a class="feed-tag" href="#">Database</a></div>
+              </div>
+              <div class="feed-row__aside">by linyi</div>
+            </article>
+
+            <article class="feed-row">
+              <div class="feed-row__time">05-20</div>
+              <div class="feed-row__main">
+                <h2 class="feed-row__title"><a href="article.html"><span class="lang-zh">Cloudflare Workers RPC：跨服务直接调函数</span><span class="lang-en">Cloudflare Workers RPC: cross-service function calls</span></a></h2>
+                <p class="feed-row__summary"><span class="lang-zh">Workers 之间不再需要 HTTP 包一层。Service Bindings 升级为 RPC。</span><span class="lang-en">Workers no longer need HTTP between them. Service Bindings upgrade to RPC.</span></p>
+                <div class="feed-row__bar"><span class="feed-domain">blog.cloudflare.com</span><span>·</span><span>10 min</span><span>·</span><a class="feed-tag" href="#">Edge</a><a class="feed-tag" href="#">RPC</a></div>
+              </div>
+              <div class="feed-row__aside">by chen</div>
+            </article>
+
+            <article class="feed-row">
+              <div class="feed-row__time">05-18</div>
+              <div class="feed-row__main">
+                <h2 class="feed-row__title"><a href="article.html"><span class="lang-zh">Fly Machines 现支持 GPU pinning</span><span class="lang-en">Fly Machines now support GPU pinning</span></a></h2>
+                <p class="feed-row__summary"><span class="lang-zh">Fly 把单 H100 划分成 7 个 sub-instance，按秒计费；冷启动 800ms。</span><span class="lang-en">Fly carves a single H100 into 7 sub-instances, billed per second, 800ms cold-start.</span></p>
+                <div class="feed-row__bar"><span class="feed-domain">fly.io/blog</span><span>·</span><span>11 min</span><span>·</span><a class="feed-tag" href="#">Edge</a><a class="feed-tag" href="#">GPU</a></div>
+              </div>
+              <div class="feed-row__aside">by chen</div>
+            </article>
+
+            <article class="feed-row">
+              <div class="feed-row__time">05-11</div>
+              <div class="feed-row__main">
+                <h2 class="feed-row__title"><a href="article.html"><span class="lang-zh">Workers Smart Placement 进 GA</span><span class="lang-en">Workers Smart Placement goes GA</span></a></h2>
+                <p class="feed-row__summary"><span class="lang-zh">让 Worker 自动跑在数据所在的 region，平均节省 50%+ 来回延迟。</span><span class="lang-en">Run a Worker where its data is — average 50%+ savings on round-trip latency.</span></p>
+                <div class="feed-row__bar"><span class="feed-domain">blog.cloudflare.com</span><span>·</span><span>7 min</span><span>·</span><a class="feed-tag" href="#">Edge</a></div>
+              </div>
+              <div class="feed-row__aside">by linyi</div>
+            </article>
+
+            <article class="feed-row">
+              <div class="feed-row__time">05-04</div>
+              <div class="feed-row__main">
+                <h2 class="feed-row__title"><a href="article.html"><span class="lang-zh">TursoDB 把 SQLite 推到边缘多副本</span><span class="lang-en">Turso pushes SQLite to multi-region replicas</span></a></h2>
+                <p class="feed-row__summary"><span class="lang-zh">libSQL 多 region 副本 + 读写分离。3 行配置在 30 个 region 部署一份只读副本。</span><span class="lang-en">libSQL multi-region replicas with read/write split. 3 lines of config to deploy a replica in 30 regions.</span></p>
+                <div class="feed-row__bar"><span class="feed-domain">turso.tech/blog</span><span>·</span><span>8 min</span><span>·</span><a class="feed-tag" href="#">Edge</a><a class="feed-tag" href="#">Database</a></div>
+              </div>
+              <div class="feed-row__aside">by linyi</div>
+            </article>
+          </div>
+
+          <div style="text-align: center; margin-top: 32px">
+            <button class="btn btn-secondary"><span class="lang-zh">加载更早的 83 条</span><span class="lang-en">Load older 83 picks</span></button>
+          </div>
+        </div>
+      </section>
+    </main>
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer__grid">
+          <div>
+            <div class="footer__brand">
+              <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+              <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+            </div>
+            <p class="t-body-sm footer__blurb">
+              <span class="lang-zh">双语技术日刊与周刊。从信息洪流里把值得读的拣回来；每条人审。</span>
+              <span class="lang-en">A bilingual tech daily &amp; weekly. I pick up the links worth reading. Every link human-reviewed.</span>
+            </p>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">阅读</span><span class="lang-en">Read</span></h2>
+            <ul>
+              <li><a href="weekly-list.html"><span class="lang-zh">所有周刊</span><span class="lang-en">All weeklies</span></a></li>
+              <li><a href="daily.html"><span class="lang-zh">今日日刊</span><span class="lang-en">Today</span></a></li>
+              <li><a href="tag-edge.html"><span class="lang-zh">所有标签</span><span class="lang-en">All tags</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 日刊</span><span class="lang-en">RSS · daily</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 周刊</span><span class="lang-en">RSS · weekly</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">参与</span><span class="lang-en">Contribute</span></h2>
+            <ul>
+              <li><a href="submit.html"><span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span></a></li>
+              <li><a href="#"><span class="lang-zh">CLI 工具</span><span class="lang-en">CLI tool</span></a></li>
+              <li><a href="standards.html"><span class="lang-zh">编辑标准</span><span class="lang-en">Editorial standards</span></a></li>
+              <li><a href="design-system.html"><span class="lang-zh">设计系统</span><span class="lang-en">Design system</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">关于</span><span class="lang-en">About</span></h2>
+            <ul>
+              <li><a href="about.html"><span class="lang-zh">关于</span><span class="lang-en">About</span></a></li>
+              <li><a href="#"><span class="lang-zh">技术栈</span><span class="lang-en">Stack</span></a></li>
+              <li><a href="#"><span class="lang-zh">联系</span><span class="lang-en">Contact</span></a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer__bottom">
+          <span><span class="lang-zh">© 2026 Glean · 拾遗 · 双语技术内容</span><span class="lang-en">© 2026 Glean · Bilingual tech curation</span></span>
+        </div>
+      </div>
+    </footer>
+    <script>
+      // Mobile nav toggle.
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        const close = () => {
+          links.classList.remove("is-open");
+          toggle.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          document.body.style.overflow = open ? "hidden" : "";
+        });
+        links.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+      })();
+
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-lang-set]");
+        if (!t) return;
+        const lang = t.getAttribute("data-lang-set");
+        document.body.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document.querySelectorAll("[data-lang-set]").forEach((b) => {
+          const active = b.getAttribute("data-lang-set") === lang;
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+      });
+    </script>
+  </body>
+</html>

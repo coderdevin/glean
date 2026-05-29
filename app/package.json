@@ -1,0 +1,44 @@
+{
+  "name": "glean-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "wrangler pages dev ./dist --d1 DB --kv CACHE --r2 RAW",
+    "deploy": "astro build && wrangler pages deploy ./dist",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply glean --local",
+    "db:migrate:remote": "wrangler d1 migrations apply glean --remote",
+    "db:studio": "drizzle-kit studio",
+    "seed:local": "wrangler d1 execute glean --local --file=./seed/initial.sql",
+    "seed:remote": "wrangler d1 execute glean --remote --file=./seed/initial.sql",
+    "typecheck": "astro check",
+    "worker:dev": "wrangler dev workers/ingest-consumer/src/index.ts -c workers/ingest-consumer/wrangler.toml --persist-to=.wrangler/state",
+    "worker:deploy": "wrangler deploy -c workers/ingest-consumer/wrangler.toml",
+    "llm:dev": "wrangler dev workers/llm-consumer/src/index.ts -c workers/llm-consumer/wrangler.toml --persist-to=.wrangler/state",
+    "llm:deploy": "wrangler deploy -c workers/llm-consumer/wrangler.toml"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^11.0.0",
+    "@astrojs/sitemap": "^3.2.0",
+    "@mozilla/readability": "^0.5.0",
+    "@types/markdown-it": "^14.1.2",
+    "astro": "^4.16.0",
+    "drizzle-orm": "^0.36.0",
+    "linkedom": "^0.18.5",
+    "markdown-it": "^14.2.0",
+    "ulid": "^2.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@cloudflare/workers-types": "^4.20251101.0",
+    "@types/node": "^22.0.0",
+    "drizzle-kit": "^0.28.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.94.0"
+  }
+}

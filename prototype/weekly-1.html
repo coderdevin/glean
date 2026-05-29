@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Issue 005 · Agent、Edge、和正在重写的浏览器 — Glean 拾遗</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <!-- Top nav -->
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="index.html" class="brand">
+          <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+        </a>
+        <nav class="nav-links" id="primary-nav" aria-label="主导航">
+          <a class="nav-link" href="index.html">首页</a>
+          <a class="nav-link" aria-current="page" href="weekly-list.html">周刊</a>
+          <a class="nav-link" href="daily.html">日刊</a>
+          <a class="nav-link" href="tag-edge.html">标签</a>
+          <a class="nav-link" href="about.html">关于</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <div class="lang-toggle" role="tablist" aria-label="Language">
+            <button type="button" data-lang-set="zh" class="is-active" role="tab" aria-selected="true">中</button>
+            <button type="button" data-lang-set="en" role="tab" aria-selected="false">EN</button>
+          </div>
+          <a href="submit.html" class="nav-link nav-link--cta">
+            <span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- =================================================================== -->
+    <!-- Issue masthead -->
+    <!-- =================================================================== -->
+    <section class="container" style="padding-top: 32px">
+      <a href="weekly-list.html" class="btn btn-text" style="margin-bottom: 16px; display: inline-block">
+        <span class="lang-zh">← 所有期号</span><span class="lang-en">← All issues</span>
+      </a>
+      <div class="issue-masthead" data-no="005">
+        <span class="issue-masthead__eyebrow">
+          <span>Issue · 005</span>
+          <span style="opacity: 0.5">/</span>
+          <span><span class="lang-zh">2026 第 21 周</span><span class="lang-en">Week 21, 2026</span></span>
+        </span>
+        <h1 class="issue-masthead__title">
+          <span class="lang-zh">Agent、Edge、和正在重写的浏览器</span>
+          <span class="lang-en">Agents, the edge, and a browser being rewritten</span>
+        </h1>
+        <p class="issue-masthead__lead">
+          <span class="lang-zh">本周双线：模型厂商把工作流打包成技能；基础设施把调函数做成默认。还有第三条暗线 — 浏览器层在被悄悄重写。</span>
+          <span class="lang-en">Two threads: vendors packaging workflows as skills; infra making function-calls the default. A quieter third — the browser layer is being rewritten.</span>
+        </p>
+        <div class="issue-masthead__meta">
+          <span class="badge"><span class="lang-zh">2026-05-18 → 2026-05-24</span><span class="lang-en">May 18 – May 24, 2026</span></span>
+          <span class="badge"><span class="lang-zh">8 篇</span><span class="lang-en">8 picks</span></span>
+          <span class="badge"><span class="lang-zh">约 24 分钟</span><span class="lang-en">~24 min</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- Editorial intro -->
+    <!-- =================================================================== -->
+    <section class="section--tight">
+      <div class="container">
+        <div class="editorial-intro prose">
+          <div class="lang-zh">
+            <div class="lang-label">编辑首语 / linyi &amp; mei</div>
+            <p><strong>这一周最大的反差是节奏。</strong>Anthropic 发了 Skills，几乎不带营销噪音；Cloudflare 把 RPC 加进 Workers 时也只是发了一篇博客和一个 changelog——但圈内的工程师群消息明显多起来。两件事的共通之处是，它们都在做"减法"：减少胶水代码，让你更直接地表达"我要做什么"。</p>
+            <p>另一边，<strong>Dan Abramov 写了一篇 RSC 一年回顾</strong>，给了过去一年困扰大家的一个边界问题更准的描述：边界其实是数据时效。读完会想去重审一遍自己手上的项目。</p>
+            <p>第三条暗线是基础设施层在被悄悄重写——CSS <code>@scope</code> 终于全可用，Bun 把 monorepo 装包压到秒级，SQLite 的 query planner 改了。我们用 5 个章节把这些线索捋顺。</p>
+          </div>
+          <div class="lang-en">
+            <div class="lang-label">Editor's note / linyi &amp; mei</div>
+            <p><strong>The most striking contrast this week was tempo.</strong> Anthropic shipped Skills with almost no marketing noise; Cloudflare added RPC to Workers in a single blog post — but engineering chats lit up. Both moves are <em>subtractive</em>: less glue, more direct expression of intent.</p>
+            <p>On a separate beat, <strong>Dan Abramov's RSC retrospective</strong> reframed the boundary that's been confusing people for a year: it isn't <code>client</code> vs <code>server</code> — it's data freshness. Worth re-auditing whatever you're building.</p>
+            <p>A third, quieter thread: the infra layer is being rewritten — CSS <code>@scope</code> ships everywhere, Bun pushes monorepo installs into the low seconds, SQLite quietly rewrites its query planner. We've grouped this week into five sections.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- Category TOC (sticky) -->
+    <!-- =================================================================== -->
+    <div class="cat-toc">
+      <div class="container">
+        <div class="cat-toc__inner">
+          <span class="cat-toc__label"><span class="lang-zh">本期目录</span><span class="lang-en">Sections</span></span>
+          <a class="cat-toc__chip" href="#sec-theme"><span class="lang-zh">本期主题</span><span class="lang-en">Theme</span><span class="cat-toc__chip-count">1</span></a>
+          <a class="cat-toc__chip" href="#sec-ai">AI · Agents <span class="cat-toc__chip-count">2</span></a>
+          <a class="cat-toc__chip" href="#sec-eng"><span class="lang-zh">工程 · 工具</span><span class="lang-en">Engineering</span><span class="cat-toc__chip-count">2</span></a>
+          <a class="cat-toc__chip" href="#sec-design"><span class="lang-zh">设计 · 产品</span><span class="lang-en">Design</span><span class="cat-toc__chip-count">1</span></a>
+          <a class="cat-toc__chip" href="#sec-os"><span class="lang-zh">开源 · 学习</span><span class="lang-en">Open source</span><span class="cat-toc__chip-count">2</span></a>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- Sections -->
+    <!-- =================================================================== -->
+    <main id="main" class="container">
+
+      <!-- 本期主题 -->
+      <section id="sec-theme" class="issue-section">
+        <div class="issue-section__head">
+          <div>
+            <div class="issue-section__eyebrow"><span class="lang-zh">章节 01 · 本期主题</span><span class="lang-en">Section 01 · Theme</span></div>
+            <h2 class="issue-section__title"><span class="lang-zh">把"工作流"做成"技能"</span><span class="lang-en">Workflows, packaged as skills</span></h2>
+          </div>
+          <span class="issue-section__count">1 / 8</span>
+        </div>
+
+        <div class="pick-list">
+          <article class="pick-item">
+            <span class="pick-item__index">01</span>
+            <div class="pick-item__main">
+              <div class="pick-item__meta">
+                <span>anthropic.com</span>
+                <span>·</span>
+                <span>14 min</span>
+                <span>·</span>
+                <span>en</span>
+              </div>
+              <h3 class="pick-item__title">
+                <a href="article.html">
+                  <span class="lang-zh">Anthropic Skills：把"工作流"变成"技能"<span class="alt">Anthropic Skills: turning workflows into skills</span></span>
+                  <span class="lang-en">Anthropic Skills: turning workflows into skills<span class="alt">Anthropic Skills · 把"工作流"变成"技能"</span></span>
+                </a>
+              </h3>
+              <p class="pick-item__note">
+                <span class="lang-zh">Anthropic 推出 <em>Skills</em>——把多步骤工作流封装成可分发、可触发的"技能"的机制。每个 Skill 是一个 SKILL.md 加可选脚本，按描述自动触发。一次解决了"提示词管不住"和"流程没法版本化"两件事。</span>
+                <span class="lang-en">Anthropic introduces <em>Skills</em> — a way to package multi-step workflows as distributable, triggerable skills. Each Skill is a SKILL.md plus optional scripts, auto-triggered by its description. Solves prompt drift and unversioned workflows in one move.</span>
+              </p>
+              <div class="pick-item__editor">
+                <span class="pick-item__editor-label">Editor</span>
+                <span class="pick-item__editor-text">
+                  <span class="lang-zh">本期最值得读的一篇。如果你在维护一个被 prompt 拖垮的 agent，这篇就是出路。</span>
+                  <span class="lang-en">The one to read this week. If you maintain a painful prompt-heavy agent, this is the answer shape.</span>
+                </span>
+              </div>
+              <div class="pick-item__footer">
+                <div class="pick-item__tags">
+                  <a class="pick-item__tag" href="#">AI</a>
+                  <a class="pick-item__tag" href="#">Agents</a>
+                  <a class="pick-item__tag" href="#">Anthropic</a>
+                </div>
+                <span class="pick-item__submitter">submitted by linyi · 2026-05-19</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- AI · Agents -->
+      <section id="sec-ai" class="issue-section">
+        <div class="issue-section__head">
+          <div>
+            <div class="issue-section__eyebrow"><span class="lang-zh">章节 02 · AI · Agents</span><span class="lang-en">Section 02 · AI &amp; Agents</span></div>
+            <h2 class="issue-section__title"><span class="lang-zh">智能体在变得更小、更专</span><span class="lang-en">Agents are getting smaller and sharper</span></h2>
+          </div>
+          <span class="issue-section__count">2 / 8</span>
+        </div>
+
+        <div class="pick-list">
+          <article class="pick-item">
+            <span class="pick-item__index">02</span>
+            <div class="pick-item__main">
+              <div class="pick-item__meta">
+                <span>github.com / NirDiamant</span>
+                <span>·</span>
+                <span>open source</span>
+              </div>
+              <h3 class="pick-item__title">
+                <a href="article.html">
+                  <span class="lang-zh">agents-towards-production：从 0 到 1 的智能体技术栈教程<span class="alt">A full-stack tutorial for shipping GenAI agents to production</span></span>
+                  <span class="lang-en">agents-towards-production: full-stack tutorial for shipping GenAI agents<span class="alt">从 0 到 1 的智能体技术栈教程</span></span>
+                </a>
+              </h3>
+              <p class="pick-item__note">
+                <span class="lang-zh">把 RAG / 多智能体 / 记忆系统 / 生产部署 串成一条可跑通的链路，配 30+ 个 notebook 直接复制粘贴。一周一个章节，跑完上线一个项目级别 demo。</span>
+                <span class="lang-en">Stitches RAG, multi-agent, memory systems and production deployment into a single runnable spine — 30+ notebooks you can paste in. One chapter a week and you ship a project-grade demo.</span>
+              </p>
+              <div class="pick-item__editor">
+                <span class="pick-item__editor-label">Editor</span>
+                <span class="pick-item__editor-text">
+                  <span class="lang-zh">开源项目里少见的"工程级深度"，不是 toy example，建议加星。</span>
+                  <span class="lang-en">Rare engineering depth in OSS — not a toy. Star-worthy.</span>
+                </span>
+              </div>
+              <div class="pick-item__footer">
+                <div class="pick-item__tags">
+                  <a class="pick-item__tag" href="#">RAG</a>
+                  <a class="pick-item__tag" href="#">Multi-agent</a>
+                  <a class="pick-item__tag" href="#">Production</a>
+                </div>
+                <span class="pick-item__submitter">submitted by chen · 2026-05-20</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="pick-item">
+            <span class="pick-item__index">03</span>
+            <div class="pick-item__main">
+              <div class="pick-item__meta">
+                <span>simonwillison.net</span>
+                <span>·</span>
+                <span>8 min</span>
+              </div>
+              <h3 class="pick-item__title">
+                <a href="article.html">
+                  <span class="lang-zh">小模型 Agent 的真正用武之地<span class="alt">Where small-model agents actually shine</span></span>
+                  <span class="lang-en">Where small-model agents actually shine<span class="alt">小模型 Agent 的真正用武之地</span></span>
+                </a>
+              </h3>
+              <p class="pick-item__note">
+                <span class="lang-zh">Simon 给"什么时候用 7B 模型替代 GPT-4"画了张决策树：可枚举的 schema、可缓存的提示、可重试的工具调用——这三件全占就该换小。</span>
+                <span class="lang-en">Simon's decision tree for swapping a 7B model in for GPT-4: enumerable schemas, cacheable prompts, retryable tool calls — hit all three and you should downsize.</span>
+              </p>
+              <div class="pick-item__editor">
+                <span class="pick-item__editor-label">Editor</span>
+                <span class="pick-item__editor-text">
+                  <span class="lang-zh">省钱省延迟的诚实建议。</span>
+                  <span class="lang-en">Honest advice on cost and latency.</span>
+                </span>
+              </div>
+              <div class="pick-item__footer">
+                <div class="pick-item__tags">
+                  <a class="pick-item__tag" href="#">SLM</a>
+                  <a class="pick-item__tag" href="#">Inference</a>
+                </div>
+                <span class="pick-item__submitter">submitted by mei · 2026-05-21</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 工程 · 工具 -->
+      <section id="sec-eng" class="issue-section">
+        <div class="issue-section__head">
+          <div>
+            <div class="issue-section__eyebrow"><span class="lang-zh">章节 03 · 工程 · 工具</span><span class="lang-en">Section 03 · Engineering &amp; tooling</span></div>
+            <h2 class="issue-section__title"><span class="lang-zh">把"调函数"做成基础原语</span><span class="lang-en">Function-calls as the new primitive</span></h2>
+          </div>
+          <span class="issue-section__count">2 / 8</span>
+        </div>
+
+        <div class="pick-list">
+          <article class="pick-item">
+            <span class="pick-item__index">04</span>
+            <div class="pick-item__main">
+              <div class="pick-item__meta">
+                <span>blog.cloudflare.com</span>
+                <span>·</span>
+                <span>10 min</span>
+              </div>
+              <h3 class="pick-item__title">
+                <a href="article.html">
+                  <span class="lang-zh">Cloudflare Workers RPC：跨服务直接调函数<span class="alt">Cloudflare Workers RPC: cross-service function calls</span></span>
+                  <span class="lang-en">Cloudflare Workers RPC: cross-service function calls<span class="alt">Cloudflare Workers RPC · 跨服务直接调函数</span></span>
+                </a>
+              </h3>
+              <p class="pick-item__note">
+                <span class="lang-zh">Workers 之间不再需要 HTTP 包一层。Service Bindings 升级为 RPC：对端导出 class，本端 await 调用，序列化由运行时托管，可传 ReadableStream / Date / Map / Set。</span>
+                <span class="lang-en">Workers no longer need HTTP between them. Service Bindings upgrade to RPC: the target exports a class, the caller awaits methods, the runtime handles serialization including ReadableStream / Date / Map / Set.</span>
+              </p>
+              <div class="pick-item__editor">
+                <span class="pick-item__editor-label">Editor</span>
+                <span class="pick-item__editor-text">
+                  <span class="lang-zh">微服务之间手写 fetch 路由的时代要结束了。</span>
+                  <span class="lang-en">The era of hand-routing fetch between microservices is ending.</span>
+                </span>
+              </div>
+              <div class="pick-item__footer">
+                <div class="pick-item__tags">
+                  <a class="pick-item__tag" href="#">Edge</a>
+                  <a class="pick-item__tag" href="#">Cloudflare</a>
+                  <a class="pick-item__tag" href="#">RPC</a>
+                </div>
+                <span class="pick-item__submitter">submitted by chen · 2026-05-20</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="pick-item">
+            <span class="pick-item__index">05</span>
+            <div class="pick-item__main">
+              <div class="pick-item__meta">
+                <span>bun.sh</span>
+                <span>·</span>
+                <span>7 min</span>
+              </div>
+              <h3 class="pick-item__title">
+                <a href="article.html">
+                  <span class="lang-zh">Bun 1.5：monorepo 安装压到秒级，lockfile 改文本<span class="alt">Bun 1.5: monorepo installs in low seconds, text lockfile</span></span>
+                  <span class="lang-en">Bun 1.5: monorepo installs in low seconds, text lockfile<span class="alt">Bun 1.5 · monorepo 安装压到秒级</span></span>
+                </a>
+              </h3>
+              <p class="pick-item__note">
+                <span class="lang-zh">新增依赖图缓存 + 并行 tar 解包，50 包 monorepo 比 pnpm 快 3-4 倍。<em>bun.lockb 改成文本</em>，PR review 不再地狱。</span>
+                <span class="lang-en">A new dep-graph cache plus parallel tar extraction makes a 50-package monorepo 3-4× faster than pnpm. <em>bun.lockb is now text-format</em>, no more PR-review hell.</span>
+              </p>
+              <div class="pick-item__editor">
+                <span class="pick-item__editor-label">Editor</span>
+                <span class="pick-item__editor-text">
+                  <span class="lang-zh">之前因为 lockfile 没换的可以试一次了。</span>
+                  <span class="lang-en">If you held off because of the lockfile, this is your moment.</span>
+                </span>
+              </div>
+              <div class="pick-item__footer">
+                <div class="pick-item__tags">
+                  <a class="pick-item__tag" href="#">JavaScript</a>
+                  <a class="pick-item__tag" href="#">Tooling</a>
+                </div>
+                <span class="pick-item__submitter">submitted by ren · 2026-05-22</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 设计 · 产品 -->
+      <section id="sec-design" class="issue-section">
+        <div class="issue-section__head">
+          <div>
+            <div class="issue-section__eyebrow"><span class="lang-zh">章节 04 · 设计 · 产品</span><span class="lang-en">Section 04 · Design &amp; product</span></div>
+            <h2 class="issue-section__title"><span class="lang-zh">设计稿正在自我编译</span><span class="lang-en">Designs are starting to self-compile</span></h2>
+          </div>
+          <span class="issue-section__count">1 / 8</span>
+        </div>
+
+        <div class="pick-list">
+          <article class="pick-item">
+            <span class="pick-item__index">06</span>
+            <div class="pick-item__main">
+              <div class="pick-item__meta">
+                <span>figma.com/blog</span>
+                <span>·</span>
+                <span>8 min</span>
+              </div>
+              <h3 class="pick-item__title">
+                <a href="article.html">
+                  <span class="lang-zh">Figma Make：设计稿一键生成可运行代码<span class="alt">Figma Make: design comps to runnable code, one click</span></span>
+                  <span class="lang-en">Figma Make: design comps to runnable code, one click<span class="alt">Figma Make · 设计稿一键生成可运行代码</span></span>
+                </a>
+              </h3>
+              <p class="pick-item__note">
+                <span class="lang-zh">Figma 把内部用 18 个月的 Code Connect 产品化为 Make。给一个 frame，输出 React / Vue / Svelte 组件，且映射到现有 design system 的真实 import 路径。</span>
+                <span class="lang-en">Figma productizes Code Connect after 18 months internally. Give it a frame, get React / Vue / Svelte components mapped to your real design-system import paths.</span>
+              </p>
+              <div class="pick-item__editor">
+                <span class="pick-item__editor-label">Editor</span>
+                <span class="pick-item__editor-text">
+                  <span class="lang-zh">先观望。我们小试还是要改 30%，但方向清晰。</span>
+                  <span class="lang-en">Watch, don't adopt yet — needs ~30% rework. Direction is clear though.</span>
+                </span>
+              </div>
+              <div class="pick-item__footer">
+                <div class="pick-item__tags">
+                  <a class="pick-item__tag" href="#">Design</a>
+                  <a class="pick-item__tag" href="#">Codegen</a>
+                </div>
+                <span class="pick-item__submitter">submitted by anon · 2026-05-23</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- 开源 · 学习 -->
+      <section id="sec-os" class="issue-section">
+        <div class="issue-section__head">
+          <div>
+            <div class="issue-section__eyebrow"><span class="lang-zh">章节 05 · 开源 · 学习</span><span class="lang-en">Section 05 · Open source &amp; learning</span></div>
+            <h2 class="issue-section__title"><span class="lang-zh">基础设施层在悄悄重写</span><span class="lang-en">The infra layer is being quietly rewritten</span></h2>
+          </div>
+          <span class="issue-section__count">2 / 8</span>
+        </div>
+
+        <div class="pick-list">
+          <article class="pick-item">
+            <span class="pick-item__index">07</span>
+            <div class="pick-item__main">
+              <div class="pick-item__meta">
+                <span>overreacted.io</span>
+                <span>·</span>
+                <span>9 min</span>
+                <span>·</span>
+                <span>Dan Abramov</span>
+              </div>
+              <h3 class="pick-item__title">
+                <a href="article.html">
+                  <span class="lang-zh">RSC 一年回顾：边界不在 client/server<span class="alt">A year of RSC: the boundary isn't client/server</span></span>
+                  <span class="lang-en">A year of RSC: the boundary isn't client/server<span class="alt">RSC 一年回顾 · 边界不在 client/server</span></span>
+                </a>
+              </h3>
+              <p class="pick-item__note">
+                <span class="lang-zh">Dan 复盘一年实战，给了一个更准的描述：边界其实是数据时效。"server" 不是机器，是知道当前数据的那段代码；"client" 是为了交互而临时拿数据快照的地方。</span>
+                <span class="lang-en">Dan reflects on a year in production. The reframing: "server" isn't a machine, it's wherever code knows current data; "client" is wherever you hold a temporary snapshot for interaction.</span>
+              </p>
+              <div class="pick-item__editor">
+                <span class="pick-item__editor-label">Editor</span>
+                <span class="pick-item__editor-text">
+                  <span class="lang-zh">本期深度最佳。读完会想重审自己的项目结构。</span>
+                  <span class="lang-en">Deepest read this week — you'll want to re-audit a project after.</span>
+                </span>
+              </div>
+              <div class="pick-item__footer">
+                <div class="pick-item__tags">
+                  <a class="pick-item__tag" href="#">React</a>
+                  <a class="pick-item__tag" href="#">Architecture</a>
+                </div>
+                <span class="pick-item__submitter">submitted by mei · 2026-05-21</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="pick-item">
+            <span class="pick-item__index">08</span>
+            <div class="pick-item__main">
+              <div class="pick-item__meta">
+                <span>sqlite.org</span>
+                <span>·</span>
+                <span>6 min</span>
+              </div>
+              <h3 class="pick-item__title">
+                <a href="article.html">
+                  <span class="lang-zh">SQLite NGQP+：复杂连接快 4 倍<span class="alt">SQLite NGQP+: 4× on complex joins</span></span>
+                  <span class="lang-en">SQLite NGQP+: 4× on complex joins<span class="alt">SQLite NGQP+ · 复杂连接快 4 倍</span></span>
+                </a>
+              </h3>
+              <p class="pick-item__note">
+                <span class="lang-zh">SQLite 第三次 query planner 大改。重点是 7 表以上查询、嵌套 LEFT JOIN 和 ATTACH 数据库的成本估算；Notion 风格嵌套查询提升最显著。</span>
+                <span class="lang-en">SQLite's third major query-planner rewrite. Focus areas: 7+ table queries, nested LEFT JOINs, ATTACH cost model. Notion-style nested queries see the largest gains.</span>
+              </p>
+              <div class="pick-item__editor">
+                <span class="pick-item__editor-label">Editor</span>
+                <span class="pick-item__editor-text">
+                  <span class="lang-zh">用 Cloudflare D1 的同学下次升级自动吃到。</span>
+                  <span class="lang-en">D1 users on Cloudflare get this on their next runtime bump.</span>
+                </span>
+              </div>
+              <div class="pick-item__footer">
+                <div class="pick-item__tags">
+                  <a class="pick-item__tag" href="#">Database</a>
+                  <a class="pick-item__tag" href="#">SQLite</a>
+                  <a class="pick-item__tag" href="#">Performance</a>
+                </div>
+                <span class="pick-item__submitter">submitted by linyi · 2026-05-24</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Prev/Next -->
+      <nav class="prev-next">
+        <a href="#" class="prev">
+          <span class="pn-label"><span class="lang-zh">上一期 · 2026-05-11</span><span class="lang-en">Previous · May 11</span></span>
+          <span class="pn-title">← Issue 004 · <span class="lang-zh">工具的小阳春</span><span class="lang-en">The tool renaissance</span></span>
+        </a>
+        <a href="#" class="next">
+          <span class="pn-label"><span class="lang-zh">下一期 · 周一</span><span class="lang-en">Next issue · Monday</span></span>
+          <span class="pn-title">Issue 006 →</span>
+        </a>
+      </nav>
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- CTA -->
+    <!-- =================================================================== -->
+    <section class="section--tight" style="padding-top: 64px">
+      <div class="container">
+        <div class="cta-band cta-band--dark">
+          <span class="t-caption-up" style="color: var(--c-accent-amber)">
+            <span class="lang-zh">下一期</span><span class="lang-en">Next issue</span>
+          </span>
+          <h2 class="t-display-md" style="color: var(--c-on-dark); margin: 0">
+            <span class="lang-zh">Issue 006 · 周一发布</span><span class="lang-en">Issue 006 · ships Monday</span>
+          </h2>
+          <p class="t-body-md" style="max-width: 60ch; color: var(--c-on-dark-soft); margin: 0">
+            <span class="lang-zh">看到好东西？现在投，周一被读到。</span>
+            <span class="lang-en">Saw something good? Submit now, read by Monday.</span>
+          </p>
+          <a href="submit.html" class="btn btn-on-dark"><span class="lang-zh">提交链接 →</span><span class="lang-en">Submit a link →</span></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer__grid">
+          <div>
+            <div class="footer__brand">
+              <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+              <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+            </div>
+            <p class="t-body-sm footer__blurb">
+              <span class="lang-zh">双语技术日刊与周刊。从信息洪流里把值得读的拣回来；每条人审。</span>
+              <span class="lang-en">A bilingual tech daily &amp; weekly. I pick up the links worth reading. Every link human-reviewed.</span>
+            </p>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">阅读</span><span class="lang-en">Read</span></h2>
+            <ul>
+              <li><a href="weekly-list.html"><span class="lang-zh">所有周刊</span><span class="lang-en">All weeklies</span></a></li>
+              <li><a href="daily.html"><span class="lang-zh">今日日刊</span><span class="lang-en">Today</span></a></li>
+              <li><a href="tag-edge.html"><span class="lang-zh">所有标签</span><span class="lang-en">All tags</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 日刊</span><span class="lang-en">RSS · daily</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 周刊</span><span class="lang-en">RSS · weekly</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">参与</span><span class="lang-en">Contribute</span></h2>
+            <ul>
+              <li><a href="submit.html"><span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span></a></li>
+              <li><a href="#"><span class="lang-zh">CLI 工具</span><span class="lang-en">CLI tool</span></a></li>
+              <li><a href="standards.html"><span class="lang-zh">编辑标准</span><span class="lang-en">Editorial standards</span></a></li>
+              <li><a href="design-system.html"><span class="lang-zh">设计系统</span><span class="lang-en">Design system</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">关于</span><span class="lang-en">About</span></h2>
+            <ul>
+              <li><a href="about.html"><span class="lang-zh">关于</span><span class="lang-en">About</span></a></li>
+              <li><a href="#"><span class="lang-zh">技术栈</span><span class="lang-en">Stack</span></a></li>
+              <li><a href="#"><span class="lang-zh">联系</span><span class="lang-en">Contact</span></a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer__bottom">
+          <span><span class="lang-zh">© 2026 Glean · 拾遗 · 双语技术内容</span><span class="lang-en">© 2026 Glean · Bilingual tech curation</span></span>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Mobile nav toggle.
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        const close = () => {
+          links.classList.remove("is-open");
+          toggle.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          document.body.style.overflow = open ? "hidden" : "";
+        });
+        // Close on link click
+        links.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+        // Close on Escape
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") close();
+        });
+      })();
+
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-lang-set]");
+        if (!t) return;
+        const lang = t.getAttribute("data-lang-set");
+        document.body.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document.querySelectorAll("[data-lang-set]").forEach((b) => {
+          const active = b.getAttribute("data-lang-set") === lang;
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+      });
+    </script>
+  </body>
+</html>

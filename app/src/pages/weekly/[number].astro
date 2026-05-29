@@ -1,0 +1,175 @@
+---
+export const prerender = false;
+import Site from "~/layouts/Site.astro";
+import { db } from "~/db/client";
+import { picksForWeekly, weeklyByNumber } from "~/lib/queries";
+
+const numberStr = Astro.params.number;
+const number = numberStr ? Number(numberStr) : NaN;
+if (!Number.isInteger(number) || number <= 0) {
+  return new Response("Not found", { status: 404 });
+}
+
+const env = Astro.locals.runtime.env;
+const drizzleDb = db(env.DB);
+const issue = await weeklyByNumber(drizzleDb, number);
+if (!issue) return new Response("Not found", { status: 404 });
+
+const picks = await picksForWeekly(drizzleDb, issue.id);
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, max-age=60, s-maxage=86400, stale-while-revalidate=86400",
+);
+
+const sectionsByCat = new Map<string, typeof picks>();
+for (const p of picks) {
+  const cat = p.category;
+  if (!sectionsByCat.has(cat)) sectionsByCat.set(cat, []);
+  sectionsByCat.get(cat)!.push(p);
+}
+const catLabel = {
+  infra: { zh: "基础设施 · Infra", en: "Infrastructure" },
+  data:  { zh: "数据 · Data",     en: "Data"  },
+  code:  { zh: "代码 · Code",     en: "Code"  },
+} as const;
+const readMinutes = picks.reduce((a, p) => a + p.read_minutes, 0);
+
+const weekNum = (() => {
+  if (!issue.dateStart) return null;
+  const d = new Date(issue.dateStart + "T00:00:00Z");
+  const oneJan = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - oneJan.getTime()) / 86400000 + oneJan.getUTCDay() + 1) / 7);
+})();
+const sections = Array.from(sectionsByCat.entries());
+let globalIdx = 0;
+---
+<Site
+  title={`#${String(issue.number).padStart(3, "0")} — ${issue.titleEn} · Glean · 拾遗`}
+  description={issue.introEn}
+>
+  <section class="container" style="padding-top: 32px">
+    <a href="/weekly" class="btn btn-text" style="margin-bottom: 16px; display: inline-block">
+      <span class="lang-zh">← 所有期号</span><span class="lang-en">← All issues</span>
+    </a>
+    <div class="issue-masthead" data-no={String(issue.number).padStart(3, "0")}>
+      <span class="issue-masthead__eyebrow">
+        <span>Issue · {String(issue.number).padStart(3, "0")}</span>
+        {weekNum && (
+          <>
+            <span style="opacity: 0.5">/</span>
+            <span>
+              <span class="lang-zh">{issue.dateStart.slice(0,4)} 第 {weekNum} 周</span>
+              <span class="lang-en">Week {weekNum}, {issue.dateStart.slice(0,4)}</span>
+            </span>
+          </>
+        )}
+      </span>
+      <h1 class="issue-masthead__title">
+        <span class="lang-zh">{issue.titleZh}</span>
+        <span class="lang-en">{issue.titleEn}</span>
+      </h1>
+      <p class="issue-masthead__lead">
+        <span class="lang-zh">{issue.introZh}</span>
+        <span class="lang-en">{issue.introEn}</span>
+      </p>
+      <div class="issue-masthead__meta">
+        <span class="badge"><span class="lang-zh">{issue.dateStart} → {issue.dateEnd}</span><span class="lang-en">{issue.dateStart} – {issue.dateEnd}</span></span>
+        <span class="badge"><span class="lang-zh">{picks.length} 篇</span><span class="lang-en">{picks.length} picks</span></span>
+        {readMinutes > 0 && (
+          <span class="badge"><span class="lang-zh">约 {readMinutes} 分钟</span><span class="lang-en">~{readMinutes} min</span></span>
+        )}
+      </div>
+    </div>
+  </section>
+
+  {sections.length > 0 && (
+    <div class="cat-toc">
+      <div class="container">
+        <div class="cat-toc__inner">
+          <span class="cat-toc__label"><span class="lang-zh">本期目录</span><span class="lang-en">Sections</span></span>
+          {sections.map(([cat, list]) => (
+            <a class="cat-toc__chip" href={`#sec-${cat}`}>
+              <span class="lang-zh">{catLabel[cat as keyof typeof catLabel].zh}</span>
+              <span class="lang-en">{catLabel[cat as keyof typeof catLabel].en}</span>
+              <span class="cat-toc__chip-count">{list.length}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+
+  <main class="container">
+    {sections.map(([cat, list], catIdx) => (
+      <section id={`sec-${cat}`} class="issue-section">
+        <div class="issue-section__head">
+          <div>
+            <div class="issue-section__eyebrow">
+              <span class="lang-zh">章节 {String(catIdx + 1).padStart(2, "0")} · {catLabel[cat as keyof typeof catLabel].zh}</span>
+              <span class="lang-en">Section {String(catIdx + 1).padStart(2, "0")} · {catLabel[cat as keyof typeof catLabel].en}</span>
+            </div>
+            <h2 class="issue-section__title">
+              <span class="lang-zh">{catLabel[cat as keyof typeof catLabel].zh}</span>
+              <span class="lang-en">{catLabel[cat as keyof typeof catLabel].en}</span>
+            </h2>
+          </div>
+          <span class="issue-section__count">{list.length} / {picks.length}</span>
+        </div>
+
+        <div class="pick-list">
+          {list.map((pick) => {
+            globalIdx += 1;
+            const idx = String(globalIdx).padStart(2, "0");
+            return (
+              <article class="pick-item">
+                <span class="pick-item__index">{idx}</span>
+                <div class="pick-item__main">
+                  <div class="pick-item__meta">
+                    <span>{pick.source_host}</span>
+                    <span>·</span>
+                    <span>{pick.read_minutes} min</span>
+                  </div>
+                  <h3 class="pick-item__title">
+                    <a href={`/a/${pick.slug}`}>
+                      <span class="lang-zh">{pick.title_zh}<span class="alt">{pick.title_en}</span></span>
+                      <span class="lang-en">{pick.title_en}<span class="alt">{pick.title_zh}</span></span>
+                    </a>
+                  </h3>
+                  <p class="pick-item__note">
+                    <span class="lang-zh">{pick.summary_zh}</span>
+                    <span class="lang-en">{pick.summary_en}</span>
+                  </p>
+                  {(pick.editor_note_zh || pick.editor_note_en) && (
+                    <div class="pick-item__editor">
+                      <span class="pick-item__editor-label">Editor</span>
+                      <span class="pick-item__editor-text">
+                        <span class="lang-zh">{pick.editor_note_zh}</span>
+                        <span class="lang-en">{pick.editor_note_en}</span>
+                      </span>
+                    </div>
+                  )}
+                  <div class="pick-item__footer">
+                    <div class="pick-item__tags">
+                      {pick.tags.map((t) => (
+                        <a class="pick-item__tag" href={`/tag/${t.slug}`}>{t.name_en}</a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    ))}
+
+    {picks.length === 0 && (
+      <div class="prose-block" style="text-align: center; padding: 48px 0">
+        <p>
+          <span class="lang-zh">这期周刊尚未编入内容。</span>
+          <span class="lang-en">This issue has no picks yet.</span>
+        </p>
+      </div>
+    )}
+  </main>
+</Site>

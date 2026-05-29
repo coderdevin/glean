@@ -1,0 +1,67 @@
+---
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+const adminEmail = Astro.locals.adminEmail ?? "—";
+---
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>{title} — Glean admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="/styles.css?v=admin2-6" />
+    <slot name="head" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="/" class="brand">
+          <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span>Glean <span class="t-code text-muted-soft" style="font-size: 11px; margin-left: 6px">/ admin</span></span>
+        </a>
+        <nav class="nav-links" id="primary-nav" aria-label="管理员导航">
+          <a class="nav-link" href="/admin">队列</a>
+          <a class="nav-link" href="/admin?status=published">已通过</a>
+          <a class="nav-link" href="/weekly">周刊</a>
+          <a class="nav-link" href="/tag">标签</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <span class="t-body-sm text-muted">{adminEmail}</span>
+          <a href="/" class="btn btn-secondary">回到站点</a>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <script is:inline>
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+        });
+      })();
+    </script>
+  </body>
+</html>

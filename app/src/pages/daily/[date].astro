@@ -1,0 +1,173 @@
+---
+export const prerender = false;
+import Site from "~/layouts/Site.astro";
+import { db } from "~/db/client";
+import { dailyPicksForDate, recentDailyDates } from "~/lib/queries";
+import { formatTimeHM, siteTz, todayInSiteTz } from "~/lib/datetime";
+
+const { date } = Astro.params;
+if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  return new Response("Not found", { status: 404 });
+}
+
+const env = Astro.locals.runtime.env;
+const drizzleDb = db(env.DB);
+const picks = await dailyPicksForDate(drizzleDb, date);
+const recentDates = await recentDailyDates(drizzleDb, 90);
+const tz = siteTz(env);
+const today = todayInSiteTz(tz);
+const idx = recentDates.indexOf(date);
+const prevDate = idx >= 0 && idx + 1 < recentDates.length ? recentDates[idx + 1] : null;
+const nextDate = idx > 0 ? recentDates[idx - 1] : null;
+const isToday = date === today;
+const ttl = isToday ? 60 : 60 * 60 * 24;
+Astro.response.headers.set(
+  "Cache-Control",
+  `public, max-age=${Math.min(ttl, 60)}, s-maxage=${ttl}, stale-while-revalidate=${ttl}`,
+);
+
+const datesSet = new Set(recentDates);
+const cur = new Date(date + "T00:00:00Z");
+const monthFirst = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth(), 1));
+const monthLast = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth() + 1, 0));
+const dow = monthFirst.getUTCDay();
+const offset = (dow + 6) % 7;
+const days: { d: number | null; iso: string | null; hasPicks: boolean; isToday: boolean; isCurrent: boolean }[] = [];
+for (let i = 0; i < offset; i++) days.push({ d: null, iso: null, hasPicks: false, isToday: false, isCurrent: false });
+for (let d = 1; d <= monthLast.getUTCDate(); d++) {
+  const iso = `${cur.getUTCFullYear()}-${String(cur.getUTCMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  days.push({
+    d,
+    iso,
+    hasPicks: datesSet.has(iso),
+    isToday: iso === today,
+    isCurrent: iso === date,
+  });
+}
+
+const longDate = new Date(date + "T00:00:00Z").toLocaleDateString("en-US", {
+  weekday: "short", month: "short", day: "numeric", year: "numeric",
+});
+const zhWeekdays = ["周日","周一","周二","周三","周四","周五","周六"];
+const zhDate = `${date} · ${zhWeekdays[new Date(date + "T00:00:00Z").getUTCDay()]}`;
+---
+<Site title={`日刊 · ${date} — Glean · 拾遗`}>
+  <section class="page-banner">
+    <div class="container">
+      <span class="eyebrow">
+        <span class="lang-zh">日刊 · 时间线</span>
+        <span class="lang-en">Daily · timeline</span>
+      </span>
+      <h1 style="margin-top: 12px">
+        <span class="lang-zh">每天拾几条。</span>
+        <span class="lang-en">A few picks a day.</span>
+      </h1>
+    </div>
+  </section>
+
+  <section style="padding: 0 0 8px">
+    <div class="container">
+      <div class="day-picker">
+        <span class="day-picker__date">
+          <span class="lang-zh">{zhDate}</span>
+          <span class="lang-en">{longDate}</span>
+        </span>
+        <span class="day-picker__sub">
+          <span class="lang-zh">{picks.length} 条</span>
+          <span class="lang-en">{picks.length} {picks.length === 1 ? "pick" : "picks"}</span>
+        </span>
+        <div class="day-picker__nav">
+          {prevDate ? (
+            <a href={`/daily/${prevDate}`} class="btn btn-secondary">
+              <span class="lang-zh">← {prevDate.slice(5)}</span>
+              <span class="lang-en">← {prevDate.slice(5)}</span>
+            </a>
+          ) : (
+            <button type="button" class="btn btn-secondary" disabled aria-label="前一天 · Previous day" style="opacity: 0.5">←</button>
+          )}
+          <details style="position: relative">
+            <summary class="btn btn-secondary" style="list-style: none; cursor: pointer">
+              <span class="lang-zh">日历 ▾</span><span class="lang-en">Calendar ▾</span>
+            </summary>
+            <div class="calendar-popover">
+              <div class="calendar-popover__heading">{cur.getUTCFullYear()} · {String(cur.getUTCMonth() + 1).padStart(2, "0")}</div>
+              <div class="cal-widget">
+                <span class="cal-widget__dow">Mo</span><span class="cal-widget__dow">Tu</span><span class="cal-widget__dow">We</span><span class="cal-widget__dow">Th</span><span class="cal-widget__dow">Fr</span><span class="cal-widget__dow">Sa</span><span class="cal-widget__dow">Su</span>
+                {days.map((dd) =>
+                  dd.iso === null ? (
+                    <span class="cal-widget__day is-empty">·</span>
+                  ) : dd.hasPicks ? (
+                    <a href={`/daily/${dd.iso}`} class={`cal-widget__day has-issues${dd.isToday ? " is-today" : ""}${dd.isCurrent ? " is-current" : ""}`}>{dd.d}</a>
+                  ) : (
+                    <span class={`cal-widget__day${dd.isToday ? " is-today" : ""}`}>{dd.d}</span>
+                  ),
+                )}
+              </div>
+              <div style="display: flex; gap: 10px; margin-top: 10px; font-size: 11px; color: var(--c-muted)">
+                <span style="display: inline-flex; align-items: center; gap: 4px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--c-surface-cream-strong); display: inline-block"></span><span class="lang-zh">有日刊</span><span class="lang-en">has picks</span></span>
+                <span style="display: inline-flex; align-items: center; gap: 4px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--c-primary); display: inline-block"></span><span class="lang-zh">今天</span><span class="lang-en">today</span></span>
+              </div>
+            </div>
+          </details>
+          {nextDate ? (
+            <a href={`/daily/${nextDate}`} class="btn btn-secondary">
+              <span class="lang-zh">{nextDate.slice(5)} →</span>
+              <span class="lang-en">{nextDate.slice(5)} →</span>
+            </a>
+          ) : (
+            <button type="button" class="btn btn-secondary" disabled aria-label="后一天 · Next day" style="opacity: 0.5">→</button>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section--tight" style="padding-top: 0">
+    <div class="container">
+      {picks.length === 0 && (
+        <div class="prose-block" style="text-align: center; padding: 48px 0">
+          <p>
+            <span class="lang-zh">这一天没有日刊。试试日历找有内容的日期。</span>
+            <span class="lang-en">Nothing for this day. Try the calendar for dates that have picks.</span>
+          </p>
+        </div>
+      )}
+      <div class="feed">
+        {picks.map((pick) => (
+          <article class="feed-row">
+            <div class="feed-row__time">
+              {formatTimeHM(pick.published_at, tz)}
+            </div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href={`/a/${pick.slug}`}>
+                  <span class="lang-zh">{pick.title_zh}</span>
+                  <span class="lang-en">{pick.title_en}</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">{pick.title_en}</span>
+                <span class="lang-en">{pick.title_zh}</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">{pick.summary_zh}</span>
+                <span class="lang-en">{pick.summary_en}</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">{pick.source_host}</span>
+                <span>·</span>
+                <span>{pick.read_minutes} min</span>
+                {pick.tags.map((t) => (
+                  <>
+                    <span>·</span>
+                    <a class="feed-tag" href={`/tag/${t.slug}`}>{t.name_en}</a>
+                  </>
+                ))}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+</Site>

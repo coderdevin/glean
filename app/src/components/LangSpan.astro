@@ -1,0 +1,18 @@
+---
+interface Props {
+  zh: string;
+  en: string;
+  /** Render as block-level paragraph wrapper instead of inline spans. */
+  block?: boolean;
+}
+const { zh, en, block = false } = Astro.props;
+---
+{block ? (
+  <p>
+    <span class="lang-zh">{zh}</span><span class="lang-en">{en}</span>
+  </p>
+) : (
+  <Fragment>
+    <span class="lang-zh">{zh}</span><span class="lang-en">{en}</span>
+  </Fragment>
+)}

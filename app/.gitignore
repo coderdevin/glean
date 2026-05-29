@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.astro/
+.wrangler/
+.dev.vars
+.env
+.env.local
+*.log
+.DS_Store
+.gstack/
+
+# Real Cloudflare bindings live in wrangler.toml (gitignored). Forks copy
+# wrangler.toml.example → wrangler.toml and fill in their own resource IDs.
+wrangler.toml
+workers/*/wrangler.toml

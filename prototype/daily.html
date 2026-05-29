@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-25 · 日刊 — Glean 拾遗</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="index.html" class="brand">
+          <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+        </a>
+        <nav class="nav-links" id="primary-nav" aria-label="主导航">
+          <a class="nav-link" href="index.html">首页</a>
+          <a class="nav-link" href="weekly-list.html">周刊</a>
+          <a class="nav-link" aria-current="page" href="daily.html">日刊</a>
+          <a class="nav-link" href="tag-edge.html">标签</a>
+          <a class="nav-link" href="about.html">关于</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <div class="lang-toggle" role="tablist" aria-label="Language">
+            <button type="button" data-lang-set="zh" class="is-active" role="tab" aria-selected="true">中</button>
+            <button type="button" data-lang-set="en" role="tab" aria-selected="false">EN</button>
+          </div>
+          <a href="submit.html" class="nav-link nav-link--cta">
+            <span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- =================================================================== -->
+    <!-- Page header -->
+    <!-- =================================================================== -->
+    <section class="page-banner">
+      <div class="container">
+        <span class="eyebrow">
+          <span class="lang-zh">日刊 · 时间线</span>
+          <span class="lang-en">Daily · timeline</span>
+        </span>
+        <h1 style="margin-top: 12px">
+          <span class="lang-zh">每天拾几条。</span>
+          <span class="lang-en">A few picks a day.</span>
+        </h1>
+        <p style="max-width: 60ch">
+          <span class="lang-zh">按提交时间倒序 · 点开看详情。</span>
+          <span class="lang-en">Newest first · click any row for the detail.</span>
+        </p>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- Day picker -->
+    <!-- =================================================================== -->
+    <section style="padding: 0 0 8px">
+      <div class="container">
+        <div class="day-picker">
+          <span class="day-picker__date"><span class="lang-zh">2026-05-25 · 周一</span><span class="lang-en">Mon, May 25, 2026</span></span>
+          <span class="day-picker__sub"><span class="lang-zh">今日 12 条 / 累计 247</span><span class="lang-en">12 today / 247 total</span></span>
+          <div class="day-picker__nav">
+            <a href="daily.html?d=2026-05-24" class="btn btn-secondary"><span class="lang-zh">← 5-24</span><span class="lang-en">← May 24</span></a>
+            <details style="position: relative">
+              <summary class="btn btn-secondary" style="list-style: none; cursor: pointer">
+                <span class="lang-zh">日历 ▾</span><span class="lang-en">Calendar ▾</span>
+              </summary>
+              <div class="calendar-popover">
+                <div class="calendar-popover__heading">2026 · 05</div>
+                <div class="cal-widget">
+                  <span class="cal-widget__dow">Mo</span><span class="cal-widget__dow">Tu</span><span class="cal-widget__dow">We</span><span class="cal-widget__dow">Th</span><span class="cal-widget__dow">Fr</span><span class="cal-widget__dow">Sa</span><span class="cal-widget__dow">Su</span>
+                  <span class="cal-widget__day is-empty">·</span><span class="cal-widget__day is-empty">·</span><span class="cal-widget__day is-empty">·</span>
+                  <a href="daily.html?d=2026-05-01" class="cal-widget__day has-issues">1</a>
+                  <span class="cal-widget__day">2</span><span class="cal-widget__day">3</span><span class="cal-widget__day">4</span>
+                  <a href="daily.html?d=2026-05-05" class="cal-widget__day has-issues">5</a>
+                  <a href="daily.html?d=2026-05-06" class="cal-widget__day has-issues">6</a>
+                  <a href="daily.html?d=2026-05-07" class="cal-widget__day has-issues">7</a>
+                  <a href="daily.html?d=2026-05-08" class="cal-widget__day has-issues">8</a>
+                  <span class="cal-widget__day">9</span><span class="cal-widget__day">10</span>
+                  <a href="daily.html?d=2026-05-11" class="cal-widget__day has-issues">11</a>
+                  <a href="daily.html?d=2026-05-12" class="cal-widget__day has-issues">12</a>
+                  <a href="daily.html?d=2026-05-13" class="cal-widget__day has-issues">13</a>
+                  <a href="daily.html?d=2026-05-14" class="cal-widget__day has-issues">14</a>
+                  <a href="daily.html?d=2026-05-15" class="cal-widget__day has-issues">15</a>
+                  <span class="cal-widget__day">16</span><span class="cal-widget__day">17</span>
+                  <a href="daily.html?d=2026-05-18" class="cal-widget__day has-issues">18</a>
+                  <a href="daily.html?d=2026-05-19" class="cal-widget__day has-issues">19</a>
+                  <a href="daily.html?d=2026-05-20" class="cal-widget__day has-issues">20</a>
+                  <a href="daily.html?d=2026-05-21" class="cal-widget__day has-issues">21</a>
+                  <a href="daily.html?d=2026-05-22" class="cal-widget__day has-issues">22</a>
+                  <span class="cal-widget__day">23</span><span class="cal-widget__day">24</span>
+                  <span class="cal-widget__day is-today">25</span>
+                  <span class="cal-widget__day is-empty">26</span><span class="cal-widget__day is-empty">27</span><span class="cal-widget__day is-empty">28</span><span class="cal-widget__day is-empty">29</span><span class="cal-widget__day is-empty">30</span><span class="cal-widget__day is-empty">31</span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px; font-size: 11px; color: var(--c-muted)">
+                  <span style="display: inline-flex; align-items: center; gap: 4px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--c-surface-cream-strong); display: inline-block"></span><span class="lang-zh">有日刊</span><span class="lang-en">has picks</span></span>
+                  <span style="display: inline-flex; align-items: center; gap: 4px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--c-primary); display: inline-block"></span><span class="lang-zh">今天</span><span class="lang-en">today</span></span>
+                </div>
+              </div>
+            </details>
+            <a href="#" class="btn btn-secondary" style="opacity: 0.5; pointer-events: none">
+              <span class="lang-zh">明天 →</span><span class="lang-en">Tomorrow →</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- Feed -->
+    <!-- =================================================================== -->
+    <section class="section--tight" style="padding-top: 0">
+      <div class="container">
+        <div class="feed">
+
+          <article class="feed-row">
+            <div class="feed-row__time">14:22</div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href="article.html">
+                  <span class="lang-zh">Durable Objects 跨区域副本正式 GA</span>
+                  <span class="lang-en">Durable Objects now ship cross-region replicas</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">Durable Objects now ship cross-region replicas</span>
+                <span class="lang-en">Durable Objects 跨区域副本正式 GA</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">DO 的强一致性扩展到多区域副本，写延迟保持在 100ms 内，读路径自动就近落地。配置只要在 wrangler.toml 加一行 <code>replicas = "global"</code>。</span>
+                <span class="lang-en">DO extends strong consistency to multi-region replicas, sub-100ms writes, nearest-replica reads. One wrangler.toml line — <code>replicas = "global"</code> — to enable.</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">blog.cloudflare.com</span>
+                <span>·</span>
+                <span>12 min</span>
+                <span>·</span>
+                <a class="feed-tag" href="#">Edge</a>
+                <a class="feed-tag" href="#">Database</a>
+                <a class="feed-tag" href="#">Cloudflare</a>
+              </div>
+            </div>
+            <div class="feed-row__aside">by linyi</div>
+          </article>
+
+          <article class="feed-row">
+            <div class="feed-row__time">12:08</div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href="article.html">
+                  <span class="lang-zh">RSC 一年回顾：边界不在 client/server</span>
+                  <span class="lang-en">A year of RSC: the boundary isn't client/server</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">A year of RSC: the boundary isn't client/server</span>
+                <span class="lang-en">RSC 一年回顾 · 边界不在 client/server</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">Dan Abramov 复盘一年实战。一句话总结：让你头疼的边界其实是"数据多新"，而不是代码在哪台机器上跑。读完想去重审一遍自己的项目结构。</span>
+                <span class="lang-en">Dan Abramov's year in production. One-liner: the boundary that hurts is data freshness, not where code runs. You'll want to re-audit a project after.</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">overreacted.io</span>
+                <span>·</span>
+                <span>9 min</span>
+                <span>·</span>
+                <a class="feed-tag" href="#">React</a>
+                <a class="feed-tag" href="#">Architecture</a>
+              </div>
+            </div>
+            <div class="feed-row__aside">by mei</div>
+          </article>
+
+          <article class="feed-row">
+            <div class="feed-row__time">11:33</div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href="article.html">
+                  <span class="lang-zh">SQLite 改写 query planner，复杂连接快 4 倍</span>
+                  <span class="lang-en">SQLite rewrites query planner: 4× on complex joins</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">SQLite rewrites query planner: 4× on complex joins</span>
+                <span class="lang-en">SQLite 改写 query planner · 复杂连接快 4 倍</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">NGQP+ 按选择度重排连接顺序，对 7 表以上查询特别明显，ATTACH 数据库成本模型也修了。Notion 风格嵌套查询提升最显著。</span>
+                <span class="lang-en">NGQP+ reorders joins by selectivity, biggest wins on 7+ table queries; ATTACH cost model fixed. Notion-style nested queries see the largest gains.</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">sqlite.org</span>
+                <span>·</span>
+                <span>6 min</span>
+                <span>·</span>
+                <a class="feed-tag" href="#">Database</a>
+                <a class="feed-tag" href="#">SQLite</a>
+              </div>
+            </div>
+            <div class="feed-row__aside">by anon</div>
+          </article>
+
+          <article class="feed-row">
+            <div class="feed-row__time">10:51</div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href="article.html">
+                  <span class="lang-zh">Bun 1.5：monorepo 安装秒进 5 位数</span>
+                  <span class="lang-en">Bun 1.5: monorepo installs in low seconds</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">Bun 1.5: monorepo installs in low seconds</span>
+                <span class="lang-en">Bun 1.5 · monorepo 安装秒进 5 位数</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">新依赖图缓存 + 并行 tar 解包，50 包 monorepo 比 pnpm 快 3-4 倍。lockfile 改文本，code review 不再地狱。</span>
+                <span class="lang-en">Dep graph cache + parallel tar — 3-4× over pnpm on a 50-package monorepo. Text lockfile, no more PR hell.</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">bun.sh</span>
+                <span>·</span>
+                <span>7 min</span>
+                <span>·</span>
+                <a class="feed-tag" href="#">JavaScript</a>
+                <a class="feed-tag" href="#">Tooling</a>
+              </div>
+            </div>
+            <div class="feed-row__aside">by ren</div>
+          </article>
+
+          <article class="feed-row">
+            <div class="feed-row__time">10:12</div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href="article.html">
+                  <span class="lang-zh">TypeScript 5.7：推断终于"懂"返回值</span>
+                  <span class="lang-en">TypeScript 5.7: inference finally "gets" return values</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">TypeScript 5.7: inference finally "gets" return values</span>
+                <span class="lang-en">TypeScript 5.7 · 推断终于"懂"返回值</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">泛型函数返回值的窄化能力变强，过去要 const assertion 现在编译器自己推。--noUncheckedSideEffectImports 默认开启。</span>
+                <span class="lang-en">Generic return narrowing got stronger — what needed const assertions now flows from the call site. --noUncheckedSideEffectImports now default on.</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">devblogs.microsoft.com</span>
+                <span>·</span>
+                <span>6 min</span>
+                <span>·</span>
+                <a class="feed-tag" href="#">TypeScript</a>
+                <a class="feed-tag" href="#">Tooling</a>
+              </div>
+            </div>
+            <div class="feed-row__aside">by anon</div>
+          </article>
+
+          <article class="feed-row">
+            <div class="feed-row__time">09:46</div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href="article.html">
+                  <span class="lang-zh">CSS @scope 终于全浏览器可用</span>
+                  <span class="lang-en">CSS @scope ships in every browser</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">CSS @scope ships in every browser</span>
+                <span class="lang-en">CSS @scope · 终于全浏览器可用</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">Firefox 也跟上了。<code>@scope</code> 严格限定一段样式到某子树，等价于 CSS-in-JS 的作用域功能，但纯原生。</span>
+                <span class="lang-en">Firefox is in. <code>@scope</code> strictly binds a stylesheet to a subtree — CSS-in-JS scoping in plain CSS.</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">web.dev</span>
+                <span>·</span>
+                <span>5 min</span>
+                <span>·</span>
+                <a class="feed-tag" href="#">CSS</a>
+                <a class="feed-tag" href="#">Browser</a>
+              </div>
+            </div>
+            <div class="feed-row__aside">by jiang</div>
+          </article>
+
+          <article class="feed-row">
+            <div class="feed-row__time">09:11</div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href="article.html">
+                  <span class="lang-zh">Fly Machines 现支持 GPU pinning</span>
+                  <span class="lang-en">Fly Machines now support GPU pinning</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">Fly Machines now support GPU pinning</span>
+                <span class="lang-en">Fly Machines · 现支持 GPU pinning</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">Fly 把单 H100 划分成 7 个 sub-instance，按秒计费；冷启动 800ms。AI 推理小厂的福利。</span>
+                <span class="lang-en">Fly carves a single H100 into 7 sub-instances, billed per second, 800ms cold-start. A break for small AI shops.</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">fly.io/blog</span>
+                <span>·</span>
+                <span>11 min</span>
+                <span>·</span>
+                <a class="feed-tag" href="#">Infra</a>
+                <a class="feed-tag" href="#">GPU</a>
+              </div>
+            </div>
+            <div class="feed-row__aside">by chen</div>
+          </article>
+
+          <article class="feed-row">
+            <div class="feed-row__time">08:33</div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href="article.html">
+                  <span class="lang-zh">Linux 6.13 加入 io_uring 零拷贝 zerocopy_recv</span>
+                  <span class="lang-en">Linux 6.13 lands io_uring zerocopy_recv</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">Linux 6.13 lands io_uring zerocopy_recv</span>
+                <span class="lang-en">Linux 6.13 · 加入 io_uring 零拷贝 zerocopy_recv</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">高吞吐网络应用直接受益。Cloudflare 已经在测试，结论：单核 100Gbps 不再纸面。</span>
+                <span class="lang-en">High-throughput networking benefits directly. Cloudflare's testing it; 100Gbps per core is no longer paper.</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">lwn.net</span>
+                <span>·</span>
+                <span>14 min</span>
+                <span>·</span>
+                <a class="feed-tag" href="#">Linux</a>
+                <a class="feed-tag" href="#">Performance</a>
+              </div>
+            </div>
+            <div class="feed-row__aside">by anon</div>
+          </article>
+
+          <article class="feed-row">
+            <div class="feed-row__time">08:02</div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href="article.html">
+                  <span class="lang-zh">Anthropic Skills：把"工作流"变成"技能"</span>
+                  <span class="lang-en">Anthropic Skills: turning workflows into skills</span>
+                </a>
+              </h2>
+              <div class="feed-row__alt">
+                <span class="lang-zh">Anthropic Skills: turning workflows into skills</span>
+                <span class="lang-en">Anthropic Skills · 把"工作流"变成"技能"</span>
+              </div>
+              <p class="feed-row__summary">
+                <span class="lang-zh">把多步骤工作流封装成可分发的"技能"，每个 SKILL.md + 可选脚本，按描述触发。一次解决"提示词管不住"和"流程没法版本化"。</span>
+                <span class="lang-en">Packages multi-step workflows as distributable Skills — each a SKILL.md plus optional scripts, auto-triggered by description. Solves prompt drift and unversioned workflows in one move.</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">anthropic.com</span>
+                <span>·</span>
+                <span>14 min</span>
+                <span>·</span>
+                <a class="feed-tag" href="#">AI</a>
+                <a class="feed-tag" href="#">Agents</a>
+              </div>
+            </div>
+            <div class="feed-row__aside">by linyi</div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- Bottom day picker -->
+    <!-- =================================================================== -->
+    <section class="section--tight" style="padding-top: 0">
+      <div class="container">
+        <nav class="prev-next">
+          <a href="#" class="prev">
+            <span class="pn-label"><span class="lang-zh">前一天</span><span class="lang-en">Previous day</span></span>
+            <span class="pn-title">← 2026-05-24 · <span class="lang-zh">周日 · 8 条</span><span class="lang-en">Sun · 8 picks</span></span>
+          </a>
+          <a href="#" class="next" style="opacity: 0.5; pointer-events: none">
+            <span class="pn-label"><span class="lang-zh">明天</span><span class="lang-en">Tomorrow</span></span>
+            <span class="pn-title" style="color: var(--c-muted-soft)"><span class="lang-zh">还没到</span><span class="lang-en">Not yet</span></span>
+          </a>
+        </nav>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer__grid">
+          <div>
+            <div class="footer__brand">
+              <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+              <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+            </div>
+            <p class="t-body-sm footer__blurb">
+              <span class="lang-zh">双语技术日刊与周刊。从信息洪流里把值得读的拣回来；每条人审。</span>
+              <span class="lang-en">A bilingual tech daily &amp; weekly. I pick up the links worth reading. Every link human-reviewed.</span>
+            </p>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">阅读</span><span class="lang-en">Read</span></h2>
+            <ul>
+              <li><a href="weekly-list.html"><span class="lang-zh">所有周刊</span><span class="lang-en">All weeklies</span></a></li>
+              <li><a href="daily.html"><span class="lang-zh">今日日刊</span><span class="lang-en">Today</span></a></li>
+              <li><a href="tag-edge.html"><span class="lang-zh">所有标签</span><span class="lang-en">All tags</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 日刊</span><span class="lang-en">RSS · daily</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 周刊</span><span class="lang-en">RSS · weekly</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">参与</span><span class="lang-en">Contribute</span></h2>
+            <ul>
+              <li><a href="submit.html"><span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span></a></li>
+              <li><a href="#"><span class="lang-zh">CLI 工具</span><span class="lang-en">CLI tool</span></a></li>
+              <li><a href="standards.html"><span class="lang-zh">编辑标准</span><span class="lang-en">Editorial standards</span></a></li>
+              <li><a href="design-system.html"><span class="lang-zh">设计系统</span><span class="lang-en">Design system</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">关于</span><span class="lang-en">About</span></h2>
+            <ul>
+              <li><a href="about.html"><span class="lang-zh">关于</span><span class="lang-en">About</span></a></li>
+              <li><a href="#"><span class="lang-zh">技术栈</span><span class="lang-en">Stack</span></a></li>
+              <li><a href="#"><span class="lang-zh">联系</span><span class="lang-en">Contact</span></a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer__bottom">
+          <span><span class="lang-zh">© 2026 Glean · 拾遗 · 双语技术内容</span><span class="lang-en">© 2026 Glean · Bilingual tech curation</span></span>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Mobile nav toggle.
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        const close = () => {
+          links.classList.remove("is-open");
+          toggle.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          document.body.style.overflow = open ? "hidden" : "";
+        });
+        // Close on link click
+        links.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+        // Close on Escape
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") close();
+        });
+      })();
+
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-lang-set]");
+        if (!t) return;
+        const lang = t.getAttribute("data-lang-set");
+        document.body.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document.querySelectorAll("[data-lang-set]").forEach((b) => {
+          const active = b.getAttribute("data-lang-set") === lang;
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+---
+interface Props {
+  slug: string;
+  nameZh: string;
+  nameEn: string;
+  family?: "infra" | "data" | "code";
+  href?: string;
+}
+const { nameZh, nameEn, family, href } = Astro.props;
+const badgeClass = ["badge", family ? `badge--cat-${family}` : ""].filter(Boolean).join(" ");
+---
+{href ? (
+  <a href={href} class="tag-link">
+    <span class={badgeClass}>
+      <span class="lang-zh">{nameZh}</span><span class="lang-en">{nameEn}</span>
+    </span>
+  </a>
+) : (
+  <span class={badgeClass}>
+    <span class="lang-zh">{nameZh}</span><span class="lang-en">{nameEn}</span>
+  </span>
+)}

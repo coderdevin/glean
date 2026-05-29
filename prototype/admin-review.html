@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>审核 · 01HXR7K… — Glean admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="index.html" class="brand">
+          <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span>Glean <span class="t-code text-muted-soft" style="font-size: 11px; margin-left: 6px">/ admin</span></span>
+        </a>
+        <nav class="nav-links" aria-label="管理员导航">
+          <a class="nav-link" href="admin.html">队列</a>
+          <a class="nav-link" href="#">已通过</a>
+          <a class="nav-link" href="#">周刊</a>
+          <a class="nav-link" href="#">标签</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <span class="t-body-sm text-muted">linyi@team.dev</span>
+          <a href="index.html" class="btn btn-secondary">回到站点</a>
+        </div>
+      </div>
+    </header>
+
+    <section id="main" class="page-banner">
+      <div class="container">
+        <a href="admin.html" class="btn btn-text" style="margin-bottom: 12px">← 回到队列</a>
+        <div class="row" style="gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px">
+          <span class="status-pill status-ready">Ready</span>
+          <span class="t-code text-muted">id 01HXR7K3FQ8WRZBV9YE2MAVDXT</span>
+          <span class="t-body-sm text-muted">submitted by <strong>linyi</strong> · 14:22 · score <span class="t-code">0.91</span></span>
+        </div>
+        <h1>Durable Objects 跨区域副本正式 GA</h1>
+        <p>
+          <a href="https://blog.cloudflare.com/durable-objects-2026/" class="t-code">blog.cloudflare.com/durable-objects-2026/</a>
+          · 12 min read · detected lang: <span class="t-code">en</span>
+        </p>
+      </div>
+    </section>
+
+    <section class="section--tight" style="padding-top: 0">
+      <div class="container">
+        <div class="admin-grid">
+          <!-- LEFT: extracted source preview -->
+          <div>
+            <div class="t-caption-up text-muted" style="margin-bottom: 10px">
+              <span class="lang-zh">原文抓取预览</span>
+              <span class="lang-en">Extracted source</span>
+            </div>
+            <div class="card card--canvas" style="padding: 24px; max-height: 640px; overflow: auto">
+              <h2 class="t-display-sm" style="margin: 0 0 8px">Durable Objects now ship cross-region replicas</h2>
+              <div class="t-body-sm text-muted" style="margin-bottom: 16px">
+                blog.cloudflare.com · by Greg McKeon · Mar 22, 2026
+              </div>
+              <p class="t-body-md text-body">Today we are announcing the general availability of cross-region replicas for Durable Objects. Strong consistency is preserved while reads automatically route to the nearest replica…</p>
+              <p class="t-body-md text-body">For the past 18 months we've been testing a new replication topology that allows DOs to operate across regions while maintaining the strong consistency guarantees customers rely on. Today, those replicas leave beta and are available to all customers on Workers paid plans.</p>
+              <p class="t-body-md text-body">Behind the scenes we use a modified Raft consensus where the leader's region is configurable per-object. Writes route to the leader; reads happen at the nearest replica that has caught up within a freshness window you specify (default: 50ms).</p>
+              <p class="t-body-md text-body"><strong>Enabling replication</strong> requires a single addition to your <code>wrangler.toml</code>:</p>
+              <pre class="t-code" style="background: var(--c-surface-cream-strong); padding: 12px; border-radius: 8px; margin: 8px 0">[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+script_name = "rooms"
+replicas = "global"</pre>
+              <p class="t-body-md text-body">Writes still incur the round-trip to your leader region, but reads now hit the nearest colo with cached state…</p>
+              <p class="t-body-sm text-muted-soft">— truncated. Full text in R2 at <code>raw/8fa3c…</code></p>
+            </div>
+            <div class="row" style="gap: 8px; margin-top: 12px">
+              <button class="btn btn-secondary">
+                <span class="lang-zh">重新抓取</span>
+                <span class="lang-en">Refetch</span>
+              </button>
+              <button class="btn btn-secondary">
+                <span class="lang-zh">重跑 LLM</span>
+                <span class="lang-en">Re-run LLM</span>
+              </button>
+              <a href="https://blog.cloudflare.com/durable-objects-2026/" class="btn btn-text">
+                <span class="lang-zh">打开原文 ↗</span>
+                <span class="lang-en">Open source ↗</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- RIGHT: editable LLM output -->
+          <div>
+            <div class="t-caption-up text-muted" style="margin-bottom: 10px; display: flex; justify-content: space-between">
+              <span>
+                <span class="lang-zh">AI 加工结果 (可编辑)</span>
+                <span class="lang-en">AI output (editable)</span>
+              </span>
+              <span class="t-body-sm text-muted-soft">DeepSeek · 2.1s · 1,840 tokens</span>
+            </div>
+
+            <div class="card card--canvas" style="padding: 28px">
+              <!-- Bilingual title -->
+              <div class="admin-field">
+                <label for="ar-title-zh">Title · 中文</label>
+                <input id="ar-title-zh" class="input" value="Durable Objects 跨区域副本正式 GA" />
+              </div>
+              <div class="admin-field">
+                <label for="ar-title-en">Title · English</label>
+                <input id="ar-title-en" class="input" value="Durable Objects now ship cross-region replicas" />
+              </div>
+
+              <hr class="hairline" style="margin: 16px 0" />
+
+              <!-- Summary -->
+              <div class="admin-field">
+                <label for="ar-summary-zh">Summary · 中文</label>
+                <textarea id="ar-summary-zh" class="textarea" style="min-height: 80px">Cloudflare 把 DO 的强一致性扩展到了多区域副本，写延迟保持在 100ms 以内，读路径自动就近落地。配置只要在 wrangler.toml 加一行 replicas = "global"。</textarea>
+              </div>
+              <div class="admin-field">
+                <label for="ar-summary-en">Summary · English</label>
+                <textarea id="ar-summary-en" class="textarea" style="min-height: 80px">Cloudflare extends DO's strong consistency to multi-region replicas, keeping write latency under 100ms while reads hit the nearest replica. One wrangler.toml line — replicas = "global" — to enable.</textarea>
+              </div>
+
+              <hr class="hairline" style="margin: 16px 0" />
+
+              <!-- Bullets -->
+              <div class="admin-field">
+                <label for="ar-bullets-zh">Bullets · 中文 (one per line)</label>
+                <textarea id="ar-bullets-zh" class="textarea" style="min-height: 100px">- 修改版 Raft，leader 区域可按对象配置
+- 读走最近副本，freshness 默认 50ms 可调
+- Workers 付费用户全量；wrangler 一行打开</textarea>
+              </div>
+              <div class="admin-field">
+                <label for="ar-bullets-en">Bullets · English (one per line)</label>
+                <textarea id="ar-bullets-en" class="textarea" style="min-height: 100px">- Modified Raft consensus, leader region configurable per object
+- Reads served from nearest replica, freshness window default 50ms
+- GA for all Workers paid plans; one-line wrangler.toml change</textarea>
+              </div>
+
+              <hr class="hairline" style="margin: 16px 0" />
+
+              <!-- Editorial -->
+              <div class="admin-field">
+                <label for="ar-editor-zh">Editor's note · 中文</label>
+                <input id="ar-editor-zh" class="input" value="如果你在写 multi-region 的状态服务，今天可以少一层 Redis 了。" />
+              </div>
+              <div class="admin-field">
+                <label for="ar-editor-en">Editor's note · English</label>
+                <input id="ar-editor-en" class="input" value="If you maintain a multi-region stateful service, you can drop a Redis layer today." />
+              </div>
+
+              <hr class="hairline" style="margin: 16px 0" />
+
+              <!-- Tags + scores -->
+              <div class="admin-field">
+                <label for="ar-tags">Tags</label>
+                <input id="ar-tags" class="input" value="Edge, Database, Cloudflare" />
+              </div>
+              <div class="row" style="gap: 12px">
+                <div class="admin-field" style="flex: 1">
+                  <label for="ar-score-importance">Importance</label>
+                  <input id="ar-score-importance" class="input" value="0.94" />
+                </div>
+                <div class="admin-field" style="flex: 1">
+                  <label for="ar-score-novelty">Novelty</label>
+                  <input id="ar-score-novelty" class="input" value="0.88" />
+                </div>
+                <div class="admin-field" style="flex: 1">
+                  <label for="ar-score-depth">Depth</label>
+                  <input id="ar-score-depth" class="input" value="0.85" />
+                </div>
+              </div>
+
+              <hr class="hairline" style="margin: 16px 0" />
+
+              <!-- Actions -->
+              <div class="row" style="gap: 12px; justify-content: flex-end; flex-wrap: wrap">
+                <button class="btn btn-secondary">
+                  <span class="lang-zh">暂存到明天</span>
+                  <span class="lang-en">Shelve</span>
+                </button>
+                <button class="btn btn-secondary">
+                  <span class="lang-zh">拒绝…</span>
+                  <span class="lang-en">Reject…</span>
+                </button>
+                <button class="btn btn-primary">
+                  <span class="lang-zh">发布并下一条 →</span>
+                  <span class="lang-en">Publish &amp; next →</span>
+                </button>
+              </div>
+
+              <div class="kbd-row">
+                <span><span class="kbd">⌘</span><span class="kbd">↵</span> <span class="lang-zh">发布</span><span class="lang-en">publish</span></span>
+                <span><span class="kbd">⌘</span><span class="kbd">D</span> <span class="lang-zh">拒绝</span><span class="lang-en">reject</span></span>
+                <span><span class="kbd">⌘</span><span class="kbd">S</span> <span class="lang-zh">暂存</span><span class="lang-en">shelve</span></span>
+                <span><span class="kbd">⌘</span><span class="kbd">→</span> <span class="lang-zh">下一条</span><span class="lang-en">next in queue</span></span>
+              </div>
+            </div>
+
+            <!-- Preview card -->
+            <div class="t-caption-up text-muted" style="margin-top: 32px; margin-bottom: 10px">
+              <span class="lang-zh">公开页预览</span>
+              <span class="lang-en">Public preview</span>
+            </div>
+            <article class="article-card" style="background: var(--c-surface-card)">
+              <div class="article-card__head">
+                <span class="badge badge--coral">即将发布</span>
+                <span>blog.cloudflare.com · 12 min read</span>
+              </div>
+              <h3 class="article-card__title">
+                <span class="lang-zh">Durable Objects 跨区域副本正式 GA</span>
+                <span class="lang-en">Durable Objects now ship cross-region replicas</span>
+              </h3>
+              <p class="article-card__summary">
+                <span class="lang-zh">Cloudflare 把 DO 的强一致性扩展到了多区域副本…</span>
+                <span class="lang-en">Cloudflare extends DO's strong consistency to multi-region replicas…</span>
+              </p>
+              <div class="article-card__editorial">
+                <span class="article-card__editorial-label">Editor's note</span>
+                <span class="lang-zh">如果你在写 multi-region 的状态服务，今天可以少一层 Redis 了。</span>
+                <span class="lang-en">If you maintain a multi-region stateful service, you can drop a Redis layer today.</span>
+              </div>
+              <div class="article-card__footer">
+                <div class="article-card__meta">
+                  <span class="badge badge--cat-infra">Edge</span>
+                  <span class="badge badge--cat-data">Database</span>
+                  <span class="badge badge--cat-infra">Cloudflare</span>
+                </div>
+                <span class="t-body-sm text-muted-soft">submitted by linyi</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="footer__bottom" style="margin-top: 0; border: 0; padding-top: 0">
+          <span class="t-body-sm" style="color: var(--c-on-dark-soft)">
+            <span class="lang-zh">admin · 仅授权邮箱可见 · CF Access</span>
+            <span class="lang-en">admin · CF Access protected · authorized emails only</span>
+          </span>
+          <span class="t-code">linyi@team.dev</span>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Mobile nav toggle.
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        const close = () => {
+          links.classList.remove("is-open");
+          toggle.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          document.body.style.overflow = open ? "hidden" : "";
+        });
+        // Close on link click
+        links.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+        // Close on Escape
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") close();
+        });
+      })();
+
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-lang-set]");
+        if (!t) return;
+        const lang = t.getAttribute("data-lang-set");
+        document.body.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document.querySelectorAll("[data-lang-set]").forEach((b) => {
+          const active = b.getAttribute("data-lang-set") === lang;
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+      });
+    </script>
+  </body>
+</html>

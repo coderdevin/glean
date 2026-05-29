@@ -1,0 +1,35 @@
+---
+import Site from "~/layouts/Site.astro";
+export const prerender = true;
+---
+<Site
+  title="关于 · About — Glean · 拾遗"
+  description="A bilingual technical zine. Hand-curated."
+>
+  <section class="page-banner">
+    <div class="container">
+      <span class="eyebrow">
+        <span class="lang-zh">关于</span><span class="lang-en">About</span>
+      </span>
+      <h1 class="balance" style="margin-top: 12px; max-width: 18ch">
+        <span class="lang-zh">一份双语技术刊</span>
+        <span class="lang-en">A bilingual tech zine</span>
+      </h1>
+    </div>
+  </section>
+
+  <section class="section--tight" style="padding-top: 0">
+    <div class="container">
+      <div class="prose-block" style="max-width: 640px; font-size: 17px; line-height: 1.8">
+        <p>
+          <span class="lang-zh">Glean 是一份双语技术刊。起初，团队习惯用 email 分享好文章——一个链接丢过来，看不到全文，过几天也就忘了。于是我们开始每天挑几条值得读的工程内容，周一汇总成一期。AI 起草摘要，编辑把关。<strong>选稿和审核，始终由人。</strong></span>
+          <span class="lang-en">Glean is a bilingual technical zine. It began with how we used to share good articles — a link dropped into an email, no full text, forgotten a few days later. So we started picking a few engineering reads worth keeping each day, gathered into one issue every Monday. AI drafts the summaries; an editor signs off. <strong>Picks and review stay human.</strong></span>
+        </p>
+        <p>
+          <span class="lang-zh">看到好东西，欢迎<a href="/submit">投一条</a>。源码在 <a href="https://github.com/" rel="noopener">GitHub</a>。</span>
+          <span class="lang-en">Saw something good? <a href="/submit">Submit a link</a>. Source on <a href="https://github.com/" rel="noopener">GitHub</a>.</span>
+        </p>
+      </div>
+    </div>
+  </section>
+</Site>

@@ -1,0 +1,11 @@
+---
+export const prerender = false;
+import { db } from "~/db/client";
+import { recentDailyDates } from "~/lib/queries";
+import { siteTz, todayInSiteTz } from "~/lib/datetime";
+
+const env = Astro.locals.runtime.env;
+const dates = await recentDailyDates(db(env.DB), 1);
+const target = dates[0] ?? todayInSiteTz(siteTz(env));
+return Astro.redirect(`/daily/${target}`, 307);
+---

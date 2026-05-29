@@ -1,0 +1,12 @@
+{
+  "name": "glean-repo",
+  "private": true,
+  "description": "Repo-level tooling only. The deployable app lives in app/.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

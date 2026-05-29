@@ -1,0 +1,104 @@
+---
+export const prerender = false;
+import Site from "~/layouts/Site.astro";
+import { db } from "~/db/client";
+import { allTagsWithCounts, picksForTag } from "~/lib/queries";
+
+const slug = Astro.params.slug;
+if (!slug) return new Response("Not found", { status: 404 });
+
+const env = Astro.locals.runtime.env;
+const drizzleDb = db(env.DB);
+const [picks, allTags] = await Promise.all([
+  picksForTag(drizzleDb, slug, 100),
+  allTagsWithCounts(drizzleDb),
+]);
+const tag = allTags.find((t) => t.slug === slug);
+if (!tag) return new Response("Not found", { status: 404 });
+const related = allTags.filter((t) => t.slug !== slug && t.count > 0).slice(0, 10);
+
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
+);
+---
+<Site title={`标签 · ${tag.name_en} — Glean · 拾遗`}>
+  <section class="page-banner">
+    <div class="container">
+      <span class="eyebrow"><span class="lang-zh">标签</span><span class="lang-en">Tag</span></span>
+      <div class="tag-hero">
+        <h1 class="tag-hero__name">{tag.name_en}</h1>
+        <span class="tag-hero__count">{picks.length} picks</span>
+      </div>
+      <p style="max-width: 60ch; margin-top: 16px">
+        <span class="lang-zh">所有打上 "{tag.name_zh}" 的精选。</span>
+        <span class="lang-en">All picks tagged "{tag.name_en}".</span>
+      </p>
+      {related.length > 0 && (
+        <div class="tag-related">
+          {related.map((t) => (
+            <a href={`/tag/${t.slug}`}>{t.name_en} · {t.count}</a>
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <section class="section--tight" style="padding-top: 16px">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow"><span class="lang-zh">最近收录</span><span class="lang-en">Recent picks</span></span>
+          <h2 class="section-head__title" style="margin-top: 8px">
+            <span class="lang-zh">{picks.length} 条 · 按时间</span>
+            <span class="lang-en">{picks.length} {picks.length === 1 ? "pick" : "picks"} · chronological</span>
+          </h2>
+        </div>
+      </div>
+
+      {picks.length === 0 && (
+        <div class="prose-block" style="text-align: center; padding: 48px 0">
+          <p>
+            <span class="lang-zh">这个标签还没有收录。</span>
+            <span class="lang-en">No picks for this tag yet.</span>
+          </p>
+        </div>
+      )}
+
+      <div class="feed">
+        {picks.map((pick) => (
+          <article class="feed-row">
+            <div class="feed-row__time">
+              {pick.published_at
+                ? new Date(pick.published_at).toISOString().slice(5, 10)
+                : ""}
+            </div>
+            <div class="feed-row__main">
+              <h2 class="feed-row__title">
+                <a href={`/a/${pick.slug}`}>
+                  <span class="lang-zh">{pick.title_zh}</span>
+                  <span class="lang-en">{pick.title_en}</span>
+                </a>
+              </h2>
+              <p class="feed-row__summary">
+                <span class="lang-zh">{pick.summary_zh}</span>
+                <span class="lang-en">{pick.summary_en}</span>
+              </p>
+              <div class="feed-row__bar">
+                <span class="feed-domain">{pick.source_host}</span>
+                <span>·</span>
+                <span>{pick.read_minutes} min</span>
+                {pick.tags.slice(0, 3).map((t) => (
+                  <>
+                    <span>·</span>
+                    <a class="feed-tag" href={`/tag/${t.slug}`}>{t.name_en}</a>
+                  </>
+                ))}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  </section>
+</Site>

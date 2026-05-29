@@ -1,0 +1,164 @@
+---
+export const prerender = false;
+import Site from "~/layouts/Site.astro";
+import { eq } from "drizzle-orm";
+import { db } from "~/db/client";
+import { submissions } from "~/db/schema";
+
+const id = Astro.url.searchParams.get("id");
+if (!id || !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(id)) {
+  return Astro.redirect("/submit", 303);
+}
+
+const env = Astro.locals.runtime.env;
+const rows = await db(env.DB)
+  .select()
+  .from(submissions)
+  .where(eq(submissions.id, id))
+  .limit(1);
+const row = rows[0];
+if (!row) return Astro.redirect("/submit", 303);
+
+Astro.response.headers.set("Cache-Control", "no-store");
+
+const stepIndex = (() => {
+  switch (row.status) {
+    case "pending":    return 1;
+    case "analyzing":  return 2;
+    case "composing":  return 2;
+    case "failed":     return 2; // AI hiccup — editor retries; keep polling
+    case "ready":      return 3;
+    case "published":  return 4;
+    case "rejected":   return -1;
+    default:           return 1;
+  }
+})();
+const isTerminal = row.status === "published" || row.status === "rejected";
+if (!isTerminal) {
+  Astro.response.headers.set("Refresh", "6");
+}
+const isDup = Astro.url.searchParams.get("dup") === "1";
+
+const rel = (d: Date) => {
+  const s = Math.max(0, Math.floor((Date.now() - new Date(d).getTime()) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+};
+
+const headlineCopy = (() => {
+  if (row.status === "published") return { zh: "已发布 · 看一眼", en: "Published — go read it" };
+  if (row.status === "rejected")  return { zh: "未通过 · 改天再战", en: "Didn't make it — try another" };
+  return { zh: "收到了，谢谢。", en: "Got it — thanks." };
+})();
+const subCopy = (() => {
+  if (row.status === "published") return { zh: "通过 · 已上日刊。", en: "Approved · live on today's daily." };
+  if (row.status === "rejected")  return { zh: row.rejectReason ?? "未通过 · 谢谢支持。", en: row.rejectReason ?? "Not selected — thanks for trying." };
+  return { zh: "已入队 · 编辑通常 1 小时内读一眼。", en: "In the queue · usually read within an hour." };
+})();
+---
+<Site title="收到 · Queued — Glean" noindex>
+  <div class="container" style="padding-top: 64px; padding-bottom: 96px">
+    <a href="/submit" class="btn btn-text" style="margin-bottom: 24px; display: inline-block">
+      <span class="lang-zh">← 再提交一条</span><span class="lang-en">← Submit another</span>
+    </a>
+
+    {isDup && (
+      <div style="margin-bottom: 16px; padding: 10px 14px; border: 1px solid var(--c-border); border-radius: 6px; background: var(--c-surface-card); font-size: 14px; color: var(--c-text-muted)">
+        <span class="lang-zh">这条链接之前已经提交过 · 跳到原投稿状态</span>
+        <span class="lang-en">This URL was already submitted · showing the original</span>
+      </div>
+    )}
+
+    <div class="success-card">
+      <div class="success-card__check" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12 l5 5 l9-11" />
+        </svg>
+      </div>
+      <span class="eyebrow"><span class="lang-zh">投稿已入队</span><span class="lang-en">Queued</span></span>
+      <h1 style="font-family: var(--f-display); font-weight: 500; font-size: 40px; letter-spacing: -0.6px; margin: 12px 0 8px">
+        <span class="lang-zh">{headlineCopy.zh}</span>
+        <span class="lang-en">{headlineCopy.en}</span>
+      </h1>
+      <p class="t-body-md text-body" style="max-width: 50ch; margin: 0 auto">
+        <span class="lang-zh">{subCopy.zh}</span>
+        <span class="lang-en">{subCopy.en}</span>
+      </p>
+      <div class="success-card__id" aria-label="Queue ID">
+        <span class="lang-zh">ID · </span><span class="lang-en">ID · </span>{row.id}
+      </div>
+      {row.status === "published" && row.linkedPickId && (
+        <p style="margin-top: 24px">
+          <a href={`/daily`} class="btn btn-primary">
+            <span class="lang-zh">看今日日刊 →</span>
+            <span class="lang-en">See today's daily →</span>
+          </a>
+        </p>
+      )}
+    </div>
+
+    <div class="progress-steps" style="max-width: 760px; margin-left: auto; margin-right: auto">
+      {[
+        { n: "01", zh: "入队",      en: "Queued",          note_zh: row.createdAt ? rel(row.createdAt) : "",     note_en: row.createdAt ? rel(row.createdAt) : "" },
+        { n: "02", zh: "AI 加工中", en: "AI pass running", note_zh: "~30 秒",                                     note_en: "~30s" },
+        { n: "03", zh: "人工审核", en: "Human review",     note_zh: "通常 ≤ 1 小时",                              note_en: "Usually ≤ 1 hr" },
+        { n: "04", zh: "进当日日刊", en: "Today's daily",   note_zh: "通过即公开",                                  note_en: "Public on approval" },
+      ].map((s, i) => {
+        const idx = i + 1;
+        const cls =
+          row.status === "rejected"
+            ? idx === 1 ? "is-done" : ""
+            : idx < stepIndex ? "is-done"
+            : idx === stepIndex ? "is-current"
+            : "";
+        return (
+          <div class={`progress-steps__cell ${cls}`}>
+            <div class="n">{s.n}</div>
+            <div class="name"><span class="lang-zh">{s.zh}</span><span class="lang-en">{s.en}</span></div>
+            <div class="note"><span class="lang-zh">{s.note_zh}</span><span class="lang-en">{s.note_en}</span></div>
+          </div>
+        );
+      })}
+    </div>
+
+    {!isTerminal && (
+      <div style="max-width: 480px; margin: 48px auto 0">
+        <div class="card card--canvas" style="padding: 24px">
+          <span class="eyebrow"><span class="lang-zh">想知道结果？</span><span class="lang-en">Track it?</span></span>
+          <h3 style="font-family: var(--f-display); font-size: 22px; margin: 8px 0 12px">
+            <span class="lang-zh">留个邮箱，发了通知你</span>
+            <span class="lang-en">Email me when it ships</span>
+          </h3>
+          <form data-subscribe-form>
+            <input type="hidden" name="source" value="submit-success" />
+            <div style="display: flex; gap: 6px">
+              <input class="input" type="email" name="email" placeholder="you@example.com" aria-label="Email address" style="flex: 1; height: 44px" required />
+              <button class="btn btn-primary" type="submit" style="padding: 0 16px">
+                <span class="subscribe-card__cta-default">
+                  <span class="lang-zh">通知我</span><span class="lang-en">Notify me</span>
+                </span>
+                <span class="subscribe-card__cta-done" aria-hidden="true">
+                  <span class="lang-zh">✓ 已订阅</span><span class="lang-en">✓ Subscribed</span>
+                </span>
+              </button>
+            </div>
+            <p class="subscribe-card__status t-body-sm" role="status" aria-live="polite" style="margin: 8px 0 0"></p>
+            <p class="t-body-sm text-muted-soft" style="margin: 8px 0 0">
+              <span class="lang-zh">只发这一封 · 不订阅周刊。</span>
+              <span class="lang-en">Single-use · no weekly signup.</span>
+            </p>
+          </form>
+        </div>
+      </div>
+    )}
+
+    <div style="text-align: center; margin-top: 48px">
+      <a class="btn btn-secondary" href="/daily">
+        <span class="lang-zh">回到今日日刊</span>
+        <span class="lang-en">Back to today's daily</span>
+      </a>
+    </div>
+  </div>
+</Site>

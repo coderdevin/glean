@@ -1,0 +1,49 @@
+#!/usr/bin/env sh
+# Glean pre-commit hook — gitleaks secret scan on staged changes.
+#
+# Behavior:
+#   - If gitleaks is installed → scan staged content; abort commit on any leak.
+#   - If gitleaks is NOT installed → print a one-time install hint and let the
+#     commit through (don't punish contributors who didn't read CONTRIBUTING).
+#     CI will catch them anyway via .github/workflows/secret-scan.yml.
+#
+# Legitimate bypass (use sparingly, with reason in the commit message):
+#   git commit --no-verify -m "..."
+
+set -e
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  cat <<'EOF'
+⚠️  gitleaks not installed — skipping local secret scan (CI will still run).
+    To install:
+      macOS:   brew install gitleaks
+      Linux:   https://github.com/gitleaks/gitleaks#installing
+EOF
+  exit 0
+fi
+
+# `git --staged` scans only what `git diff --cached` would show.
+# Fast (sub-second on small diffs) and exact match for "what's about to commit".
+# (`protect --staged` is the deprecated v7 spelling; some 8.x builds let it
+# print findings but still exit 0 — use the modern command.)
+echo "🔍 gitleaks: scanning staged changes…"
+if ! gitleaks git --staged --redact --verbose; then
+  cat <<'EOF'
+
+🚫 Commit blocked: gitleaks detected a possible secret in staged changes.
+
+What to do:
+  1. Confirm whether it's a real secret. Check the file:line shown above.
+  2. If it's a real secret:
+       - Remove it from staging (git restore --staged <file>) and edit the file.
+       - Rotate the secret. Treat it as compromised.
+  3. If it's a false positive (e.g. a test fixture or example key):
+       - Add a `gitleaks:allow` inline comment on that line, OR
+       - Add a rule to .gitleaks.toml (see https://github.com/gitleaks/gitleaks#configuration).
+  4. Re-stage and retry: git add <file> && git commit ...
+
+EOF
+  exit 1
+fi
+
+echo "✅ gitleaks: clean."

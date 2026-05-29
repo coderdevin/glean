@@ -1,0 +1,49 @@
+---
+export interface WeeklyCoverIssue {
+  number: number;
+  slug: string;
+  title_zh: string;
+  title_en: string;
+  date_start: string;
+  date_end: string;
+  intro_zh: string;
+  intro_en: string;
+  pick_count: number;
+  cover_image_url: string | null;
+}
+
+interface Props { issue: WeeklyCoverIssue; }
+const { issue } = Astro.props;
+const fmtRange = (start: string, end: string) => {
+  const s = new Date(start);
+  const e = new Date(end);
+  const m = (d: Date) => `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+  return `${m(s)} – ${m(e)}, ${e.getUTCFullYear()}`;
+};
+---
+<article class="weekly-cover">
+  <a class="weekly-cover__link" href={`/weekly/${issue.number}`}>
+    <div class="weekly-cover__meta">
+      <span class="t-caption-up">#{String(issue.number).padStart(2, "0")}</span>
+      <span class="text-muted-soft">{fmtRange(issue.date_start, issue.date_end)}</span>
+    </div>
+    <h2 class="weekly-cover__title">
+      <span class="lang-zh">{issue.title_zh}</span>
+      <span class="lang-en">{issue.title_en}</span>
+    </h2>
+    <p class="weekly-cover__intro">
+      <span class="lang-zh">{issue.intro_zh}</span>
+      <span class="lang-en">{issue.intro_en}</span>
+    </p>
+    <div class="weekly-cover__footer">
+      <span class="t-body-sm text-muted">
+        <span class="lang-zh">{issue.pick_count} 条精选</span>
+        <span class="lang-en">{issue.pick_count} picks</span>
+      </span>
+      <span class="t-body-sm text-link">
+        <span class="lang-zh">读这期 →</span>
+        <span class="lang-en">Read issue →</span>
+      </span>
+    </div>
+  </a>
+</article>

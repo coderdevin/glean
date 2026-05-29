@@ -1,0 +1,14 @@
+# Copy this file to `.dev.vars` and fill in real values for local dev.
+# `.dev.vars` is gitignored. `.dev.vars.example` is committed as a template.
+#
+# Worker-stage secrets. Mirror app/.dev.vars for any keys you also use there.
+# Set OPENAI_API_KEY or DEEPSEEK_API_KEY (or both), then `pnpm worker:dev`.
+
+# OPENAI_API_KEY=sk-...
+# DEEPSEEK_API_KEY=sk-...
+# LLM_PROVIDER=openai
+# LLM_MODEL=gpt-4o-mini
+
+# Auto-fallback model used by the LLM client on transient failure
+# (429 / 5xx / timeout). Leave unset to disable fallback.
+# LLM_FALLBACK_MODEL=deepseek-v4-flash

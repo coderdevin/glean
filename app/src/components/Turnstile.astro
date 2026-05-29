@@ -1,0 +1,45 @@
+---
+interface Props { action?: string; }
+const { action = "submit" } = Astro.props;
+const isDev = import.meta.env.DEV;
+const envSitekey = Astro.locals.runtime?.env.TURNSTILE_SITEKEY;
+// Fail fast in prod if the real sitekey is missing — silently falling back
+// to the always-passes test key is how the site shipped with no bot check.
+// In dev, fall back to the documented test sitekey so local work is uninterrupted.
+if (!envSitekey && !isDev) {
+  throw new Error("TURNSTILE_SITEKEY is not set in production; refusing to render the test key.");
+}
+const sitekey = envSitekey ?? "1x00000000000000000000AA";
+---
+<div class="field">
+  <div
+    class="cf-turnstile"
+    data-sitekey={sitekey}
+    data-action={action}
+    data-theme="light"
+    data-size="flexible"
+  ></div>
+  {/* Static fallback that matches the prototype's placeholder; the real
+       Turnstile widget hides this div by replacing it once the script loads. */}
+  <div
+    class="cf-turnstile-fallback"
+    style="display: flex; gap: 10px; align-items: center; padding: 10px 14px; background: var(--c-surface-soft); border: 1px solid var(--c-hairline); border-radius: var(--r-md); font-size: 13px; color: var(--c-body); margin-top: 4px;"
+  >
+    <span
+      style="width: 18px; height: 18px; border-radius: 4px; background: var(--c-accent-teal); display: inline-flex; align-items: center; justify-content: center; color: white; font-size: 12px; flex: 0 0 18px;"
+      aria-hidden="true"
+    >✓</span>
+    <span class="lang-zh">验证你是人 · Cloudflare Turnstile{isDev ? "（dev）" : ""}</span>
+    <span class="lang-en">Verified human · Cloudflare Turnstile{isDev ? " (dev)" : ""}</span>
+  </div>
+</div>
+{!isDev && (
+  <script is:inline src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+)}
+<style is:inline>
+  /* Hide the fallback once the Turnstile widget injects any content.
+     Modern Turnstile renders a <div> wrapper (not a bare <iframe>), so
+     check :not(:empty) rather than :has(iframe). */
+  .cf-turnstile:not(:empty) + .cf-turnstile-fallback { display: none !important; }
+  .cf-turnstile:empty { display: none; }
+</style>

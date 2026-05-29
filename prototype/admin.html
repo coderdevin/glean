@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>审核队列 · Glean admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="index.html" class="brand">
+          <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span>Glean <span class="t-code text-muted-soft" style="font-size: 11px; margin-left: 6px">/ admin</span></span>
+        </a>
+        <nav class="nav-links" aria-label="管理员导航">
+          <a class="nav-link" aria-current="page" href="admin.html">队列</a>
+          <a class="nav-link" href="#">已通过</a>
+          <a class="nav-link" href="#">周刊</a>
+          <a class="nav-link" href="#">标签</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <span class="t-body-sm text-muted">linyi@team.dev</span>
+          <a href="index.html" class="btn btn-secondary">
+            <span class="lang-zh">回到站点</span>
+            <span class="lang-en">Back to site</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <section id="main" class="page-banner">
+      <div class="container">
+        <span class="eyebrow">
+          <span class="lang-zh">审核队列</span>
+          <span class="lang-en">Review queue</span>
+        </span>
+        <div class="row row--between" style="align-items: end; margin-top: 12px">
+          <h1>
+            <span class="lang-zh">12 条待审核</span>
+            <span class="lang-en">12 in queue</span>
+          </h1>
+          <div class="row" style="gap: 8px">
+            <button class="btn btn-secondary">
+              <span class="lang-zh">仅看 Ready</span><span class="lang-en">Ready only</span>
+            </button>
+            <button class="btn btn-secondary">
+              <span class="lang-zh">仅看 Pending</span><span class="lang-en">Pending only</span>
+            </button>
+            <button class="btn btn-secondary">
+              <span class="lang-zh">刷新</span><span class="lang-en">Refresh</span>
+            </button>
+          </div>
+        </div>
+        <p>
+          <span class="lang-zh">按时间倒序 · Ready = 可审 · Pending = 抓取中 · Processing = 重试</span>
+          <span class="lang-en">Newest first · Ready = ready · Pending = fetching · Processing = retry</span>
+        </p>
+      </div>
+    </section>
+
+    <section class="section--tight" style="padding-top: 0">
+      <div class="container">
+        <div class="queue-scroll">
+        <table class="queue-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Title (AI)</th>
+              <th>URL</th>
+              <th>Tags</th>
+              <th>Submitter</th>
+              <th>Score</th>
+              <th>Submitted</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="status-pill status-ready">Ready</span></td>
+              <td class="title">Durable Objects 跨区域副本正式 GA</td>
+              <td class="url">blog.cloudflare.com/durable-objects-2026/</td>
+              <td><span class="badge badge--cat-infra">Edge</span> <span class="badge badge--cat-data">DB</span></td>
+              <td>linyi</td>
+              <td><span class="t-code">0.91</span></td>
+              <td>14:22</td>
+              <td><a href="admin-review.html" class="btn btn-text">→ <span class="lang-zh">审核</span><span class="lang-en">Review</span></a></td>
+            </tr>
+            <tr>
+              <td><span class="status-pill status-ready">Ready</span></td>
+              <td class="title">RSC 一年回顾：边界不在 client/server</td>
+              <td class="url">overreacted.io/a-year-of-rsc</td>
+              <td><span class="badge badge--cat-code">React</span></td>
+              <td>mei</td>
+              <td><span class="t-code">0.87</span></td>
+              <td>12:08</td>
+              <td><a href="admin-review.html" class="btn btn-text">→ <span class="lang-zh">审核</span><span class="lang-en">Review</span></a></td>
+            </tr>
+            <tr>
+              <td><span class="status-pill status-ready">Ready</span></td>
+              <td class="title">SQLite 改写 query planner，复杂连接快 4 倍</td>
+              <td class="url">sqlite.org/ngqp-plus.html</td>
+              <td><span class="badge badge--cat-data">DB</span></td>
+              <td>anon</td>
+              <td><span class="t-code">0.83</span></td>
+              <td>11:33</td>
+              <td><a href="admin-review.html" class="btn btn-text">→ <span class="lang-zh">审核</span><span class="lang-en">Review</span></a></td>
+            </tr>
+            <tr>
+              <td><span class="status-pill status-processing">Processing</span></td>
+              <td class="title text-muted-soft" style="font-style: italic">— 抓取重试中 (2/3) —</td>
+              <td class="url">medium.com/.../building-a-llm-router</td>
+              <td>—</td>
+              <td>anon</td>
+              <td>—</td>
+              <td>11:10</td>
+              <td><a href="#" class="btn btn-text">→ <span class="lang-zh">详情</span><span class="lang-en">Detail</span></a></td>
+            </tr>
+            <tr>
+              <td><span class="status-pill status-ready">Ready</span></td>
+              <td class="title">Bun 1.5：monorepo 安装秒进 5 位数</td>
+              <td class="url">bun.sh/blog/bun-1.5</td>
+              <td><span class="badge badge--cat-code">JS</span></td>
+              <td>ren</td>
+              <td><span class="t-code">0.74</span></td>
+              <td>10:51</td>
+              <td><a href="admin-review.html" class="btn btn-text">→ <span class="lang-zh">审核</span><span class="lang-en">Review</span></a></td>
+            </tr>
+            <tr>
+              <td><span class="status-pill status-ready">Ready</span></td>
+              <td class="title">TypeScript 5.7：推断终于"懂"返回值</td>
+              <td class="url">devblogs.microsoft.com/.../ts-5-7</td>
+              <td><span class="badge badge--cat-code">TS</span></td>
+              <td>anon</td>
+              <td><span class="t-code">0.81</span></td>
+              <td>10:12</td>
+              <td><a href="admin-review.html" class="btn btn-text">→ <span class="lang-zh">审核</span><span class="lang-en">Review</span></a></td>
+            </tr>
+            <tr>
+              <td><span class="status-pill status-pending">Pending</span></td>
+              <td class="title text-muted-soft" style="font-style: italic">— 队列中 —</td>
+              <td class="url">www.figma.com/blog/figma-make</td>
+              <td>—</td>
+              <td>jiang</td>
+              <td>—</td>
+              <td>09:46</td>
+              <td><a href="#" class="btn btn-text">→ <span class="lang-zh">详情</span><span class="lang-en">Detail</span></a></td>
+            </tr>
+            <tr>
+              <td><span class="status-pill status-ready">Ready</span></td>
+              <td class="title">Fly Machines 现支持 GPU pinning</td>
+              <td class="url">fly.io/blog/gpu-pinning</td>
+              <td><span class="badge badge--cat-infra">Infra</span></td>
+              <td>chen</td>
+              <td><span class="t-code">0.69</span></td>
+              <td>09:11</td>
+              <td><a href="admin-review.html" class="btn btn-text">→ <span class="lang-zh">审核</span><span class="lang-en">Review</span></a></td>
+            </tr>
+            <tr>
+              <td><span class="status-pill status-ready">Ready</span></td>
+              <td class="title">Linux 6.13 加入 io_uring 零拷贝 zerocopy_recv</td>
+              <td class="url">lwn.net/Articles/...</td>
+              <td><span class="badge badge--cat-code">Linux</span></td>
+              <td>anon</td>
+              <td><span class="t-code">0.78</span></td>
+              <td>08:33</td>
+              <td><a href="admin-review.html" class="btn btn-text">→ <span class="lang-zh">审核</span><span class="lang-en">Review</span></a></td>
+            </tr>
+            <tr>
+              <td><span class="status-pill status-rejected">Rejected</span></td>
+              <td class="title text-muted-soft" style="text-decoration: line-through">10 best AI tools for 2026</td>
+              <td class="url text-muted-soft">listicle-blog.example/...</td>
+              <td>—</td>
+              <td>anon</td>
+              <td><span class="t-code text-muted-soft">0.21</span></td>
+              <td>07:58</td>
+              <td><span class="t-body-sm text-muted-soft">listicle / low signal</span></td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="footer__bottom" style="margin-top: 0; border: 0; padding-top: 0">
+          <span class="t-body-sm" style="color: var(--c-on-dark-soft)">
+            <span class="lang-zh">admin · 仅授权邮箱可见 · CF Access</span>
+            <span class="lang-en">admin · CF Access protected · authorized emails only</span>
+          </span>
+          <span class="t-code">linyi@team.dev</span>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Mobile nav toggle.
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        const close = () => {
+          links.classList.remove("is-open");
+          toggle.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          document.body.style.overflow = open ? "hidden" : "";
+        });
+        // Close on link click
+        links.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+        // Close on Escape
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") close();
+        });
+      })();
+
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-lang-set]");
+        if (!t) return;
+        const lang = t.getAttribute("data-lang-set");
+        document.body.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document.querySelectorAll("[data-lang-set]").forEach((b) => {
+          const active = b.getAttribute("data-lang-set") === lang;
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+      });
+    </script>
+  </body>
+</html>

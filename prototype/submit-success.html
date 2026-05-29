@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>已收到 · Submission received — Glean · 拾遗</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <!-- Top nav -->
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="index.html" class="brand">
+          <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+        </a>
+        <nav class="nav-links" id="primary-nav" aria-label="主导航">
+          <a class="nav-link" href="index.html">首页</a>
+          <a class="nav-link" href="weekly-list.html">周刊</a>
+          <a class="nav-link" href="daily.html">日刊</a>
+          <a class="nav-link" href="tag-edge.html">标签</a>
+          <a class="nav-link" href="about.html">关于</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <div class="lang-toggle" role="tablist" aria-label="Language">
+            <button type="button" data-lang-set="zh" class="is-active" role="tab" aria-selected="true">中</button>
+            <button type="button" data-lang-set="en" role="tab" aria-selected="false">EN</button>
+          </div>
+          <a href="submit.html" class="nav-link nav-link--cta">
+            <span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span>
+          </a>
+        </div>
+      </div>
+    </header>
+    <main id="main" class="container" style="padding-top: 64px; padding-bottom: 96px">
+      <a href="submit.html" class="btn btn-text" style="margin-bottom: 24px; display: inline-block">
+        <span class="lang-zh">← 再提交一条</span><span class="lang-en">← Submit another</span>
+      </a>
+
+      <div class="success-card">
+        <div class="success-card__check" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12 l5 5 l9-11" />
+          </svg>
+        </div>
+        <span class="eyebrow"><span class="lang-zh">投稿已入队</span><span class="lang-en">Queued</span></span>
+        <h1 style="font-family: var(--f-display); font-weight: 500; font-size: 40px; letter-spacing: -0.6px; margin: 12px 0 8px">
+          <span class="lang-zh">收到了，谢谢。</span><span class="lang-en">Got it — thanks.</span>
+        </h1>
+        <p class="t-body-md text-body" style="max-width: 50ch; margin: 0 auto">
+          <span class="lang-zh">已入队 · 编辑通常 1 小时内读一眼。</span>
+          <span class="lang-en">In the queue · usually read within an hour.</span>
+        </p>
+        <div class="success-card__id" aria-label="Queue ID">
+          <span class="lang-zh">ID · </span><span class="lang-en">ID · </span>01HXR7K3FQ8WRZBV9YE2MAVDXT
+        </div>
+      </div>
+
+      <div class="progress-steps" style="max-width: 760px; margin-left: auto; margin-right: auto">
+        <div class="progress-steps__cell is-done">
+          <div class="n">01</div>
+          <div class="name"><span class="lang-zh">入队</span><span class="lang-en">Queued</span></div>
+          <div class="note"><span class="lang-zh">5 秒前</span><span class="lang-en">5 seconds ago</span></div>
+        </div>
+        <div class="progress-steps__cell is-current">
+          <div class="n">02</div>
+          <div class="name"><span class="lang-zh">AI 加工中</span><span class="lang-en">AI pass running</span></div>
+          <div class="note"><span class="lang-zh">~30 秒</span><span class="lang-en">~30s</span></div>
+        </div>
+        <div class="progress-steps__cell">
+          <div class="n">03</div>
+          <div class="name"><span class="lang-zh">人工审核</span><span class="lang-en">Human review</span></div>
+          <div class="note"><span class="lang-zh">通常 ≤ 1 小时</span><span class="lang-en">Usually ≤ 1 hr</span></div>
+        </div>
+        <div class="progress-steps__cell">
+          <div class="n">04</div>
+          <div class="name"><span class="lang-zh">进当日日刊</span><span class="lang-en">Today's daily</span></div>
+          <div class="note"><span class="lang-zh">通过即公开</span><span class="lang-en">Public on approval</span></div>
+        </div>
+      </div>
+
+      <div style="max-width: 480px; margin: 48px auto 0">
+        <div class="card card--canvas" style="padding: 24px">
+          <span class="eyebrow"><span class="lang-zh">想知道结果？</span><span class="lang-en">Track it?</span></span>
+          <h3 style="font-family: var(--f-display); font-size: 22px; margin: 8px 0 12px"><span class="lang-zh">留个邮箱，发了通知你</span><span class="lang-en">Email me when it ships</span></h3>
+          <form data-subscribe-form>
+            <div style="display: flex; gap: 6px">
+              <input class="input" type="email" placeholder="you@example.com" aria-label="Email address" style="flex: 1; height: 44px" required />
+              <button class="btn btn-primary" type="submit" style="padding: 0 16px">
+                <span class="subscribe-card__cta-default">
+                  <span class="lang-zh">通知我</span><span class="lang-en">Notify me</span>
+                </span>
+                <span class="subscribe-card__cta-done" aria-hidden="true">
+                  <span class="lang-zh">✓ 已订阅</span><span class="lang-en">✓ Subscribed</span>
+                </span>
+              </button>
+            </div>
+            <p class="subscribe-card__status t-body-sm" role="status" aria-live="polite" style="margin: 8px 0 0"></p>
+            <p class="t-body-sm text-muted-soft" style="margin: 8px 0 0"><span class="lang-zh">只发这一封 · 不订阅周刊。</span><span class="lang-en">Single-use · no weekly signup.</span></p>
+          </form>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 48px">
+        <a class="btn btn-secondary" href="daily.html"><span class="lang-zh">回到今日日刊</span><span class="lang-en">Back to today's daily</span></a>
+      </div>
+    </main>
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer__grid">
+          <div>
+            <div class="footer__brand">
+              <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+              <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+            </div>
+            <p class="t-body-sm footer__blurb">
+              <span class="lang-zh">双语技术日刊与周刊。从信息洪流里把值得读的拣回来；每条人审。</span>
+              <span class="lang-en">A bilingual tech daily &amp; weekly. I pick up the links worth reading. Every link human-reviewed.</span>
+            </p>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">阅读</span><span class="lang-en">Read</span></h2>
+            <ul>
+              <li><a href="weekly-list.html"><span class="lang-zh">所有周刊</span><span class="lang-en">All weeklies</span></a></li>
+              <li><a href="daily.html"><span class="lang-zh">今日日刊</span><span class="lang-en">Today</span></a></li>
+              <li><a href="tag-edge.html"><span class="lang-zh">所有标签</span><span class="lang-en">All tags</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 日刊</span><span class="lang-en">RSS · daily</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 周刊</span><span class="lang-en">RSS · weekly</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">参与</span><span class="lang-en">Contribute</span></h2>
+            <ul>
+              <li><a href="submit.html"><span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span></a></li>
+              <li><a href="#"><span class="lang-zh">CLI 工具</span><span class="lang-en">CLI tool</span></a></li>
+              <li><a href="standards.html"><span class="lang-zh">编辑标准</span><span class="lang-en">Editorial standards</span></a></li>
+              <li><a href="design-system.html"><span class="lang-zh">设计系统</span><span class="lang-en">Design system</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">关于</span><span class="lang-en">About</span></h2>
+            <ul>
+              <li><a href="about.html"><span class="lang-zh">关于</span><span class="lang-en">About</span></a></li>
+              <li><a href="#"><span class="lang-zh">技术栈</span><span class="lang-en">Stack</span></a></li>
+              <li><a href="#"><span class="lang-zh">联系</span><span class="lang-en">Contact</span></a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer__bottom">
+          <span><span class="lang-zh">© 2026 Glean · 拾遗 · 双语技术内容</span><span class="lang-en">© 2026 Glean · Bilingual tech curation</span></span>
+        </div>
+      </div>
+    </footer>
+    <script>
+      // Notify-me form — toggle .is-subscribed class and announce status.
+      (function () {
+        document.querySelectorAll("[data-subscribe-form]").forEach((form) => {
+          form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            form.classList.add("is-subscribed");
+            const status = form.querySelector(".subscribe-card__status");
+            if (status) {
+              const lang = document.body.getAttribute("data-lang") || "zh";
+              status.textContent = lang === "zh"
+                ? "好。审稿通过/未通过都会给你发一封。"
+                : "Got it. We'll email you either way.";
+            }
+            const btn = form.querySelector("button[type=submit]");
+            if (btn) btn.disabled = true;
+          });
+        });
+      })();
+
+      // Mobile nav toggle.
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        const close = () => {
+          links.classList.remove("is-open");
+          toggle.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          document.body.style.overflow = open ? "hidden" : "";
+        });
+        links.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+      })();
+
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-lang-set]");
+        if (!t) return;
+        const lang = t.getAttribute("data-lang-set");
+        document.body.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document.querySelectorAll("[data-lang-set]").forEach((b) => {
+          const active = b.getAttribute("data-lang-set") === lang;
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+      });
+    </script>
+  </body>
+</html>

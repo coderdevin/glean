@@ -1,0 +1,60 @@
+name = "glean-llm"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Shares D1 + R2 with the extract worker (and the Pages app).
+[[d1_databases]]
+binding = "DB"
+database_name = "glean"
+database_id = "REPLACE_WITH_D1_ID"
+migrations_dir = "../../migrations"
+
+[[r2_buckets]]
+binding = "RAW"
+bucket_name = "glean-raw"
+
+[vars]
+# Order: try V4-Pro first; on 429/5xx/timeout/network, fall back to V4-Flash
+# (non-reasoning). V4-Pro normally takes ~200s, so the LLM client gives it a
+# 720s stream window and only falls back on true transport/provider failure.
+LLM_FALLBACK_MODEL = "deepseek-v4-flash"
+
+[[queues.consumers]]
+queue = "glean-llm"
+max_batch_size = 1            # one LLM call per message; no point batching
+max_batch_timeout = 5
+# concurrency=1: V4-Pro streaming can hang past STREAM_TIMEOUT_MS in CF
+# Workers (abort doesn't always unstick reader.read() on idle SSE). Single
+# slot means one stuck call only blocks the next message, not 3.
+max_concurrency = 1
+# retries=0: any LLM failure (schema/truncation OR transient 429/5xx) is
+# treated as terminal. Retrying a failed run almost always burns more
+# DeepSeek budget for the same answer; the admin "Re-run V4-Pro" button is
+# the explicit retry path. Keeps the event-log timeline clean too.
+max_retries = 0
+# visibility_timeout=900s: V4-Pro reasoning calls commonly run ~200s and can
+# legitimately sit quiet while reasoning. Match the 15-minute Queue Consumer
+# wall-time ceiling so a healthy long run is not redelivered underneath itself.
+visibility_timeout_ms = 900000
+dead_letter_queue = "glean-llm-dlq"
+
+# Producer side of the same queue — used to enqueue a "phase=sections"
+# message when admin clicks "重新生成 sections" from a Pages route. We can't
+# call runSectionsPhase synchronously from Pages (30s SSR limit vs. ~2-4 min
+# sections call), so the Pages route enqueues here and a fresh worker
+# delivery does the work.
+[[queues.producers]]
+binding = "INGEST_LLM"
+queue = "glean-llm"
+
+[dev]
+port = 8788
+
+# Secrets to set with `wrangler secret put <NAME> -c workers/llm-consumer/wrangler.toml`:
+#   DEEPSEEK_API_KEY     — default LLM (uses deepseek-v4-pro reasoning model)
+#   OPENAI_API_KEY       — alternative, or for any OpenAI-compatible endpoint
+#   LLM_PROVIDER         — optional, "deepseek" | "openai"
+#   LLM_MODEL            — optional, override default ("deepseek-v4-flash" is cheaper)
+#   LLM_BASE_URL         — optional, override endpoint URL
+#   LLM_FALLBACK_MODEL   — optional, model to fall back to on transient failure

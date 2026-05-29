@@ -1,0 +1,48 @@
+name = "glean-ingest"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# In local dev we point at the same .wrangler/state as the Astro dev server,
+# so submissions inserted by `pnpm dev` are visible here.
+# `wrangler dev -c ...` with --persist-to is the right flag for full sharing,
+# but the default state path under the app/ cwd works for our setup.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "glean"
+database_id = "REPLACE_WITH_D1_ID"
+migrations_dir = "../../migrations"
+
+[[r2_buckets]]
+binding = "RAW"
+bucket_name = "glean-raw"
+
+[[queues.consumers]]
+queue = "glean-ingest"
+max_batch_size = 5
+max_batch_timeout = 30
+max_concurrency = 5
+max_retries = 2
+# Extract is usually fast (Jina/Readability < 10s) but paywalled sites and
+# the fxtwitter fallback can stall. 120s comfortably covers the upper bound
+# without letting the default 30s cause duplicate fetches under load.
+visibility_timeout_ms = 120000
+dead_letter_queue = "glean-ingest-dlq"
+
+# Producer binding — extract worker forwards the ULID to the LLM stage queue
+# after a successful R2 write.
+[[queues.producers]]
+binding = "INGEST_LLM"
+queue = "glean-llm"
+
+# Local dev port — choose a non-conflicting one
+[dev]
+port = 8787
+
+# Secrets to set with `wrangler secret put <NAME> -c workers/ingest-consumer/wrangler.toml`:
+#   DEEPSEEK_API_KEY     — default LLM (uses deepseek-v4-pro reasoning model)
+#   OPENAI_API_KEY       — alternative, or for any OpenAI-compatible endpoint
+#   LLM_PROVIDER         — optional, "deepseek" | "openai"
+#   LLM_MODEL            — optional, override default ("deepseek-v4-flash" is cheaper)
+#   LLM_BASE_URL         — optional, override endpoint URL

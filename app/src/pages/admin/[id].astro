@@ -1,0 +1,1335 @@
+---
+export const prerender = false;
+import Admin from "~/layouts/Admin.astro";
+import StatusPill from "~/components/StatusPill.astro";
+import { db } from "~/db/client";
+import { submissions, submissionEvents } from "~/db/schema";
+import { getAdminProcessingStatus } from "~/lib/adminProcessingStatus";
+import { formatTimeHM, formatTimeHMS, siteTz } from "~/lib/datetime";
+import { isInFlight } from "~/lib/submissionStatus";
+import { asc, eq } from "drizzle-orm";
+
+const id = Astro.params.id;
+if (!id) return new Response("Not found", { status: 404 });
+
+const env = Astro.locals.runtime.env;
+const drizzle = db(env.DB);
+const rows = await drizzle.select().from(submissions).where(eq(submissions.id, id)).limit(1);
+const row = rows[0];
+if (!row) return new Response("Not found", { status: 404 });
+
+// Position inside the "ready" queue, so J/K (prev/next) can wire up.
+// Only computed when the current row is itself ready — for other statuses
+// the strip just shows the status without a queue counter.
+let queueContext: { total: number; index: number; prevId: string | null; nextId: string | null } | null = null;
+if (row.status === "ready") {
+  const ready = await drizzle
+    .select({ id: submissions.id })
+    .from(submissions)
+    .where(eq(submissions.status, "ready"))
+    .orderBy(asc(submissions.createdAt));
+  const idx = ready.findIndex((r) => r.id === row.id);
+  if (idx >= 0) {
+    queueContext = {
+      total: ready.length,
+      index: idx,
+      prevId: ready[idx - 1]?.id ?? null,
+      nextId: ready[idx + 1]?.id ?? null,
+    };
+  }
+}
+
+let rawText: string | null = null;
+let rawTotalChars: number | null = null;
+const RAW_PREVIEW_CHARS = 8000;
+if (row.rawR2Key) {
+  try {
+    const obj = await env.RAW.get(row.rawR2Key);
+    if (obj) {
+      const full = await obj.text();
+      rawTotalChars = full.length;
+      rawText = full.slice(0, RAW_PREVIEW_CHARS);
+    }
+  } catch (err) {
+    console.warn("r2 read failed", err);
+  }
+}
+
+const aiBullets: { zh: string; en: string }[] = (() => {
+  try { return JSON.parse(row.aiBulletsJson ?? "[]"); } catch { return []; }
+})();
+const aiTags: string[] = (() => {
+  try { return JSON.parse(row.aiTagsJson ?? "[]"); } catch { return []; }
+})();
+const aiSubscores: Record<string, number> | null = (() => {
+  try { return row.aiSubscoresJson ? JSON.parse(row.aiSubscoresJson) : null; } catch { return null; }
+})();
+const aiGlossary: { en: string; zh: string; meaning: string; anchor?: string }[] = (() => {
+  try { return JSON.parse(row.aiGlossaryJson ?? "[]"); } catch { return []; }
+})();
+const aiNextHints: string[] = (() => {
+  try { return JSON.parse(row.aiNextHintsJson ?? "[]"); } catch { return []; }
+})();
+const bulletsZhText = aiBullets.map((b) => b.zh).join("\n");
+const bulletsEnText = aiBullets.map((b) => b.en).join("\n");
+const tz = siteTz(env);
+const submitTime = formatTimeHM(row.createdAt, tz);
+
+const events = await drizzle
+  .select()
+  .from(submissionEvents)
+  .where(eq(submissionEvents.submissionId, row.id))
+  .orderBy(asc(submissionEvents.createdAt));
+
+type EventRow = typeof events[number];
+type RenderedEvent = {
+  ts: string;
+  tsISO: string;
+  stage: EventRow["stage"];
+  status: EventRow["status"];
+  message: string | null;
+  meta: Record<string, unknown> | null;
+  elapsedSincePrev: string | null;
+  state: "ok" | "active" | "warn" | "fail";
+  glyph: string;
+};
+const stateForEvent = (e: EventRow): RenderedEvent["state"] => {
+  if (e.status === "failed" || e.status === "rejected") return "fail";
+  if (e.status === "skipped") return "warn";
+  if (e.status === "started") return "active";
+  return "ok";
+};
+const glyphFor = (state: RenderedEvent["state"], status: EventRow["status"]): string => {
+  if (state === "fail") return "✗";
+  if (state === "warn") return "⊘";
+  if (state === "active") return "◌";
+  if (status === "queued") return "↪";
+  return "✓";
+};
+const fmtElapsed = (ms: number): string => {
+  if (ms < 1000) return `+${ms}ms`;
+  const s = ms / 1000;
+  if (s < 60) return `+${s.toFixed(s < 10 ? 1 : 0)}s`;
+  const m = Math.floor(s / 60);
+  const rem = Math.round(s - m * 60);
+  return `+${m}m${rem ? ` ${rem}s` : ""}`;
+};
+const renderedEvents: RenderedEvent[] = events.map((e, idx) => {
+  const ts = e.createdAt ? new Date(e.createdAt) : new Date();
+  const prevEvent = idx > 0 ? events[idx - 1] : undefined;
+  const prevCreatedAt = prevEvent?.createdAt ?? null;
+  const elapsed = prevCreatedAt ? ts.getTime() - new Date(prevCreatedAt).getTime() : null;
+  let meta: Record<string, unknown> | null = null;
+  if (e.metaJson) {
+    try { meta = JSON.parse(e.metaJson) as Record<string, unknown>; } catch { meta = null; }
+  }
+  const state = stateForEvent(e);
+  return {
+    ts: formatTimeHMS(ts, tz),
+    tsISO: ts.toISOString(),
+    stage: e.stage,
+    status: e.status,
+    message: e.message,
+    meta,
+    elapsedSincePrev: elapsed != null ? fmtElapsed(elapsed) : null,
+    state,
+    glyph: glyphFor(state, e.status),
+  };
+});
+
+Astro.response.headers.set("Cache-Control", "no-store");
+
+const isProcessing = isInFlight(row.status);
+const processingStatus = isProcessing
+  ? getAdminProcessingStatus({
+      status: row.status,
+      rawR2Key: row.rawR2Key,
+      processingStartedAt: row.processingStartedAt,
+      processingModel: row.processingModel,
+      createdAt: row.createdAt,
+      rawTotalChars,
+    })
+  : null;
+
+const sourceHost = (() => { try { return new URL(row.url).host; } catch { return row.url; } })();
+const shortId = `${row.id.slice(0, 7)}…${row.id.slice(-4)}`;
+// Same heuristic as publish.ts uses for the published pick: ~1000 chars/min
+// across a mix of ZH and EN. Floor at 1, only shown when we have raw text.
+const readMinutes = rawTotalChars ? Math.max(1, Math.round(rawTotalChars / 1000)) : null;
+
+// Pipeline header derivation. The terminal-log panel is always rendered;
+// status + model + elapsed are sourced from row + adminProcessingStatus +
+// the latest event so the editor can see "what stage are we at" without
+// reading the log itself.
+const modelShort = (model: string | null | undefined): string | null => {
+  if (!model) return null;
+  const cleaned = model.replace(/^deepseek[-/]/i, "").toLowerCase();
+  if (cleaned.includes("flash")) return "V4-Flash";
+  if (cleaned.includes("v4-pro")) return "V4-Pro";
+  return model;
+};
+const activeEventIdx = (() => {
+  if (!isProcessing) return -1;
+  for (let i = renderedEvents.length - 1; i >= 0; i--) {
+    if (renderedEvents[i]!.status === "started") return i;
+  }
+  return -1;
+})();
+const pipelineModel = processingStatus?.modelLabel
+  ?? modelShort(row.processingModel)
+  ?? modelShort(row.aiModel?.split("/")[1])
+  ?? null;
+const pipelineState: "running" | "complete" | "failed" | "rejected" | "queued" | "idle" = (() => {
+  if (row.status === "failed") return "failed";
+  if (row.status === "rejected") return "rejected";
+  if (row.status === "ready" || row.status === "published") return "complete";
+  if (row.status === "analyzing" || row.status === "composing") return "running";
+  if (row.status === "pending") return "queued";
+  return "idle";
+})();
+const pipelineHeadline: string = (() => {
+  switch (pipelineState) {
+    case "running": return "RUNNING";
+    case "complete": return "COMPLETE";
+    case "failed": return "AI FAILED";
+    case "rejected": return "REJECTED BY EDITOR";
+    case "queued": return "QUEUED";
+    default: return "IDLE";
+  }
+})();
+const pipelineFailureReason: string | null = (() => {
+  if (pipelineState === "failed") return (row.aiSectionsError ?? "").trim() || null;
+  if (pipelineState === "rejected") return (row.rejectReason ?? "").trim() || null;
+  return null;
+})();
+const pipelineStartedAt = row.processingStartedAt ?? row.createdAt ?? new Date();
+const pipelineElapsedMs = Math.max(0, Date.now() - pipelineStartedAt.getTime());
+const fmtClock = (ms: number): string => {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+};
+const pipelineElapsedLabel = fmtClock(pipelineElapsedMs);
+const pipelineProgressPct = processingStatus?.progressPct ?? (pipelineState === "complete" ? 100 : 0);
+const pipelineWindowLabel = processingStatus?.windowLabel ?? null;
+const pipelineIsStalled = processingStatus?.isPastWindow ?? false;
+
+// Body sections are guaranteed present once status is 'ready'/'published'.
+// While composing, the body drawer shows the "生成中" placeholder.
+const sectionsComposing = row.status === "composing";
+const failureErrorShort = row.aiSectionsError ? row.aiSectionsError.replace(/\s+/g, " ").slice(0, 200) : null;
+
+type SectionPair = {
+  heading_zh?: string;
+  heading_en?: string;
+  body_zh: string;
+  body_en: string;
+  anchor_id?: string;
+};
+const aiSections: SectionPair[] = (() => {
+  if (!row.aiSectionsJson) return [];
+  try {
+    const v = JSON.parse(row.aiSectionsJson);
+    return Array.isArray(v) ? (v as SectionPair[]) : [];
+  } catch { return []; }
+})();
+// Total chars across sections — gives editor a sense of body coverage.
+const sectionsTotalChars = aiSections.reduce(
+  (n, s) => n + (s.body_zh?.length ?? 0) + (s.body_en?.length ?? 0),
+  0,
+);
+---
+<Admin title={`审核 · ${row.id.slice(0, 8)}…`}>
+
+  <form id="ar-form" action={`/api/admin/${row.id}/save`} method="post" autocomplete="off">
+    <header class="r2-strip">
+      <a href="/admin" class="r2-strip__back">← Queue</a>
+      {queueContext && (
+        <span class="r2-strip__pos">
+          Ready <strong>{queueContext.index + 1}</strong> / {queueContext.total}
+        </span>
+      )}
+      <StatusPill status={row.status} />
+      <span class="r2-strip__id" title={row.id}>{shortId}</span>
+      <span class="r2-strip__meta">
+        <a href={row.url} class="t-code" rel="noopener" style="color: inherit">{sourceHost}</a>
+        {row.extractedLang && <> · {row.extractedLang}</>}
+        {row.aiModel && <> · {row.aiModel}</>}
+        {row.aiLatencyMs ? <> · {(row.aiLatencyMs / 1000).toFixed(1)}s</> : null}
+        {row.aiTokens ? <> · {row.aiTokens.toLocaleString()} tok</> : null}
+      </span>
+      <div class="r2-strip__tools">
+        <button type="button" class="r2-strip__tool" data-drawer-open="src-drawer">
+          Source <kbd>V</kbd>
+        </button>
+        <button
+          type="button"
+          class={`r2-strip__tool${row.status === "failed" ? " is-warn" : ""}`}
+          data-drawer-open="body-drawer"
+          title={sectionsComposing
+            ? "Sections 生成中"
+            : row.status === "failed"
+              ? `Sections 失败: ${failureErrorShort ?? "未知错误"}`
+              : "正文双语段落"}
+        >
+          Body <kbd>B</kbd>
+          {aiSections.length > 0 && <span class="r2-strip__tool-count">{aiSections.length}</span>}
+          {sectionsComposing && <span class="r2-strip__tool-dot" aria-label="pending"></span>}
+          {row.status === "failed" && <span class="r2-strip__tool-bang" aria-hidden="true">!</span>}
+        </button>
+        <button type="button" class="r2-strip__tool" data-drawer-open="ai-drawer">
+          AI <kbd>I</kbd>
+        </button>
+        <div class="opmenu" id="opmenu">
+          <button type="button" class="r2-strip__tool" data-opmenu-toggle>⋯</button>
+          <div class="opmenu__list" role="menu">
+            <button type="button" class="opmenu__item" data-action="refetch">
+              Refetch source
+            </button>
+            <button type="button" class="opmenu__item" data-action="rerun-pro">
+              Re-run V4-Pro <span class="text-muted-soft">· 2–12min</span>
+            </button>
+            <button type="button" class="opmenu__item" data-action="rerun-flash">
+              Re-run V4-Flash <span class="text-muted-soft">· 1–4min</span>
+            </button>
+            <a href={row.url} class="opmenu__item" rel="noopener" target="_blank">Open source ↗</a>
+            <div class="opmenu__sep"></div>
+            <button type="button" class="opmenu__item opmenu__item--danger" data-action="delete">
+              Delete permanently
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="r2" id="main">
+      {renderedEvents.length > 0 && (
+        <section
+          class={`r2-pipeline is-${pipelineState}${pipelineIsStalled ? " is-stalled" : ""}${pipelineState === "complete" && !pipelineIsStalled ? " is-collapsed" : ""}`}
+          aria-live="polite"
+          data-pipeline
+          data-pipeline-state={pipelineState}
+          data-event-count={renderedEvents.length}
+        >
+          <header class="r2-pipeline__head" data-pipeline-toggle role="button" tabindex="0" aria-expanded="true" aria-controls={`pipeline-body-${row.id}`}>
+            <div class="r2-pipeline__title">
+              <span class="r2-pipeline__bullet" aria-hidden="true"></span>
+              <span class="r2-pipeline__title-text">pipeline · {pipelineHeadline}</span>
+              {pipelineModel && <span class="r2-pipeline__model">· {pipelineModel}</span>}
+              <span class="r2-pipeline__count">{renderedEvents.length} events</span>
+            </div>
+            <div class="r2-pipeline__elapsed">
+              <span
+                class="r2-pipeline__elapsed-main"
+                data-pipeline-elapsed
+                data-started-at={pipelineStartedAt.toISOString()}
+                data-running={isProcessing ? "1" : "0"}
+              >{pipelineElapsedLabel}</span>
+              {pipelineWindowLabel && <small>{pipelineWindowLabel}</small>}
+            </div>
+            <span class="r2-pipeline__chevron" aria-hidden="true">▾</span>
+          </header>
+          <div class="r2-pipeline__body" id={`pipeline-body-${row.id}`}>
+          {pipelineFailureReason && (
+            <div class={`r2-pipeline__reason r2-pipeline__reason--${pipelineState}`}>
+              <span class="r2-pipeline__reason-label">
+                {pipelineState === "rejected" ? "原因 · Rejected by editor" : "原因 · AI failure"}
+              </span>
+              <pre class="r2-pipeline__reason-msg">{pipelineFailureReason}</pre>
+            </div>
+          )}
+          {isProcessing && (
+            <div class="r2-pipeline__meter" aria-hidden="true">
+              <span style={`width: ${pipelineProgressPct}%`}></span>
+            </div>
+          )}
+          <ol class="r2-pipeline__log" data-active-idx={activeEventIdx}>
+            {renderedEvents.map((e, idx) => {
+              const isActive = idx === activeEventIdx;
+              const rowState = isActive ? "active" : e.state;
+              const metaEntries = e.meta ? Object.entries(e.meta) : [];
+              return (
+                <li class={`r2-pipeline__row is-${rowState}`}>
+                  <div class="r2-pipeline__line">
+                    <span class="r2-pipeline__glyph" aria-hidden="true">{isActive ? "◌" : e.glyph}</span>
+                    <span class="r2-pipeline__ts t-code">{e.ts}</span>
+                    <span class="r2-pipeline__stage">{e.stage}</span>
+                    <span class="r2-pipeline__status">{e.status}</span>
+                    <span class="r2-pipeline__delta t-code">{e.elapsedSincePrev ?? ""}</span>
+                  </div>
+                  {(metaEntries.length > 0 || e.message || isActive) && (
+                    <div class="r2-pipeline__sub">
+                      {e.message && (
+                        <div class="r2-pipeline__sub-row r2-pipeline__sub-row--msg">
+                          <span class="r2-pipeline__sub-glyph" aria-hidden="true">⤷</span>
+                          <span>{e.message}</span>
+                        </div>
+                      )}
+                      {metaEntries.map(([k, v]) => (
+                        <div class="r2-pipeline__sub-row">
+                          <span class="r2-pipeline__sub-glyph" aria-hidden="true">⤷</span>
+                          <span class="r2-pipeline__sub-kv">
+                            <span class="r2-pipeline__sub-k">{k}</span>
+                            <span class="r2-pipeline__sub-eq">=</span>
+                            <span class="r2-pipeline__sub-v">{
+                              Array.isArray(v)
+                                ? (v.length ? v.join(",") : "—")
+                                : typeof v === "object" && v !== null
+                                  ? JSON.stringify(v)
+                                  : String(v)
+                            }</span>
+                          </span>
+                        </div>
+                      ))}
+                      {isActive && (
+                        <div class="r2-pipeline__sub-row r2-pipeline__sub-row--live">
+                          <span class="r2-pipeline__sub-glyph" aria-hidden="true">⤷</span>
+                          <span>
+                            running…
+                            <span
+                              class="r2-pipeline__live-tick t-code"
+                              data-live-since={e.tsISO}
+                            >{e.elapsedSincePrev ?? "0s"}</span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+          {pipelineIsStalled && (
+            <div class="r2-pipeline__hint">
+              已超过正常窗口。可以用右上角 ⋯ 里的 Re-run 重新入队。
+            </div>
+          )}
+          </div>
+        </section>
+      )}
+
+      <article class="r2-card" id="r2-card">
+        <div class="r2-card__eyebrow">
+          <a href={row.url} rel="noopener" target="_blank" title="Open source">{sourceHost} ↗</a>
+          {row.extractedLang && (
+            <>
+              <span class="r2-card__sep">·</span>
+              <span>{row.extractedLang}</span>
+            </>
+          )}
+          {readMinutes && (
+            <>
+              <span class="r2-card__sep">·</span>
+              <span>{readMinutes} min read</span>
+            </>
+          )}
+          <div class="lang3-toggle" role="tablist" aria-label="Show language">
+            <button type="button" data-lang3="both" class="is-active">Both</button>
+            <button type="button" data-lang3="zh">中</button>
+            <button type="button" data-lang3="en">EN</button>
+          </div>
+        </div>
+
+        <h1
+          class="r2-title ie lang-zh-only"
+          contenteditable="true"
+          spellcheck="false"
+          data-mirror="title_zh"
+          data-placeholder="点击写中文标题"
+          data-empty={!row.aiTitleZh ? "1" : undefined}
+        >{row.aiTitleZh ?? ""}</h1>
+        <h2
+          class="r2-title r2-title--en ie lang-en-only"
+          contenteditable="true"
+          spellcheck="false"
+          data-mirror="title_en"
+          data-placeholder="Click to write English title"
+          data-empty={!row.aiTitleEn ? "1" : undefined}
+        >{row.aiTitleEn ?? ""}</h2>
+
+        <div class="r2-bilingual">
+          <p
+            class="r2-summary ie lang-zh-only"
+            contenteditable="true"
+            spellcheck="false"
+            data-mirror="summary_zh"
+            data-placeholder="点击写中文摘要"
+            data-empty={!row.aiSummaryZh ? "1" : undefined}
+          >{row.aiSummaryZh ?? ""}</p>
+          <p
+            class="r2-summary r2-summary--en ie lang-en-only"
+            contenteditable="true"
+            spellcheck="false"
+            data-mirror="summary_en"
+            data-placeholder="Click to write English summary"
+            data-empty={!row.aiSummaryEn ? "1" : undefined}
+          >{row.aiSummaryEn ?? ""}</p>
+        </div>
+
+        <ul class="r2-bullets" id="r2-bullets">
+          {aiBullets.length === 0 && (
+            <li class="r2-bullets__row" data-bullet-row>
+              <span class="r2-bullets__zh ie lang-zh-only" contenteditable="true" data-bullet-zh data-placeholder="点击加一条要点 (中)" data-empty="1"></span>
+              <span class="r2-bullets__en ie lang-en-only" contenteditable="true" data-bullet-en data-placeholder="And English…" data-empty="1"></span>
+              <button type="button" class="r2-bullets__remove" data-bullet-remove aria-label="Remove">×</button>
+            </li>
+          )}
+          {aiBullets.map((b) => (
+            <li class="r2-bullets__row" data-bullet-row>
+              <span class="r2-bullets__zh ie lang-zh-only" contenteditable="true" data-bullet-zh data-placeholder="(中)" data-empty={!b.zh ? "1" : undefined}>{b.zh}</span>
+              <span class="r2-bullets__en ie lang-en-only" contenteditable="true" data-bullet-en data-placeholder="(en)" data-empty={!b.en ? "1" : undefined}>{b.en}</span>
+              <button type="button" class="r2-bullets__remove" data-bullet-remove aria-label="Remove">×</button>
+            </li>
+          ))}
+        </ul>
+        <button type="button" class="r2-bullets__add" id="r2-bullets-add" style="margin-top: 14px">+ 加一条要点 / Add bullet</button>
+
+        <div class="r2-note">
+          <span class="r2-note__label">Editor's note · 你的话</span>
+          <div
+            class="r2-note__body ie lang-zh-only"
+            contenteditable="true"
+            spellcheck="false"
+            data-mirror="editor_zh"
+            data-placeholder="一句你的视角——AI 没法替你写的那一段"
+            data-empty={!row.editorNoteZh ? "1" : undefined}
+          >{row.editorNoteZh ?? ""}</div>
+          <div
+            class="r2-note__body ie lang-en-only"
+            contenteditable="true"
+            spellcheck="false"
+            data-mirror="editor_en"
+            data-placeholder="One line in your voice"
+            data-empty={!row.editorNoteEn ? "1" : undefined}
+          >{row.editorNoteEn ?? ""}</div>
+        </div>
+
+        <div class="r2-footer">
+          <div class="chips" id="r2-chips">
+            {aiTags.map((t) => (
+              <span class="chip" data-chip>
+                <span data-chip-text>{t}</span>
+                <button type="button" class="chip__remove" data-chip-remove aria-label="Remove tag">×</button>
+              </span>
+            ))}
+            <input
+              type="text"
+              class="chip-input"
+              id="r2-chip-input"
+              placeholder="+ tag"
+              autocomplete="off"
+              maxlength="30"
+            />
+          </div>
+
+          <div class="r2-meta">
+            <span><span class="r2-meta__label">cat</span>
+              <select class="r2-meta__edit" name="category">
+                <option value="code" selected={row.aiCategory === "code"}>code</option>
+                <option value="infra" selected={row.aiCategory === "infra"}>infra</option>
+                <option value="data" selected={row.aiCategory === "data"}>data</option>
+              </select>
+            </span>
+            <span class="r2-meta__sep">·</span>
+            <span><span class="r2-meta__label">score</span>
+              <input
+                type="number"
+                class="r2-meta__edit"
+                name="score"
+                step="0.01"
+                min="0"
+                max="1"
+                value={row.aiScore?.toString() ?? "0.5"}
+                style="width: 64px"
+              />
+            </span>
+            <span class="r2-meta__sep">·</span>
+            <span><span class="r2-meta__label">by</span>
+              <input
+                type="text"
+                class="r2-meta__edit"
+                name="submitter"
+                value={row.submitterName ?? ""}
+                placeholder="Devin"
+                maxlength="40"
+                style="width: 110px"
+              />
+            </span>
+          </div>
+        </div>
+      </article>
+
+      {/* Hidden mirror fields. Visible contenteditable copies its content here on every edit. */}
+      <div hidden aria-hidden="true">
+        <input type="hidden" name="title_zh" value={row.aiTitleZh ?? ""} />
+        <input type="hidden" name="title_en" value={row.aiTitleEn ?? ""} />
+        <textarea name="summary_zh">{row.aiSummaryZh ?? ""}</textarea>
+        <textarea name="summary_en">{row.aiSummaryEn ?? ""}</textarea>
+        <textarea name="bullets_zh" id="ar-bullets-zh">{bulletsZhText}</textarea>
+        <textarea name="bullets_en" id="ar-bullets-en">{bulletsEnText}</textarea>
+        <input type="hidden" name="editor_zh" value={row.editorNoteZh ?? ""} />
+        <input type="hidden" name="editor_en" value={row.editorNoteEn ?? ""} />
+        <input type="hidden" name="tags" id="ar-tags" value={aiTags.join(",")} />
+      </div>
+    </main>
+
+    <footer class="r2-actionbar">
+      <div class="r2-actionbar__nav">
+        {queueContext?.prevId ? (
+          <a href={`/admin/${queueContext.prevId}`} class="r2-strip__tool" title="Previous ready" data-nav="prev">← <kbd>J</kbd></a>
+        ) : (
+          <span class="r2-strip__tool" style="opacity: 0.35; cursor: default">← <kbd>J</kbd></span>
+        )}
+        {queueContext?.nextId ? (
+          <a href={`/admin/${queueContext.nextId}`} class="r2-strip__tool" title="Next ready" data-nav="next"><kbd>K</kbd> →</a>
+        ) : (
+          <span class="r2-strip__tool" style="opacity: 0.35; cursor: default"><kbd>K</kbd> →</span>
+        )}
+      </div>
+      <div class="r2-actionbar__spacer"></div>
+      <div class="r2-actionbar__status" id="r2-save-status" aria-live="polite"></div>
+      {sectionsComposing && (
+        <div class="r2-actionbar__sections" data-sections-state="composing">
+          <span class="r2-actionbar__sections-msg">
+            <span class="r2-actionbar__sections-dot" aria-hidden="true"></span>
+            sections 生成中…
+          </span>
+        </div>
+      )}
+      {row.status === "failed" && (
+        <div class="r2-actionbar__sections" data-sections-state="failed">
+          <span class="r2-actionbar__sections-msg" title={row.aiSectionsError ?? undefined}>
+            {`sections 失败${failureErrorShort ? `: ${failureErrorShort}` : ""}`}
+          </span>
+          {/* form="ar-regen-form" associates this submit with the
+              separate form declared after ar-form, so Enter inside any
+              ar-form input cannot accidentally trigger a regenerate. */}
+          <button type="submit" form="ar-regen-form" class="btn btn-secondary">
+            重新生成 sections
+          </button>
+        </div>
+      )}
+      <button type="submit" class="btn-reject" formaction={`/api/admin/${row.id}/reject`} formnovalidate>
+        Reject
+      </button>
+      <button
+        type="submit"
+        class="btn-publish"
+        formaction={`/api/admin/${row.id}/publish`}
+        disabled={row.status !== "ready"}
+        title={row.status !== "ready" ? `Publish 阻塞：status ${row.status}` : undefined}
+      >
+        Publish &amp; next <kbd>⏎</kbd>
+      </button>
+    </footer>
+  </form>
+
+  {/* Dedicated form for the "重新生成 sections" actionbar button. Kept
+       OUTSIDE ar-form so the button (referenced via form="ar-regen-form")
+       isn't the implicit-submit target when Enter is pressed inside one of
+       ar-form's text inputs — otherwise pressing Enter in the score input
+       while sections=failed would fire an unintended LLM call. */}
+  <form id="ar-regen-form" action={`/api/admin/${row.id}/regenerate-sections`} method="post" style="display: none"></form>
+
+  {/* Body / sections drawer (B) — bilingual paragraph pairs that get
+       rendered on the public article page. Phase-2 LLM output. */}
+  <div class="drawer drawer--wide" id="body-drawer" role="dialog" aria-modal="true" aria-labelledby="body-drawer-title">
+    <div class="drawer__backdrop" data-drawer-close></div>
+    <aside class="drawer__panel">
+      <header class="drawer__header">
+        <span id="body-drawer-title">Body · 双语段落 · B</span>
+        <button type="button" class="drawer__close" data-drawer-close aria-label="Close">×</button>
+      </header>
+      <div class="drawer__body">
+        <div class="r2-sections__meta">
+          {aiSections.length > 0 && (
+            <span>{aiSections.length} sections · {sectionsTotalChars.toLocaleString()} chars</span>
+          )}
+        </div>
+
+        {sectionsComposing && aiSections.length === 0 && (
+          <p class="r2-sections__empty">
+            <span class="r2-sections__empty-pulse" aria-hidden="true"></span>
+            sections 生成中… 4 秒后页面会自动刷新。
+          </p>
+        )}
+
+        {row.status === "failed" && aiSections.length === 0 && (
+          <div class="r2-sections__error">
+            <div class="r2-sections__error-title">Sections 生成失败</div>
+            {failureErrorShort && (
+              <pre class="r2-sections__error-msg">{failureErrorShort}</pre>
+            )}
+            <form action={`/api/admin/${row.id}/regenerate-sections`} method="post" style="margin-top: 12px">
+              <button class="btn btn-secondary" type="submit">重新生成 sections</button>
+            </form>
+          </div>
+        )}
+
+        {aiSections.length === 0 && !sectionsComposing && row.status !== "failed" && (
+          <p class="r2-sections__empty">还没有 sections 数据。</p>
+        )}
+
+        {aiSections.length > 0 && (
+          <ol class="r2-sections">
+            {aiSections.map((s, i) => (
+              <li class="r2-sections__row" id={`sec-${i + 1}`}>
+                <div class="r2-sections__num t-code">§ {i + 1}</div>
+                <div class="r2-sections__pair">
+                  {(s.heading_en || s.heading_zh) && (
+                    <div class="r2-sections__heading">
+                      {s.heading_en && <strong lang="en">{s.heading_en}</strong>}
+                      {s.heading_en && s.heading_zh && <span class="r2-sections__heading-sep"> · </span>}
+                      {s.heading_zh && <strong lang="zh">{s.heading_zh}</strong>}
+                    </div>
+                  )}
+                  <div class="r2-sections__cols">
+                    <div class="r2-sections__col r2-sections__col--orig" lang="en">{s.body_en}</div>
+                    <div class="r2-sections__col r2-sections__col--trans" lang="zh">{s.body_zh}</div>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {aiSections.length > 0 && (
+          <form action={`/api/admin/${row.id}/regenerate-sections`} method="post" style="margin-top: 18px">
+            <button class="btn btn-secondary" type="submit">重新生成 sections</button>
+          </form>
+        )}
+      </div>
+    </aside>
+  </div>
+
+  {/* Source drawer (V) */}
+  <div class="drawer" id="src-drawer" role="dialog" aria-modal="true" aria-labelledby="src-drawer-title">
+    <div class="drawer__backdrop" data-drawer-close></div>
+    <aside class="drawer__panel">
+      <header class="drawer__header">
+        <span id="src-drawer-title">Extracted source · V</span>
+        <button type="button" class="drawer__close" data-drawer-close aria-label="Close">×</button>
+      </header>
+      <div class="drawer__body">
+        {rawTotalChars !== null && (
+          <div class="r2-source__stats">
+            {rawTotalChars > RAW_PREVIEW_CHARS
+              ? `${RAW_PREVIEW_CHARS.toLocaleString()} / ${rawTotalChars.toLocaleString()} chars · preview only`
+              : `${rawTotalChars.toLocaleString()} chars`}
+          </div>
+        )}
+        {rawText ? (
+          <pre class="r2-source__text">{rawText}</pre>
+        ) : isProcessing ? (
+          <p style="color: var(--c-muted); font-style: italic">— 抓取中 —</p>
+        ) : (
+          <p style="color: var(--c-muted); font-style: italic">— 未能抓取正文 —{row.rejectReason ? ` (${row.rejectReason})` : ""}</p>
+        )}
+
+        <form action={`/api/admin/${row.id}/refetch`} method="post" style="margin-top: 16px">
+          <button class="btn btn-secondary" type="submit">Refetch URL</button>
+        </form>
+
+        <div class="r2-source__paste">
+          <div class="r2-source__paste-label">Manual paste · 抓不到时用</div>
+          <p class="t-body-sm text-muted" style="margin: 0 0 10px">
+            付费墙 / JS 渲染 / 404 都行——粘原文进来 AI 直接处理，跳过抓取。
+          </p>
+          <form action={`/api/admin/${row.id}/paste`} method="post">
+            <input
+              type="text"
+              name="manual_title"
+              class="input"
+              placeholder="可选 · Title override"
+              style="margin-bottom: 8px"
+            />
+            <textarea
+              name="content"
+              class="textarea"
+              required
+              minlength="200"
+              placeholder="把原文粘到这里（≥ 200 字符）"
+              style="min-height: 220px; width: 100%; font-family: var(--f-mono); font-size: 12.5px"
+            ></textarea>
+            <button class="btn btn-primary" type="submit" style="margin-top: 10px">
+              用粘贴内容处理 →
+            </button>
+          </form>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  {/* AI details drawer (I) */}
+  <div class="drawer" id="ai-drawer" role="dialog" aria-modal="true" aria-labelledby="ai-drawer-title">
+    <div class="drawer__backdrop" data-drawer-close></div>
+    <aside class="drawer__panel">
+      <header class="drawer__header">
+        <span id="ai-drawer-title">AI details · I</span>
+        <button type="button" class="drawer__close" data-drawer-close aria-label="Close">×</button>
+      </header>
+      <div class="drawer__body">
+        {aiSubscores ? (
+          <div class="r2-ai__group">
+            <div class="r2-ai__group-label">5-dim subscores</div>
+            {Object.entries(aiSubscores).map(([k, v]) => (
+              <div class="r2-ai__row">
+                <span class="r2-ai__row-label">{k}</span>
+                <span class="r2-ai__row-bar"><span class="r2-ai__row-fill" style={`width: ${Math.round(Number(v) * 100)}%`}></span></span>
+                <span class="r2-ai__row-val">{Number(v).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style="color: var(--c-muted-soft); font-style: italic">No AI subscores yet.</p>
+        )}
+
+        {aiGlossary.length > 0 && (
+          <div class="r2-ai__group">
+            <div class="r2-ai__group-label">Glossary</div>
+            <ul class="r2-ai__glossary">
+              {aiGlossary.map((g) => (
+                <li>
+                  <span class="r2-ai__glossary-term">{g.en}</span>
+                  <span class="r2-ai__glossary-zh"> · {g.zh}</span>
+                  <div class="r2-ai__glossary-def">{g.meaning}</div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {aiNextHints.length > 0 && (
+          <div class="r2-ai__group">
+            <div class="r2-ai__group-label">Next-read hints</div>
+            <div class="chips">
+              {aiNextHints.map((h) => <span class="chip" style="cursor: default">→ {h}</span>)}
+            </div>
+          </div>
+        )}
+
+        <div class="r2-ai__group">
+          <div class="r2-ai__group-label">Pipeline</div>
+          <div class="t-body-sm text-muted" style="line-height: 1.7">
+            {row.aiModel && <>model: <span class="t-code">{row.aiModel}</span><br /></>}
+            {row.aiLatencyMs ? <>latency: <span class="t-code">{(row.aiLatencyMs / 1000).toFixed(1)}s</span><br /></> : null}
+            {row.aiTokens ? <>tokens: <span class="t-code">{row.aiTokens.toLocaleString()}</span><br /></> : null}
+            {row.extractedLang && <>detected lang: <span class="t-code">{row.extractedLang}</span></>}
+          </div>
+          <div class="row" style="gap: 8px; margin-top: 12px; flex-wrap: wrap">
+            <form action="/api/admin/process" method="post" style="display: inline">
+              <input type="hidden" name="id" value={row.id} />
+              <button class="btn btn-secondary" type="submit" name="model" value="deepseek-v4-pro">Re-run V4-Pro</button>
+            </form>
+            <form action="/api/admin/process" method="post" style="display: inline">
+              <input type="hidden" name="id" value={row.id} />
+              <button class="btn btn-secondary" type="submit" name="model" value="deepseek-v4-flash">Re-run V4-Flash</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  {/* Hidden helper forms triggered from the ⋯ menu */}
+  <form id="op-refetch" action={`/api/admin/${row.id}/refetch`} method="post" hidden></form>
+  <form id="op-rerun-pro" action="/api/admin/process" method="post" hidden>
+    <input type="hidden" name="id" value={row.id} />
+    <input type="hidden" name="model" value="deepseek-v4-pro" />
+  </form>
+  <form id="op-rerun-flash" action="/api/admin/process" method="post" hidden>
+    <input type="hidden" name="id" value={row.id} />
+    <input type="hidden" name="model" value="deepseek-v4-flash" />
+  </form>
+  <form id="op-delete" action={`/api/admin/${row.id}/delete`} method="post" hidden></form>
+
+  {/* Destructive-action confirm modal — replaces the native window.prompt
+       that ships with no design. Currently used only by the ⋯ Delete flow;
+       structure is reusable if we add more confirm paths later. */}
+  <div class="confirm" id="confirm-delete" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title" aria-hidden="true">
+    <div class="confirm__backdrop" data-confirm-close></div>
+    <div class="confirm__panel" role="document">
+      <header class="confirm__header">
+        <span class="confirm__icon" aria-hidden="true">⚠</span>
+        <h2 id="confirm-delete-title" class="confirm__title">彻底删除提交</h2>
+      </header>
+      <div class="confirm__body">
+        <p>这一步会一并删除关联的已发布 pick + R2 原文。<strong>不可恢复。</strong></p>
+        <p class="confirm__hint">
+          输入 <code class="confirm__sentinel">删除</code> 或 <code class="confirm__sentinel">DELETE</code> 继续。
+        </p>
+        <input
+          type="text"
+          id="confirm-delete-input"
+          class="confirm__input"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="删除 / DELETE"
+          aria-label="Type 删除 or DELETE to confirm"
+        />
+      </div>
+      <footer class="confirm__actions">
+        <button type="button" class="btn btn-secondary confirm__cancel" data-confirm-close>
+          取消 <kbd>Esc</kbd>
+        </button>
+        <button type="button" id="confirm-delete-go" class="btn btn-danger" disabled>
+          删除 <kbd>⏎</kbd>
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <style>@keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }</style>
+
+  <script is:inline define:vars={{ submissionId: row.id, prevId: queueContext?.prevId ?? null, nextId: queueContext?.nextId ?? null, isProcessingJS: isProcessing, publishBlocked: row.status !== "ready" }}>
+    (() => {
+      const form = document.getElementById("ar-form");
+      if (!form) return;
+
+      // ---- Plain-text paste & single-line key handling for every .ie cell.
+      // Paste-as-text avoids ending up with arbitrary HTML in the field; the
+      // hidden form mirror uses innerText anyway, but stripping at paste-time
+      // keeps the visible state clean too.
+      const insertPlainText = (text) => {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const r = sel.getRangeAt(0);
+        r.deleteContents();
+        r.insertNode(document.createTextNode(text));
+        r.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(r);
+      };
+      document.querySelectorAll(".ie").forEach((el) => {
+        el.addEventListener("paste", (e) => {
+          e.preventDefault();
+          const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+          insertPlainText(text);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+      });
+      // Titles are single-line — Enter should commit, not insert a newline.
+      document.querySelectorAll(".r2-title.ie").forEach((el) => {
+        el.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+        });
+      });
+
+      // ---- Mirror logic: copy contenteditable text into hidden form fields.
+      const syncMirror = (el) => {
+        const name = el.dataset.mirror;
+        if (!name) return;
+        const target = form.querySelector(`[name="${name}"]`);
+        if (!target) return;
+        const value = (el.innerText ?? "").trim();
+        target.value = value;
+        el.dataset.empty = value ? "" : "1";
+      };
+      document.querySelectorAll("[data-mirror]").forEach((el) => {
+        // Initialize empty state.
+        if (!(el.innerText ?? "").trim()) el.dataset.empty = "1";
+        el.addEventListener("input", () => { syncMirror(el); scheduleAutosave(); });
+        el.addEventListener("blur", () => syncMirror(el));
+      });
+
+      // ---- Bullets: list of {zh, en}. Joined into two hidden textareas.
+      const list = document.getElementById("r2-bullets");
+      const bulletsZh = document.getElementById("ar-bullets-zh");
+      const bulletsEn = document.getElementById("ar-bullets-en");
+      const syncBullets = () => {
+        const rows = list.querySelectorAll("[data-bullet-row]");
+        const zh = [];
+        const en = [];
+        rows.forEach((r) => {
+          const z = (r.querySelector("[data-bullet-zh]").innerText ?? "").trim();
+          const e = (r.querySelector("[data-bullet-en]").innerText ?? "").trim();
+          // Skip totally empty rows on submit. Keep them visible while editing.
+          if (z || e) { zh.push(z); en.push(e); }
+        });
+        bulletsZh.value = zh.join("\n");
+        bulletsEn.value = en.join("\n");
+      };
+      const bindBulletRow = (row) => {
+        row.querySelectorAll("[data-bullet-zh], [data-bullet-en]").forEach((cell) => {
+          const updateEmpty = () => { cell.dataset.empty = (cell.innerText ?? "").trim() ? "" : "1"; };
+          cell.addEventListener("input", () => { syncBullets(); updateEmpty(); scheduleAutosave(); });
+          cell.addEventListener("blur", () => { syncBullets(); updateEmpty(); });
+        });
+        row.querySelector("[data-bullet-remove]")?.addEventListener("click", () => {
+          row.remove();
+          syncBullets();
+          scheduleAutosave();
+        });
+      };
+      list.querySelectorAll("[data-bullet-row]").forEach(bindBulletRow);
+      document.getElementById("r2-bullets-add")?.addEventListener("click", () => {
+        const tpl = document.createElement("li");
+        tpl.className = "r2-bullets__row";
+        tpl.dataset.bulletRow = "1";
+        tpl.innerHTML = `
+          <span class="r2-bullets__zh ie lang-zh-only" contenteditable="true" data-bullet-zh data-placeholder="(中)" data-empty="1"></span>
+          <span class="r2-bullets__en ie lang-en-only" contenteditable="true" data-bullet-en data-placeholder="(en)" data-empty="1"></span>
+          <button type="button" class="r2-bullets__remove" data-bullet-remove aria-label="Remove">×</button>
+        `;
+        list.appendChild(tpl);
+        bindBulletRow(tpl);
+        tpl.querySelector("[data-bullet-zh]").focus();
+      });
+
+      // ---- Tags / chips.
+      const chips = document.getElementById("r2-chips");
+      const chipInput = document.getElementById("r2-chip-input");
+      const tagsHidden = document.getElementById("ar-tags");
+      const syncTags = () => {
+        const slugs = [];
+        chips.querySelectorAll("[data-chip]").forEach((c) => {
+          const t = c.querySelector("[data-chip-text]").textContent.trim();
+          if (t) slugs.push(t);
+        });
+        tagsHidden.value = slugs.join(",");
+      };
+      const addChip = (raw) => {
+        const slug = raw.trim().toLowerCase().replace(/[\s,，]+/g, "-").replace(/[^a-z0-9-]/g, "");
+        if (!slug) return;
+        // Dedupe.
+        const existing = [...chips.querySelectorAll("[data-chip-text]")].map((s) => s.textContent.trim());
+        if (existing.includes(slug)) return;
+        const el = document.createElement("span");
+        el.className = "chip";
+        el.dataset.chip = "1";
+        el.innerHTML = `<span data-chip-text>${slug}</span><button type="button" class="chip__remove" data-chip-remove aria-label="Remove tag">×</button>`;
+        chips.insertBefore(el, chipInput);
+        el.querySelector("[data-chip-remove]").addEventListener("click", () => { el.remove(); syncTags(); scheduleAutosave(); });
+        syncTags();
+        scheduleAutosave();
+      };
+      chips.querySelectorAll("[data-chip-remove]").forEach((btn) => {
+        btn.addEventListener("click", () => { btn.closest("[data-chip]").remove(); syncTags(); scheduleAutosave(); });
+      });
+      chipInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === "," || e.key === "，") {
+          e.preventDefault();
+          addChip(chipInput.value);
+          chipInput.value = "";
+        } else if (e.key === "Backspace" && !chipInput.value) {
+          const last = chips.querySelectorAll("[data-chip]");
+          if (last.length) { last[last.length - 1].remove(); syncTags(); scheduleAutosave(); }
+        }
+      });
+      chipInput.addEventListener("blur", () => {
+        if (chipInput.value.trim()) { addChip(chipInput.value); chipInput.value = ""; }
+      });
+
+      // ---- Auto-save (debounced 700ms).
+      const status = document.getElementById("r2-save-status");
+      let saveTimer = null;
+      let inFlight = false;
+      const setStatus = (text, kind) => {
+        if (!status) return;
+        status.textContent = text;
+        status.className = "r2-actionbar__status" + (kind ? ` is-${kind}` : "");
+      };
+      const scheduleAutosave = () => {
+        // Don't auto-save while still processing.
+        if (form.dataset.processing === "1") return;
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(doAutosave, 700);
+      };
+      const doAutosave = async () => {
+        if (inFlight) return;
+        inFlight = true;
+        setStatus("Saving…", "saving");
+        try {
+          const fd = new FormData(form);
+          const res = await fetch(`/api/admin/${submissionId}/save`, { method: "POST", body: fd, redirect: "manual" });
+          // Accept 200, 303 (redirect), or opaque-redirect — all mean OK.
+          if (res.ok || res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+            setStatus(`Saved ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, "saved");
+          } else {
+            setStatus("Save failed", "saving");
+          }
+        } catch (err) {
+          setStatus("Save failed", "saving");
+        } finally {
+          inFlight = false;
+        }
+      };
+      form.dataset.processing = isProcessingJS ? "1" : "0";
+      // Save on visible input changes to category/score/byline too.
+      form.querySelectorAll("select[name], input[name='score'], input[name='submitter']").forEach((el) => {
+        el.addEventListener("change", scheduleAutosave);
+        el.addEventListener("input", scheduleAutosave);
+      });
+
+      // ---- Live tick for the pipeline panel. Updates both the header's
+      // overall elapsed clock and any active row's "running… XmYs" sub-row
+      // once a second so the editor sees motion between the 4s page reloads.
+      const fmtClock = (ms) => {
+        const totalSec = Math.max(0, Math.floor(ms / 1000));
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        if (m === 0) return `${s}s`;
+        return `${m}m ${s.toString().padStart(2, "0")}s`;
+      };
+      const headEl = document.querySelector("[data-pipeline-elapsed]");
+      const tickEl = document.querySelector("[data-live-since]");
+      const tickHead = () => {
+        if (!headEl) return;
+        if (headEl.dataset.running !== "1") return;
+        const started = headEl.dataset.startedAt ? new Date(headEl.dataset.startedAt).getTime() : NaN;
+        if (!Number.isFinite(started)) return;
+        headEl.textContent = fmtClock(Date.now() - started);
+      };
+      const tickRow = () => {
+        if (!tickEl) return;
+        const since = tickEl.dataset.liveSince ? new Date(tickEl.dataset.liveSince).getTime() : NaN;
+        if (!Number.isFinite(since)) return;
+        tickEl.textContent = fmtClock(Date.now() - since);
+      };
+      tickHead(); tickRow();
+      if (isProcessingJS) setInterval(() => { tickHead(); tickRow(); }, 1000);
+
+      // ---- Pipeline panel collapse/expand. Default is set server-side
+      // (collapsed when the row is complete, expanded otherwise). User
+      // preference is persisted in localStorage so a session-wide choice
+      // survives reloads/auto-refreshes.
+      const pipelineEl = document.querySelector("[data-pipeline]");
+      if (pipelineEl) {
+        const headerEl = pipelineEl.querySelector("[data-pipeline-toggle]");
+        const PREF_KEY = "glean.admin.pipelineCollapsed";
+        const setCollapsed = (collapsed) => {
+          pipelineEl.classList.toggle("is-collapsed", collapsed);
+          headerEl?.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        };
+        // Honor stored preference if present, otherwise leave server default.
+        const stored = localStorage.getItem(PREF_KEY);
+        if (stored === "1") setCollapsed(true);
+        else if (stored === "0") setCollapsed(false);
+        const toggle = () => {
+          const collapsed = !pipelineEl.classList.contains("is-collapsed");
+          setCollapsed(collapsed);
+          localStorage.setItem(PREF_KEY, collapsed ? "1" : "0");
+        };
+        headerEl?.addEventListener("click", toggle);
+        headerEl?.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+        });
+      }
+
+      // ---- In-flight feedback for any submit button. The form-target server
+      // endpoint will redirect on its own; this just makes sure the user sees
+      // *something* happen between click and redirect (otherwise the AI drawer
+      // looks frozen for 100-400ms while the request is in flight).
+      document.querySelectorAll("button[type='submit']").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          // Only act on the actual button the user clicked, not bubbled keys.
+          // Skip our main publish/reject/save buttons in the action bar — those
+          // are already in the user's natural sight line; the spinner here is
+          // for the drawer-embedded operator actions like Re-run V4-Pro.
+          if (btn.closest(".r2-actionbar")) return;
+          // Defer to the next tick so we don't block the form submission.
+          setTimeout(() => {
+            btn.classList.add("is-submitting");
+            // Stash original text so a failed submit could restore (best-effort).
+            if (!btn.dataset.origLabel) btn.dataset.origLabel = btn.textContent || "";
+            // Keep the button width stable while spinner shows.
+            btn.style.minWidth = btn.offsetWidth + "px";
+            btn.textContent = btn.dataset.queuingLabel || (btn.textContent.includes("Re-run") ? "Queuing…" : "…");
+          }, 0);
+        });
+      });
+
+      // ---- Drawer open/close.
+      // Used to be a <meta http-equiv="refresh"> tag, but that wiped any open
+      // drawer every 4s — annoying when you're inspecting AI details. Now a
+      // JS interval polls only when isProcessing is true AND no drawer is
+      // open AND nothing is focused (so you don't lose a mid-edit field).
+      const openDrawer = (id) => {
+        document.querySelectorAll(".drawer.is-open").forEach((d) => d.classList.remove("is-open"));
+        const d = document.getElementById(id);
+        if (d) d.classList.add("is-open");
+        pauseRefresh();
+      };
+      const closeDrawers = () => {
+        document.querySelectorAll(".drawer.is-open").forEach((d) => d.classList.remove("is-open"));
+        maybeResumeRefresh();
+      };
+      document.querySelectorAll("[data-drawer-open]").forEach((btn) => {
+        btn.addEventListener("click", () => openDrawer(btn.dataset.drawerOpen));
+      });
+      document.querySelectorAll("[data-drawer-close]").forEach((btn) => {
+        btn.addEventListener("click", closeDrawers);
+      });
+
+      // ---- Auto-refresh while processing (replaces the meta tag).
+      let refreshTimer = null;
+      const REFRESH_MS = 4000;
+      const startRefresh = () => {
+        if (!isProcessingJS) return;
+        clearInterval(refreshTimer);
+        refreshTimer = setInterval(() => {
+          if (document.querySelector(".drawer.is-open")) return;
+          const a = document.activeElement;
+          if (a && (a.isContentEditable || a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT")) return;
+          location.reload();
+        }, REFRESH_MS);
+      };
+      const pauseRefresh = () => clearInterval(refreshTimer);
+      const maybeResumeRefresh = () => { if (!document.querySelector(".drawer.is-open")) startRefresh(); };
+      startRefresh();
+
+      // ---- Op menu.
+      const opmenu = document.getElementById("opmenu");
+      document.querySelector("[data-opmenu-toggle]")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        opmenu.classList.toggle("is-open");
+      });
+      document.addEventListener("click", (e) => {
+        if (!opmenu.contains(e.target)) opmenu.classList.remove("is-open");
+      });
+      const triggerForm = (formId) => {
+        const f = document.getElementById(formId);
+        if (f) f.submit();
+      };
+
+      // ---- Confirm-delete modal. Replaces native window.prompt so the
+      // destructive action lives inside the design system. Accepts either
+      // "删除" or "DELETE" (case-insensitive) — same sentinel as before.
+      const confirmEl = document.getElementById("confirm-delete");
+      const confirmInput = document.getElementById("confirm-delete-input");
+      const confirmGo = document.getElementById("confirm-delete-go");
+      const isDeleteSentinel = (v) => {
+        const t = (v || "").trim();
+        return t === "删除" || t.toUpperCase() === "DELETE";
+      };
+      const closeConfirmDelete = () => {
+        if (!confirmEl) return;
+        confirmEl.classList.remove("is-open");
+        confirmEl.setAttribute("aria-hidden", "true");
+        if (confirmInput) confirmInput.value = "";
+        if (confirmGo) confirmGo.disabled = true;
+      };
+      const openConfirmDelete = () => {
+        if (!confirmEl) return;
+        confirmEl.classList.add("is-open");
+        confirmEl.setAttribute("aria-hidden", "false");
+        if (confirmInput) {
+          confirmInput.value = "";
+          setTimeout(() => confirmInput.focus(), 30);
+        }
+        if (confirmGo) confirmGo.disabled = true;
+      };
+      confirmEl?.querySelectorAll("[data-confirm-close]").forEach((b) => {
+        b.addEventListener("click", closeConfirmDelete);
+      });
+      confirmInput?.addEventListener("input", () => {
+        if (confirmGo) confirmGo.disabled = !isDeleteSentinel(confirmInput.value);
+      });
+      confirmInput?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (isDeleteSentinel(confirmInput.value)) {
+            closeConfirmDelete();
+            triggerForm("op-delete");
+          }
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          closeConfirmDelete();
+        }
+      });
+      confirmGo?.addEventListener("click", () => {
+        if (!isDeleteSentinel(confirmInput?.value)) return;
+        closeConfirmDelete();
+        triggerForm("op-delete");
+      });
+
+      document.querySelectorAll("[data-action]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const action = btn.dataset.action;
+          if (action === "refetch") triggerForm("op-refetch");
+          else if (action === "rerun-pro") triggerForm("op-rerun-pro");
+          else if (action === "rerun-flash") triggerForm("op-rerun-flash");
+          else if (action === "delete") {
+            openConfirmDelete();
+          }
+        });
+      });
+
+      // ---- Language toggle. CSS rule: ".lang-only-zh .lang-en-only { display: none }"
+      // — adding class .lang-only-zh on the card hides every .lang-en-only descendant.
+      document.querySelectorAll("[data-lang3]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const mode = btn.dataset.lang3; // "both" | "zh" | "en"
+          const card = document.getElementById("r2-card");
+          card.classList.remove("lang-only-zh", "lang-only-en");
+          if (mode === "zh") card.classList.add("lang-only-zh");
+          if (mode === "en") card.classList.add("lang-only-en");
+          document.querySelectorAll("[data-lang3]").forEach((b) => b.classList.toggle("is-active", b === btn));
+        });
+      });
+
+      // ---- Keyboard shortcuts (only when focus isn't inside editor / input).
+      const isEditingFocus = () => {
+        const a = document.activeElement;
+        if (!a) return false;
+        if (a.isContentEditable) return true;
+        if (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT") return true;
+        return false;
+      };
+      document.addEventListener("keydown", (e) => {
+        // Esc: close confirm modal first (most-intrusive), then drawer / op menu.
+        if (e.key === "Escape") {
+          if (confirmEl?.classList.contains("is-open")) {
+            closeConfirmDelete(); e.preventDefault();
+            return;
+          }
+          if (document.querySelector(".drawer.is-open") || opmenu.classList.contains("is-open")) {
+            closeDrawers(); opmenu.classList.remove("is-open"); e.preventDefault();
+          }
+          return;
+        }
+        // ⌘ / Ctrl combos always work.
+        if (e.metaKey || e.ctrlKey) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (publishBlocked) return;
+            form.action = `/api/admin/${submissionId}/publish`; form.submit(); return;
+          }
+          if (e.key === "s") { e.preventDefault(); doAutosave(); return; }
+          // NOTE: Cmd+D was previously bound to reject. Removed — destructive
+          // shortcuts with no confirm caused silent rejects (single `r` or
+          // `R` keystroke while focus left an input was enough). The Reject
+          // button in the action bar is now the only path; click is explicit.
+        }
+        // Single-key shortcuts: only when not typing.
+        if (isEditingFocus()) return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (publishBlocked) return;
+          form.action = `/api/admin/${submissionId}/publish`; form.submit();
+        }
+        // NOTE: single-key `R` was previously a reject shortcut — see comment
+        // above. Removed to prevent accidental rejects. Use the Reject button.
+        else if (e.key === "s" || e.key === "S") { e.preventDefault(); doAutosave(); }
+        else if (e.key === "v" || e.key === "V") { e.preventDefault(); openDrawer("src-drawer"); }
+        else if (e.key === "i" || e.key === "I") { e.preventDefault(); openDrawer("ai-drawer"); }
+        else if (e.key === "b" || e.key === "B") { e.preventDefault(); openDrawer("body-drawer"); }
+        else if (e.key === "j" || e.key === "J" || e.key === "ArrowLeft") {
+          if (prevId) { e.preventDefault(); location.href = `/admin/${prevId}`; }
+        } else if (e.key === "k" || e.key === "K" || e.key === "ArrowRight") {
+          if (nextId) { e.preventDefault(); location.href = `/admin/${nextId}`; }
+        }
+      });
+
+      // ---- Final form-submit sync: make sure mirrors/bullets/tags are current.
+      form.addEventListener("submit", () => {
+        document.querySelectorAll("[data-mirror]").forEach(syncMirror);
+        syncBullets();
+        syncTags();
+      });
+    })();
+  </script>
+</Admin>

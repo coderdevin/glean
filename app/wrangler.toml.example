@@ -1,0 +1,66 @@
+name = "glean"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+# D1 database --- holds picks, weekly_issues, tags, submissions, subscribers.
+# Create with: `pnpm wrangler d1 create glean`, then paste the printed id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "glean"
+database_id = "REPLACE_WITH_D1_ID"
+migrations_dir = "migrations"
+
+# KV namespace --- short-lived HTML cache + opt-in confirm tokens.
+# Create with: `pnpm wrangler kv namespace create CACHE`.
+[[kv_namespaces]]
+binding = "CACHE"
+id = "REPLACE_WITH_KV_ID"
+
+# R2 bucket --- raw extracted article bodies, weekly cover images.
+# Create with: `pnpm wrangler r2 bucket create glean-raw`.
+[[r2_buckets]]
+binding = "RAW"
+bucket_name = "glean-raw"
+
+# Queue producers:
+#   INGEST     → extract-stage queue. Submit + refetch endpoints write here;
+#                the extract worker consumes, runs Readability/Jina/fxtwitter,
+#                writes raw text to R2, then forwards the id to glean-llm.
+#   INGEST_LLM → LLM-stage queue. Admin "paste content" and "re-run V4-Pro/Flash"
+#                write directly here to skip the extract stage (R2 already
+#                contains the body). The llm-consumer worker reads from this.
+[[queues.producers]]
+binding = "INGEST"
+queue = "glean-ingest"
+
+[[queues.producers]]
+binding = "INGEST_LLM"
+queue = "glean-llm"
+
+# Public, safe-to-commit env values.
+# TURNSTILE_SITEKEY is rendered into the page; the matching TURNSTILE_SECRET
+# lives as a Pages secret (set via `wrangler pages secret put`).
+[vars]
+TURNSTILE_SITEKEY = "REPLACE_WITH_TURNSTILE_SITEKEY"
+SITE_NAME = "Glean"
+SITE_URL = "https://your-domain.example"
+# IANA TZ name used to render publish times. Default fits a Chinese audience.
+SITE_TZ = "Asia/Shanghai"
+# Optional. When set, /standards corrections section and footer "Contact"
+# link surface this email. Leave unset to hide.
+# CONTACT_EMAIL = "hello@your-domain.example"
+# CORRECTIONS_EMAIL = "corrections@your-domain.example"
+
+# Secrets to set with `wrangler pages secret put <NAME>`:
+#   ADMIN_EMAILS         — comma-separated allowlist of admin emails (REQUIRED).
+#                          Even with Cloudflare Access in front, the app gates
+#                          /admin against this list. No list = no admin.
+#   DEEPSEEK_API_KEY     — DeepSeek API key (default LLM, model deepseek-v4-pro).
+#   OPENAI_API_KEY       — OpenAI / OpenAI-compatible key (set LLM_BASE_URL for proxies).
+#   LLM_PROVIDER         — "deepseek" | "openai" — override auto-detect when both set.
+#   LLM_MODEL            — override default model (e.g. "deepseek-v4-flash" for cheaper/faster).
+#   LLM_BASE_URL         — override endpoint (for ModelScope, Together, Groq, etc.).
+#   TURNSTILE_SECRET     — Cloudflare Turnstile server-side secret.
+#   COOKIE_SIGNING_KEY   — random 32-byte hex for signing the subscribe token.
+#   JINA_API_KEY         — optional; raises Jina Reader's 20 req/min anon limit.

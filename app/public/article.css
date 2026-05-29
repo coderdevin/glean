@@ -1,0 +1,1273 @@
+      /* ============================================================
+         article v2 — bilingual parallel reader
+         Layout: reader's language on the left, original on the right.
+         Modes: 译文 only | 原文 only | 对照
+         ============================================================ */
+
+      /* ---------- Outer layout (TOC | article | aside) ---------- */
+      .av2-layout {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 0 var(--s-md);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: flex-start;
+        gap: var(--s-xl);
+      }
+
+      .av2 {
+        max-width: 1200px;
+        min-width: 0;
+        flex: 1 1 760px;
+      }
+      /* Chrome max-width var — every prose block aligns to this width;
+         the bilingual body breaks out to the full .av2 container.
+         960 = ~56 CPL for CJK at 17px (within the comfortable 30–60 range),
+               ~110 CPL for Latin (slightly above the 80ch ideal but fine
+               for tech prose). Bumped from 860 after the right rail moved
+               below the body, freeing horizontal space for reading. */
+      .av2 {
+        --chrome-w: 960px;
+      }
+
+      /* ---------- Left rail: TOC ---------- */
+      .av2-toc {
+        display: none; /* hidden by default; shown ≥1280px */
+      }
+      @media (min-width: 1280px) {
+        .av2-toc {
+          display: block;
+          flex: 0 0 210px;
+          position: sticky;
+          top: 140px; /* below top-nav (76) + sticky modebar (56) */
+          align-self: flex-start;
+          max-height: calc(100vh - 156px);
+          overflow-y: auto;
+          padding: 4px 0;
+          scrollbar-width: thin;
+          scrollbar-color: var(--c-hairline-soft) transparent;
+        }
+      }
+
+      /* ---------- Below-article footer: tags / glossary / next / notes ----------
+         Moved here from the sticky right rail so the bilingual columns get
+         the full reading width. Two-column grid on wide screens; collapses
+         to one column on narrow. */
+      .av2-footer {
+        margin-top: var(--s-xxl);
+        padding-top: var(--s-xl);
+        border-top: 1px solid var(--c-hairline-soft);
+      }
+      .av2-footer__grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+        gap: var(--s-xl);
+        align-items: start;
+      }
+      @media (max-width: 760px) {
+        .av2-footer__grid { grid-template-columns: 1fr; gap: var(--s-lg); }
+      }
+      .av2-footer__col { display: flex; flex-direction: column; gap: var(--s-lg); }
+      .av2-footer__sec + .av2-footer__sec {
+        margin-top: var(--s-md);
+        padding-top: var(--s-md);
+        border-top: 1px dashed var(--c-hairline);
+      }
+      .av2-footer__sec--notes {
+        margin-top: var(--s-xl);
+        padding-top: var(--s-lg);
+        border-top: 1px solid var(--c-hairline);
+      }
+      .av2-footer__label {
+        font-family: var(--f-mono);
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--c-muted-soft);
+        margin: 0 0 var(--s-sm);
+        font-weight: 500;
+      }
+
+      .av2-glossary { margin: 0; }
+      .av2-glossary__row {
+        padding: 8px 0;
+        border-bottom: 1px dashed var(--c-hairline);
+      }
+      .av2-glossary__row:last-child { border-bottom: 0; }
+      .av2-glossary__term {
+        font-family: var(--f-mono);
+        font-size: 12px;
+        color: var(--c-ink);
+      }
+      .av2-glossary__def {
+        margin: 4px 0 0;
+        font-size: 13.5px;
+        line-height: 1.55;
+        color: var(--c-body);
+      }
+
+      .av2-notes {
+        list-style: decimal;
+        padding-left: 20px;
+        margin: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--s-md) var(--s-xl);
+      }
+      @media (max-width: 760px) {
+        .av2-notes { grid-template-columns: 1fr; }
+      }
+      .av2-notes li { padding: 4px 0; }
+      .av2-notes__anchor {
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        letter-spacing: 1px;
+        color: var(--c-muted-soft);
+      }
+      .av2-notes__body {
+        margin: 4px 0 0;
+        font-size: 13.5px;
+        line-height: 1.55;
+        color: var(--c-body);
+      }
+      .aside-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .aside-tags .badge {
+        font-size: 10.5px;
+        padding: 2px 8px;
+      }
+      .av2-toc__head {
+        font-family: var(--f-mono);
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--c-muted-soft);
+        margin-bottom: var(--s-sm);
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--c-hairline);
+      }
+      .av2-toc__list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: toc;
+      }
+      .av2-toc__list li { margin: 0; }
+      .av2-toc__list a {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 7px 0 7px 10px;
+        margin-left: -1px;
+        font-family: var(--f-body);
+        font-size: 13.5px;
+        line-height: 1.35;
+        color: var(--c-muted);
+        text-decoration: none;
+        border-left: 2px solid transparent;
+        transition: color 0.12s, border-color 0.12s, background 0.12s;
+      }
+      .av2-toc__list a:hover {
+        color: var(--c-ink);
+        background: linear-gradient(to right, var(--c-surface-soft), transparent 60%);
+      }
+      .av2-toc__list a.is-active {
+        color: var(--c-ink);
+        border-left-color: var(--c-primary);
+      }
+      .av2-toc__list a.is-active .title {
+        font-style: italic;
+      }
+      .av2-toc__list .sec-num {
+        font-family: var(--f-mono);
+        font-size: 11px;
+        letter-spacing: 0.3px;
+        color: var(--c-muted-soft);
+        flex-shrink: 0;
+        font-weight: 500;
+      }
+      .av2-toc__list a.is-active .sec-num { color: var(--c-primary); }
+      .av2-toc__list .title {
+        flex: 1;
+        min-width: 0;
+      }
+      .av2-toc__list .count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 16px;
+        height: 14px;
+        padding: 0 5px;
+        color: var(--c-text-coral-dark);
+        border: 1px solid oklch(63% 0.105 32 / 30%);
+        border-radius: 999px;
+        font-family: var(--f-mono);
+        font-size: 9.5px;
+        font-weight: 500;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+      .av2-toc__list a:hover .count,
+      .av2-toc__list a.is-active .count {
+        background: var(--c-primary);
+        color: var(--c-on-primary);
+        border-color: var(--c-primary);
+      }
+      .av2-toc__foot {
+        margin-top: var(--s-md);
+        padding-top: var(--s-sm);
+        border-top: 1px solid var(--c-hairline);
+        font-family: var(--f-mono);
+        font-size: 10px;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: var(--c-muted-soft);
+      }
+
+      /* ---------- Header ---------- */
+      .av2-head {
+        max-width: var(--chrome-w);
+        margin-bottom: var(--s-lg);
+      }
+      .av2-head .av2-crumbs {
+        font-family: var(--f-mono);
+        font-size: 11px;
+        letter-spacing: 1.5px;
+        color: var(--c-muted);
+        text-transform: uppercase;
+        margin-bottom: var(--s-lg);
+      }
+      .av2-head .av2-crumbs a { color: var(--c-muted); }
+      .av2-head .av2-crumbs .sep { opacity: 0.5; margin: 0 6px; }
+      .av2-head__title {
+        font-family: var(--f-display);
+        font-weight: 400;
+        font-variation-settings: "opsz" 60, "wght" 400;
+        font-size: clamp(1.6rem, 2.6vw, 2.1rem);
+        line-height: 1.15;
+        letter-spacing: -0.015em;
+        margin: 0 0 var(--s-sm);
+        text-wrap: balance;
+        color: var(--c-ink);
+      }
+      .av2-head__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px var(--s-md);
+        font-family: var(--f-mono);
+        font-size: 11.5px;
+        color: var(--c-muted);
+        margin-bottom: 0;
+        padding-top: var(--s-xs);
+        border-top: 1px solid var(--c-hairline);
+        padding-bottom: var(--s-xs);
+        border-bottom: 1px solid var(--c-hairline);
+      }
+      .av2-head__meta .k {
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--c-muted-soft);
+        margin-right: 6px;
+      }
+      .av2-head__meta .v { color: var(--c-body); font-weight: 500; }
+      .av2-head__meta a.v { color: var(--c-body); border-bottom: 1px solid var(--c-hairline-soft); }
+      .av2-head__meta a.v:hover { color: var(--c-primary); border-bottom-color: var(--c-primary); }
+
+      /* ---------- Decision card ---------- */
+      /* Spans the full .av2 width to align with the sticky modebar and the
+         parallel-mode body below; constraining to --chrome-w left an awkward
+         gap on the right because those siblings are not capped. */
+      .av2-decision {
+        margin: var(--s-xl) 0;
+        padding: var(--s-md) var(--s-lg);
+        background: var(--c-surface-soft);
+        border-left: 2px solid var(--c-primary);
+        border-radius: 0 2px 2px 0;
+      }
+      .av2-decision__label {
+        font-family: var(--f-mono);
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--c-text-coral-dark);
+        margin-bottom: var(--s-sm);
+      }
+      /* AI TL;DR — the 30-second "what is this" inside the decision card */
+      .av2-decision__tldr {
+        margin-bottom: var(--s-md);
+        padding-bottom: var(--s-md);
+        border-bottom: 1px solid var(--c-hairline);
+      }
+      .av2-decision__tldr-tag {
+        display: inline-block;
+        font-family: var(--f-mono);
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        background: var(--c-ink);
+        color: var(--c-on-dark);
+        border-radius: 3px;
+        vertical-align: 1px;
+      }
+      .av2-decision__tldr-by {
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.5px;
+        color: var(--c-muted);
+        margin-left: 6px;
+      }
+      .av2-decision__tldr-text {
+        margin: 6px 0 0;
+        font-family: var(--f-body);
+        font-size: 15.5px;
+        line-height: 1.6;
+        color: var(--c-body-strong);
+      }
+      .av2-decision__tldr-text strong {
+        font-weight: 500;
+        background: oklch(63% 0.105 32 / 14%);
+        padding: 0 2px;
+      }
+      .av2-decision__tldr-text code {
+        font-family: var(--f-mono);
+        font-size: 0.88em;
+        background: var(--c-canvas);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      .av2-decision p {
+        font-family: var(--f-body);
+        font-size: 15.5px;
+        line-height: 1.5;
+        margin: 0 0 4px;
+        color: var(--c-ink);
+      }
+      .av2-decision p.no { opacity: 0.78; }
+      .av2-decision p .marker {
+        font-family: var(--f-mono);
+        font-weight: 500;
+        font-size: 12px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--c-text-coral-dark);
+        margin-right: 6px;
+      }
+      .av2-decision__pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--s-xs);
+        margin-top: var(--s-sm);
+      }
+      .av2-decision__pill {
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        padding: 3px 10px;
+        border-radius: 999px;
+      }
+      .av2-decision__pill--verdict {
+        background: var(--c-primary);
+        color: var(--c-on-primary);
+      }
+      .av2-decision__pill--depth {
+        background: transparent;
+        color: var(--c-body);
+        border: 1px solid var(--c-hairline-soft);
+      }
+
+      /* ---------- Mode toggle ---------- */
+      .av2-modebar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--s-md);
+        padding: var(--s-md) 0;
+        margin-bottom: var(--s-lg);
+        border-top: 1px solid var(--c-hairline);
+        border-bottom: 1px solid var(--c-hairline);
+        position: sticky;
+        top: 76px;
+        background: var(--c-canvas);
+        z-index: 5;
+      }
+      .av2-modebar__group {
+        display: inline-flex;
+        background: var(--c-surface-soft);
+        padding: 3px;
+        border-radius: 999px;
+      }
+      .av2-modebar__btn {
+        font-family: var(--f-mono);
+        font-size: 11.5px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        padding: 7px 14px;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--c-muted);
+        border: 0;
+        cursor: pointer;
+        transition: background 0.12s, color 0.12s;
+      }
+      .av2-modebar__btn:hover { color: var(--c-body); }
+      .av2-modebar__btn.is-active {
+        background: var(--c-canvas);
+        color: var(--c-ink);
+        box-shadow: 0 1px 2px var(--shadow-ink-6);
+      }
+      .av2-modebar__source {
+        font-family: var(--f-mono);
+        font-size: 11.5px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--c-primary);
+        white-space: nowrap;
+      }
+      .av2-modebar__source:hover { color: var(--c-primary-active); }
+
+      /* ---------- Bilingual body ---------- */
+      .av2-body { margin: 0 0 var(--s-xxl); }
+      .av2-row {
+        display: grid;
+        gap: var(--s-md);
+        padding: var(--s-md) 0;
+      }
+      .av2-row + .av2-row { border-top: 1px solid var(--c-hairline-soft); }
+
+      /* Parallel mode: two columns; reader's lang on left.
+         body[data-lang="zh"]  -> .av2-trans left, .av2-orig right
+         body[data-lang="en"]  -> .av2-orig left, .av2-trans right */
+      .av2-body[data-mode="parallel"] .av2-row {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        column-gap: var(--s-xl);
+      }
+      body[data-lang="zh"] .av2-body[data-mode="parallel"] .av2-trans { order: 1; }
+      body[data-lang="zh"] .av2-body[data-mode="parallel"] .av2-orig  { order: 2; opacity: 0.78; }
+      body[data-lang="en"] .av2-body[data-mode="parallel"] .av2-orig  { order: 1; }
+      body[data-lang="en"] .av2-body[data-mode="parallel"] .av2-trans { order: 2; opacity: 0.78; }
+
+      /* Below 1024px the two parallel columns get too narrow to read
+         comfortably. Stack them: reader's language on top, original below,
+         with a hairline between for visual rhythm. */
+      @media (max-width: 1023px) {
+        .av2-body[data-mode="parallel"] .av2-row {
+          grid-template-columns: minmax(0, 1fr);
+          row-gap: var(--s-md);
+        }
+        .av2-body[data-mode="parallel"] .av2-row > .av2-orig,
+        .av2-body[data-mode="parallel"] .av2-row > .av2-trans {
+          max-width: var(--chrome-w, 860px);
+        }
+        body[data-lang="zh"] .av2-body[data-mode="parallel"] .av2-orig,
+        body[data-lang="en"] .av2-body[data-mode="parallel"] .av2-trans {
+          padding-top: var(--s-md);
+          border-top: 1px dashed var(--c-hairline-soft);
+        }
+      }
+
+      /* Single-language modes */
+      .av2-body[data-mode="orig"] .av2-trans,
+      .av2-body[data-mode="trans"] .av2-orig {
+        display: none;
+      }
+      .av2-body[data-mode="orig"] .av2-row,
+      .av2-body[data-mode="trans"] .av2-row {
+        max-width: var(--chrome-w);
+      }
+
+      .av2-orig, .av2-trans {
+        margin: 0;
+        font-family: var(--f-body);
+        font-size: 17px;
+        line-height: 1.65;
+        color: var(--c-ink);
+      }
+      .av2-orig { font-style: normal; }
+      .av2-trans {
+        line-height: 1.75; /* CJK breathes a touch more here */
+      }
+      /* When body becomes mixed text + figures, the container is a <div>
+         holding <p> + <figure> children. Tighten their margins so they
+         don't stack like a doc page. */
+      .av2-orig > p, .av2-trans > p { margin: 0; }
+      .av2-orig > p + p, .av2-trans > p + p { margin-top: 0.6em; }
+      .av2-figure {
+        margin: 14px 0;
+      }
+      .av2-figure img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        border-radius: 4px;
+        border: 1px solid var(--c-hairline-soft);
+      }
+      .av2-figure figcaption {
+        margin-top: 6px;
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: var(--c-muted);
+        font-style: italic;
+      }
+      .av2-orig code, .av2-trans code {
+        font-family: var(--f-mono);
+        font-size: 0.88em;
+        background: var(--c-surface-soft);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      /* ---------- Markdown-rendered prose (.av2-prose) ----------
+         Sections now come from markdown-it, so we get real <pre>, <h2-h6>,
+         <ul>, <ol>, <blockquote>, <strong>, <img> nodes. These rules style
+         them inside the bilingual columns without competing with the body
+         font. Reset code inside <pre> to avoid the inline pill background. */
+      .av2-prose > * + * { margin-top: 0.65em; }
+      .av2-prose h2, .av2-prose h3, .av2-prose h4, .av2-prose h5, .av2-prose h6 {
+        font-family: var(--f-display);
+        font-weight: 400;
+        font-variation-settings: "opsz" 24, "wght" 400;
+        letter-spacing: -0.012em;
+        line-height: 1.3;
+        color: var(--c-ink);
+        margin-top: 1.2em;
+      }
+      .av2-prose h2 { font-size: 1.15em; }
+      .av2-prose h3 { font-size: 1.05em; }
+      .av2-prose h4, .av2-prose h5, .av2-prose h6 { font-size: 1em; font-weight: 500; }
+      .av2-prose ul, .av2-prose ol {
+        padding-left: 1.4em;
+        margin: 0.6em 0;
+      }
+      .av2-prose li + li { margin-top: 0.3em; }
+      .av2-prose blockquote {
+        margin: 0.8em 0;
+        padding: 4px 14px;
+        color: var(--c-body);
+        border-left: 1px solid var(--c-hairline);
+        font-style: italic;
+      }
+      .av2-prose strong { font-weight: 600; }
+      .av2-prose pre {
+        font-family: var(--f-mono);
+        font-size: 13px;
+        line-height: 1.55;
+        background: var(--c-surface-soft);
+        color: var(--c-ink);
+        padding: 12px 14px;
+        border-radius: 4px;
+        border: 1px solid var(--c-hairline-soft);
+        overflow-x: auto;
+        margin: 0.8em 0;
+        white-space: pre;
+      }
+      .av2-prose pre code {
+        background: transparent;
+        padding: 0;
+        font-size: inherit;
+        border-radius: 0;
+      }
+      .av2-prose img {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        margin: 0.8em 0;
+        border-radius: 4px;
+        border: 1px solid var(--c-hairline-soft);
+      }
+      .av2-prose a {
+        color: var(--c-primary);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        text-decoration-thickness: 1px;
+      }
+      .av2-prose hr {
+        border: 0;
+        border-top: 1px solid var(--c-hairline);
+        margin: 1.2em 0;
+      }
+      /* First-child no top margin (avoid extra space at top of section) */
+      .av2-prose > *:first-child { margin-top: 0; }
+
+      .av2-row__num {
+        grid-column: 1 / -1;
+        font-family: var(--f-mono);
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--c-muted-soft);
+        margin-bottom: -8px;
+      }
+
+      /* ---------- Annotated spans — minimal, non-intrusive ----------
+         Subtle dotted underline only. Hover reveals a soft coral wash to hint
+         that commentary exists. The commentary itself lives in the side panel. */
+      .av2-annotated {
+        border-bottom: 1px dotted oklch(63% 0.105 32 / 55%);
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease;
+      }
+      .av2-annotated:hover {
+        background: oklch(63% 0.105 32 / 10%);
+        border-bottom-color: var(--c-primary);
+      }
+
+      /* Section number is now a button: § N + small count badge.
+         Click → opens side panel scrolled to that anchor. */
+      .av2-row__num.is-button {
+        font: inherit;
+        background: transparent;
+        border: 0;
+        cursor: pointer;
+        padding: 0;
+        color: inherit;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .av2-row__num .anchor-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 18px;
+        height: 17px;
+        padding: 0 6px;
+        background: transparent;
+        color: var(--c-text-coral-dark);
+        border: 1px solid oklch(63% 0.105 32 / 35%);
+        border-radius: 999px;
+        font-family: var(--f-mono);
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0;
+        line-height: 1;
+        transition: background 0.15s, color 0.15s, border-color 0.15s;
+      }
+      .av2-row__num.is-button:hover .anchor-count {
+        background: var(--c-primary);
+        color: var(--c-on-primary);
+        border-color: var(--c-primary);
+      }
+
+      /* ---------- Floating panel trigger ---------- */
+      .av2-panel-trigger {
+        position: fixed;
+        bottom: var(--s-lg);
+        right: var(--s-lg);
+        z-index: 50;
+        display: inline-flex;
+        align-items: center;
+        gap: var(--s-sm);
+        padding: 10px 16px;
+        background: var(--c-surface-dark);
+        color: var(--c-on-dark);
+        border-radius: 999px;
+        font-family: var(--f-mono);
+        font-size: 11.5px;
+        font-weight: 500;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        border: 0;
+        cursor: pointer;
+        box-shadow: 0 6px 20px color-mix(in oklch, var(--c-ink) 25%, transparent);
+        transition: transform 0.15s, background 0.15s;
+      }
+      .av2-panel-trigger:hover {
+        background: var(--c-surface-dark-elevated);
+        transform: translateY(-1px);
+      }
+      .av2-panel-trigger__label { white-space: nowrap; }
+      .av2-panel-trigger__count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 22px;
+        height: 20px;
+        padding: 0 7px;
+        background: var(--c-primary);
+        color: var(--c-on-primary);
+        border-radius: 999px;
+        font-size: 11px;
+        letter-spacing: 0;
+      }
+      .av2-panel-trigger__agents {
+        font-size: 10px;
+        color: var(--c-on-dark-soft);
+        letter-spacing: 1px;
+      }
+
+      /* ---------- Side panel (right slide-in on desktop, bottom sheet on mobile) ---------- */
+      .av2-panel-scrim {
+        position: fixed;
+        inset: 0;
+        background: color-mix(in oklch, var(--c-ink) 35%, transparent);
+        z-index: 99;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.24s ease-out;
+      }
+      .av2-panel-scrim.is-open { opacity: 1; pointer-events: auto; }
+
+      .av2-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(460px, 92%);
+        background: var(--c-canvas);
+        border-left: 1px solid var(--c-hairline);
+        box-shadow: -8px 0 40px color-mix(in oklch, var(--c-ink) 18%, transparent);
+        transform: translateX(100%);
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+      }
+      .av2-panel.is-open { transform: translateX(0); }
+
+      .av2-panel__head {
+        flex-shrink: 0;
+        padding: var(--s-md) var(--s-lg) var(--s-sm);
+        border-bottom: 1px solid var(--c-hairline);
+      }
+      .av2-panel__title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: var(--s-xs);
+      }
+      .av2-panel__title {
+        font-family: var(--f-display);
+        font-weight: 500;
+        font-size: 17px;
+        color: var(--c-ink);
+        margin: 0;
+      }
+      .av2-panel__meta {
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--c-muted);
+      }
+      .av2-panel__close {
+        position: absolute;
+        top: var(--s-sm);
+        right: var(--s-sm);
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        background: transparent;
+        color: var(--c-muted);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        border-radius: 50%;
+      }
+      .av2-panel__close:hover { background: var(--c-surface-soft); color: var(--c-ink); }
+
+      .av2-panel__filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding-top: var(--s-xs);
+      }
+      .av2-panel__filter {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px 4px 4px;
+        background: transparent;
+        border: 1px solid var(--c-hairline);
+        border-radius: 999px;
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        letter-spacing: 1px;
+        color: var(--c-body);
+        cursor: pointer;
+        transition: background 0.12s, border-color 0.12s;
+      }
+      .av2-panel__filter:hover { border-color: var(--c-primary); }
+      .av2-panel__filter.is-active {
+        background: var(--c-ink);
+        color: var(--c-on-dark);
+        border-color: var(--c-ink);
+      }
+      .av2-panel__filter .dot {
+        display: inline-block;
+        width: 10px; height: 10px;
+        border-radius: 50%;
+      }
+      .av2-panel__filter[data-agent="claude"]   .dot { background: oklch(64% 0.13 50); }
+      .av2-panel__filter[data-agent="gpt"]      .dot { background: oklch(58% 0.12 165); }
+      .av2-panel__filter[data-agent="gemini"]   .dot { background: oklch(58% 0.16 250); }
+      .av2-panel__filter[data-agent="deepseek"] .dot { background: oklch(55% 0.18 25); }
+      .av2-panel__filter[data-agent="linyi"]    .dot { background: var(--c-primary); }
+      .av2-panel__filter[data-agent="all"]      .dot { background: var(--c-ink); }
+
+      .av2-panel__list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 var(--s-lg) var(--s-xl);
+      }
+
+      /* Anchor group — passage header + agent cards underneath */
+      .av2-anchor-group {
+        padding: var(--s-md) 0;
+        border-bottom: 1px solid var(--c-hairline);
+      }
+      .av2-anchor-group:target { scroll-margin-top: var(--s-md); }
+      .av2-anchor-group__head {
+        margin-bottom: var(--s-sm);
+      }
+      .av2-anchor-group__loc {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--c-primary);
+        background: transparent;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        margin-bottom: 5px;
+      }
+      .av2-anchor-group__loc:hover { color: var(--c-primary-active); }
+      .av2-anchor-group__loc .jump-arrow { font-size: 13px; }
+      .av2-anchor-group__phrase {
+        font-family: var(--f-display);
+        font-style: italic;
+        font-size: 13.5px;
+        line-height: 1.4;
+        color: var(--c-body);
+        background: oklch(63% 0.105 32 / 10%);
+        padding: 2px 6px;
+        border-radius: 2px;
+      }
+      .av2-anchor-group__count {
+        display: block;
+        margin-top: 4px;
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        letter-spacing: 1px;
+        color: var(--c-muted);
+      }
+
+      .av2-agent-card {
+        padding: var(--s-sm) 0;
+        border-top: 1px dashed var(--c-hairline);
+      }
+      .av2-agent-card:first-of-type { border-top: 0; }
+      .av2-agent-card__head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .av2-agent-card__avatar {
+        width: 22px; height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        font-family: var(--f-mono);
+        font-size: 9.5px;
+        font-weight: 500;
+        letter-spacing: 0.3px;
+        flex-shrink: 0;
+        color: white;
+      }
+      .av2-agent-card__avatar[data-agent="claude"]   { background: oklch(64% 0.13 50); }
+      .av2-agent-card__avatar[data-agent="gpt"]      { background: oklch(58% 0.12 165); }
+      .av2-agent-card__avatar[data-agent="gemini"]   { background: oklch(58% 0.16 250); }
+      .av2-agent-card__avatar[data-agent="deepseek"] { background: oklch(55% 0.18 25); }
+      .av2-agent-card__avatar[data-agent="linyi"]    { background: var(--c-primary); color: var(--c-on-primary); }
+      .av2-agent-card__name {
+        font-family: var(--f-body);
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--c-ink);
+      }
+      .av2-agent-card__version {
+        font-family: var(--f-mono);
+        font-size: 10px;
+        color: var(--c-muted-soft);
+      }
+      .av2-agent-card__role {
+        font-family: var(--f-mono);
+        font-size: 9.5px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--c-muted);
+        padding: 1px 5px;
+        border: 1px solid var(--c-hairline-soft);
+        border-radius: 3px;
+      }
+      .av2-agent-card__role[data-kind="human"] {
+        color: var(--c-text-coral-dark);
+        border-color: oklch(63% 0.105 32 / 35%);
+      }
+      .av2-agent-card__time {
+        font-family: var(--f-mono);
+        font-size: 10px;
+        color: var(--c-muted-soft);
+        margin-left: auto;
+      }
+      .av2-agent-card__text {
+        margin: 0;
+        font-family: var(--f-body);
+        font-size: 14.5px;
+        line-height: 1.6;
+        color: var(--c-body);
+      }
+      .av2-agent-card__text strong {
+        font-weight: 500;
+        background: oklch(63% 0.105 32 / 14%);
+        padding: 0 2px;
+      }
+      .av2-agent-card__text code {
+        font-family: var(--f-mono);
+        font-size: 0.88em;
+        background: var(--c-surface-soft);
+        padding: 1px 4px;
+        border-radius: 2px;
+      }
+
+      /* Highlight target row when panel jumps to it. */
+      .av2-row.is-pulsed > p { transition: background 0.4s; }
+      .av2-row.is-pulsed { animation: avPulse 1.6s ease-out 1; }
+      @keyframes avPulse {
+        0%   { background: oklch(63% 0.105 32 / 0); }
+        20%  { background: oklch(63% 0.105 32 / 11%); }
+        100% { background: oklch(63% 0.105 32 / 0); }
+      }
+
+      /* Mobile: panel becomes a bottom drawer */
+      @media (max-width: 768px) {
+        .av2-panel {
+          top: auto;
+          right: 0;
+          left: 0;
+          width: 100%;
+          max-height: 82vh;
+          transform: translateY(100%);
+          border-left: 0;
+          border-top: 1px solid var(--c-hairline);
+          border-radius: 14px 14px 0 0;
+        }
+        .av2-panel.is-open { transform: translateY(0); }
+        .av2-panel-trigger { bottom: 14px; right: 14px; padding: 8px 14px; font-size: 11px; }
+      }
+
+      /* ---------- Below-the-fold: AI summary / actions ---------- */
+      .av2-below {
+        max-width: var(--chrome-w);
+        margin-top: var(--s-xxl);
+        padding-top: var(--s-xl);
+        border-top: 2px solid var(--c-hairline-soft);
+      }
+      .av2-below__intro {
+        font-family: var(--f-mono);
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--c-muted);
+        margin-bottom: var(--s-md);
+      }
+      .av2-fold {
+        border-bottom: 1px solid var(--c-hairline);
+      }
+      .av2-fold:first-of-type { border-top: 1px solid var(--c-hairline); }
+      .av2-fold > summary {
+        list-style: none;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: var(--s-md) 0;
+      }
+      .av2-fold > summary::-webkit-details-marker { display: none; }
+      .av2-fold > summary::after {
+        content: "+";
+        font-family: var(--f-mono);
+        font-size: 18px;
+        color: var(--c-muted);
+        margin-left: var(--s-md);
+      }
+      .av2-fold[open] > summary::after { content: "−"; }
+      .av2-fold__title {
+        font-family: var(--f-display);
+        font-weight: 500;
+        font-size: 19px;
+        line-height: 1.25;
+        color: var(--c-ink);
+        margin: 0;
+      }
+      .av2-fold__title .count {
+        font-family: var(--f-mono);
+        font-size: 11px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--c-muted);
+        font-weight: 400;
+        margin-left: var(--s-xs);
+      }
+      .av2-fold__time {
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--c-muted-soft);
+      }
+      .av2-fold__body {
+        padding: 0 0 var(--s-lg);
+        font-family: var(--f-body);
+        font-size: 16px;
+        line-height: 1.6;
+        color: var(--c-body);
+      }
+      .av2-fold__body p { margin: 0 0 var(--s-md); }
+      .av2-fold__body p:last-child { margin-bottom: 0; }
+      .av2-fold__body code {
+        font-family: var(--f-mono);
+        font-size: 0.88em;
+        background: var(--c-surface-soft);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      /* ---------- Deep Read section (replaces shallow AI summary) ----------
+         Multiple agents tackle different angles: signal / unsaid / next. */
+      .av2-deepread + .av2-deepread {
+        margin-top: var(--s-lg);
+        padding-top: var(--s-lg);
+        border-top: 1px dashed var(--c-hairline);
+      }
+      .av2-deepread__head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .av2-deepread__byline {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.25;
+      }
+      .av2-deepread__byline .av2-agent-card__name {
+        font-size: 13.5px;
+      }
+      .av2-deepread__byline .av2-agent-card__version {
+        font-size: 10.5px;
+      }
+      .av2-deepread__title {
+        font-family: var(--f-display);
+        font-weight: 500;
+        font-size: 18px;
+        line-height: 1.3;
+        letter-spacing: -0.005em;
+        margin: 0 0 var(--s-sm);
+        color: var(--c-ink);
+        text-wrap: balance;
+      }
+      .av2-deepread__text {
+        font-family: var(--f-body);
+        font-size: 15.5px;
+        line-height: 1.65;
+        color: var(--c-body);
+      }
+      .av2-deepread__text p { margin: 0 0 var(--s-sm); }
+      .av2-deepread__text p:last-child { margin-bottom: 0; }
+      .av2-deepread__text ol, .av2-deepread__text ul {
+        margin: var(--s-xs) 0 var(--s-sm);
+        padding-left: 24px;
+      }
+      .av2-deepread__text ol li, .av2-deepread__text ul li {
+        margin-bottom: 6px;
+        padding-left: 4px;
+      }
+      .av2-deepread__text strong {
+        font-weight: 500;
+        background: oklch(63% 0.105 32 / 14%);
+        padding: 0 2px;
+      }
+      .av2-deepread__text code {
+        font-family: var(--f-mono);
+        font-size: 0.88em;
+        background: var(--c-surface-soft);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+      .av2-deepread__text em {
+        font-style: italic;
+        color: var(--c-body-strong);
+      }
+
+      /* Actions list (reused style, lighter) */
+      .av2-actions {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .av2-actions li {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: var(--s-sm);
+        padding: var(--s-md) 0;
+      }
+      .av2-actions li + li { border-top: 1px dashed var(--c-hairline); }
+      .av2-actions__n {
+        font-family: var(--f-mono);
+        font-weight: 500;
+        font-size: 13px;
+        color: var(--c-primary);
+      }
+      .av2-actions strong {
+        display: block;
+        font-family: var(--f-display);
+        font-weight: 500;
+        font-size: 16.5px;
+        margin-bottom: 2px;
+        color: var(--c-ink);
+      }
+      .av2-actions p {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.55;
+        color: var(--c-body);
+      }
+      .av2-actions code {
+        font-family: var(--f-mono);
+        font-size: 0.85em;
+        background: var(--c-surface-soft);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      /* Bottom CTA: go to source */
+      .av2-cta {
+        max-width: var(--chrome-w);
+        margin: var(--s-xxl) 0;
+        padding: var(--s-lg);
+        background: var(--c-surface-dark);
+        color: var(--c-on-dark);
+        border-radius: 4px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--s-md);
+      }
+      .av2-cta__text {
+        font-family: var(--f-body);
+        font-size: 15.5px;
+        line-height: 1.5;
+        color: var(--c-on-dark);
+      }
+      .av2-cta__text .alt {
+        display: block;
+        font-size: 13px;
+        color: var(--c-on-dark-soft);
+        margin-top: 4px;
+      }
+      .av2-cta .btn {
+        background: var(--c-on-dark);
+        color: var(--c-ink);
+      }
+      .av2-cta .btn:hover { background: var(--warm-100); }
+
+      /* Same-day prev/next at article bottom */
+      .av2-pn {
+        max-width: var(--chrome-w);
+        margin: var(--s-xl) 0 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--s-md);
+      }
+      .av2-pn__item {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: var(--s-md) var(--s-lg);
+        text-decoration: none;
+        color: inherit;
+        background: var(--c-surface-soft);
+        border-radius: 3px;
+        transition: background 0.15s, transform 0.15s;
+      }
+      .av2-pn__item:hover {
+        background: var(--c-surface-card);
+      }
+      .av2-pn__item--next { text-align: right; }
+      .av2-pn__dir {
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--c-muted);
+      }
+      .av2-pn__title {
+        font-family: var(--f-display);
+        font-size: 15px;
+        line-height: 1.35;
+        font-weight: 500;
+        color: var(--c-ink);
+        text-wrap: balance;
+      }
+      .av2-pn__item:hover .av2-pn__title { color: var(--c-primary); }
+
+      @media (max-width: 640px) {
+        .av2-pn { grid-template-columns: 1fr; }
+        .av2-pn__item--next { text-align: left; }
+      }
+
+      /* Footer block: tags, related, prev/next — keep modest */
+      .av2-footer {
+        max-width: 1080px;
+        padding-top: var(--s-xxl);
+        border-top: 1px solid var(--c-hairline-soft);
+      }
+
+      /* ---------- Responsive ---------- */
+      @media (max-width: 1024px) {
+        /* Parallel collapses to a stacked, reader's-lang-first layout */
+        .av2-body[data-mode="parallel"] .av2-row {
+          grid-template-columns: 1fr;
+          column-gap: 0;
+          row-gap: var(--s-sm);
+        }
+        .av2-body[data-mode="parallel"] .av2-orig {
+          padding-top: var(--s-sm);
+          border-top: 1px dashed var(--c-hairline);
+        }
+        .av2-modebar { top: 76px; }
+      }
+      @media (max-width: 640px) {
+        .av2-decision, .av2-cta, .av2-below {
+          padding-left: var(--s-md);
+          padding-right: var(--s-md);
+        }
+        .av2-modebar__group { flex-wrap: wrap; }
+      }
+
+      /* Lang-aware label hiding inside the bilingual body itself.
+         The .av2-orig spans hold English, .av2-trans spans hold Chinese — we
+         never want the page lang toggle to also hide article body content,
+         so we override the global lang-zh/lang-en hide rules within .av2-body. */
+      .av2-body [lang="en"] { /* keep visible regardless of body data-lang */ }
+      .av2-body [lang="zh"] { }

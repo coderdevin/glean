@@ -1,0 +1,356 @@
+---
+export const prerender = false;
+import Site from "~/layouts/Site.astro";
+import { db } from "~/db/client";
+import { pickBySlug, adjacentPicks } from "~/lib/queries";
+import { formatDateISO, formatTimeHM, siteTz } from "~/lib/datetime";
+import MarkdownIt from "markdown-it";
+
+// Single shared instance — markdown-it is stateless after construction.
+// html:false guards against raw <script>/<iframe> sneaking in from LLM
+// output. linkify auto-detects bare URLs so prompt templates with naked
+// links still render as clickable.
+const md = new MarkdownIt({ html: false, linkify: true, breaks: false });
+
+const slug = Astro.params.slug;
+if (!slug) return new Response("Not found", { status: 404 });
+
+const env = Astro.locals.runtime.env;
+const pick = await pickBySlug(db(env.DB), slug);
+if (!pick) return new Response("Not found", { status: 404 });
+
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, max-age=300, s-maxage=86400, stale-while-revalidate=86400",
+);
+
+const tz = siteTz(env);
+const publishedDate = formatDateISO(pick.published_at, tz);
+const publishedTime = formatTimeHM(pick.published_at, tz);
+
+// Prev/next on the global timeline (by daily_date, position_in_day).
+const { prev, next } = await adjacentPicks(db(env.DB), {
+  dailyDate: pick.daily_date,
+  positionInDay: pick.position_in_day,
+});
+// "· 同日" when the neighbor shares this pick's day, else show its date (MM-DD).
+const neighborLabel = (d: string) =>
+  d === pick.daily_date ? null : d.slice(5);
+
+/** Per-section count of editor annotations anchored to it. */
+const annotationsByAnchor = new Map<string, number>();
+for (const a of pick.annotations) {
+  annotationsByAnchor.set(a.anchor, (annotationsByAnchor.get(a.anchor) ?? 0) + 1);
+}
+
+const tocItems = pick.sections.map((s, i) => {
+  const anchorId = s.anchor_id ?? "";
+  return {
+    id: `row-${i + 1}`,
+    section: `§ ${i + 1}`,
+    labelZh: s.heading_zh,
+    labelEn: s.heading_en,
+    count: anchorId ? annotationsByAnchor.get(anchorId) ?? 0 : 0,
+  };
+});
+
+/** Modebar labels flip when the source article is Chinese (e.g. an infoq.cn
+ *  link). Default (en/other source) leaves "英文原文" / "中文译文" as-is. */
+const sourceIsZh = pick.lang === "zh";
+const labelZhBtn = {
+  zh: sourceIsZh ? "中文原文" : "中文译文",
+  en: sourceIsZh ? "Chinese original" : "Chinese 中译",
+};
+const labelEnBtn = {
+  zh: sourceIsZh ? "英文译文" : "英文原文",
+  en: sourceIsZh ? "English translation" : "English original",
+};
+
+/**
+ * Render a section body as HTML. The LLM output contains real markdown:
+ * fenced code blocks (```), headings (##), bold (**...**), lists, links,
+ * inline images. Earlier we only recognised image markdown and dumped the
+ * rest as plain text — that's why code fences and ## leaked through as
+ * raw characters.
+ *
+ * markdown-it handles all of those; raw HTML is disabled so an LLM that
+ * decides to emit `<script>` can't break the page. CSS in article.css
+ * styles the resulting <pre>/<code>/<h3>/<ul> nodes inside .av2-orig and
+ * .av2-trans.
+ */
+function renderBody(text: string | null | undefined): string {
+  if (!text) return "";
+  return md.render(text);
+}
+---
+<Site
+  title={`${pick.title_en} — Glean · 拾遗`}
+  description={pick.summary_en}
+>
+  <link rel="stylesheet" href="/article.css?v=art2" slot="head" />
+  <link rel="stylesheet" href="/article.css?v=art2" />
+
+  <div style="padding-top: 40px; padding-bottom: 64px">
+    <div class="av2-layout">
+      <aside class="av2-toc" aria-label="目录 / Contents">
+        <div class="av2-toc__head">
+          <span class="lang-zh">目录</span><span class="lang-en">Contents</span>
+        </div>
+        <ol class="av2-toc__list">
+          {tocItems.map((item) => (
+            <li>
+              <a
+                href={`#${item.id}`}
+                data-toc-target={item.id}
+                title={`${item.section} · ${item.labelZh}${item.labelEn ? ` / ${item.labelEn}` : ""}`}
+              >
+                <span class="sec-num">{item.section}</span>
+                <span class="title">
+                  <span class="lang-zh">{item.labelZh}</span>
+                  <span class="lang-en">{item.labelEn}</span>
+                </span>
+                {item.count > 0 && <span class="count">{item.count}</span>}
+              </a>
+            </li>
+          ))}
+        </ol>
+        {pick.annotations.length > 0 && (
+          <div class="av2-toc__foot">
+            <span class="lang-zh">{pick.annotations.length} 条评注</span>
+            <span class="lang-en">{pick.annotations.length} notes</span>
+          </div>
+        )}
+      </aside>
+
+      <article class="av2">
+        <header class="av2-head">
+          <div class="av2-crumbs">
+            <a href="/daily"><span class="lang-zh">日刊</span><span class="lang-en">Daily</span></a>
+            {publishedDate && (<><span class="sep">/</span><a href={`/daily/${publishedDate}`}>{publishedDate}</a></>)}
+            <span class="sep">/</span>
+            <span>
+              <span class="lang-zh">{pick.title_zh}</span>
+              <span class="lang-en">{pick.title_en}</span>
+            </span>
+          </div>
+
+          <h1 class="av2-head__title">
+            <span class="lang-zh">{pick.title_zh}</span>
+            <span class="lang-en">{pick.title_en}</span>
+          </h1>
+
+          <div class="av2-head__meta">
+            <span>
+              <span class="k"><span class="lang-zh">原文</span><span class="lang-en">Source</span></span>
+              <a class="v" href={pick.source_url} rel="noopener">{pick.source_host}</a>
+            </span>
+            <span>
+              <span class="k"><span class="lang-zh">收录</span><span class="lang-en">Glean'd</span></span>
+              <span class="v">{publishedDate} {publishedTime}</span>
+            </span>
+            <span>
+              <span class="k"><span class="lang-zh">阅读</span><span class="lang-en">Read</span></span>
+              <span class="v">{pick.read_minutes} min</span>
+            </span>
+          </div>
+        </header>
+
+        {(pick.summary_zh || pick.summary_en || pick.editor_note_zh || pick.editor_note_en) && (
+          <section class="av2-decision" aria-label="AI summary">
+            <div class="av2-decision__label">
+              <span class="lang-zh">AI 解读</span><span class="lang-en">AI summary</span>
+            </div>
+            {(pick.summary_zh || pick.summary_en) && (
+              <div class="av2-decision__tldr">
+                <p class="av2-decision__tldr-text">
+                  <span class="lang-zh">{pick.summary_zh}</span>
+                  <span class="lang-en">{pick.summary_en}</span>
+                </p>
+              </div>
+            )}
+            {(pick.editor_note_zh || pick.editor_note_en) && (
+              <p>
+                <span class="marker"><span class="lang-zh">编辑说</span><span class="lang-en">Editor</span></span>
+                <span class="lang-zh">{pick.editor_note_zh}</span>
+                <span class="lang-en">{pick.editor_note_en}</span>
+              </p>
+            )}
+            <div class="av2-decision__pills">
+              <span class="av2-decision__pill av2-decision__pill--depth">
+                <span class="lang-zh">原文 {pick.read_minutes} 分钟</span>
+                <span class="lang-en">Original · {pick.read_minutes} min</span>
+              </span>
+            </div>
+          </section>
+        )}
+
+        <div class="av2-modebar" role="tablist" aria-label="Reading mode">
+          <div class="av2-modebar__group">
+            <button class="av2-modebar__btn" data-mode-set="trans" role="tab">
+              <span class="lang-zh">{labelZhBtn.zh}</span><span class="lang-en">{labelZhBtn.en}</span>
+            </button>
+            <button class="av2-modebar__btn" data-mode-set="orig" role="tab">
+              <span class="lang-zh">{labelEnBtn.zh}</span><span class="lang-en">{labelEnBtn.en}</span>
+            </button>
+            <button class="av2-modebar__btn is-active" data-mode-set="parallel" role="tab" aria-selected="true">
+              <span class="lang-zh">对照</span><span class="lang-en">Parallel</span>
+            </button>
+          </div>
+          <a class="av2-modebar__source" href={pick.source_url} rel="noopener">
+            <span class="lang-zh">原文 {pick.source_host} ↗</span>
+            <span class="lang-en">{pick.source_host} ↗</span>
+          </a>
+        </div>
+
+        <div class="av2-body" data-mode="parallel">
+          {pick.sections.map((s, i) => {
+            const anchorId = s.anchor_id ?? "";
+            const noteCount = anchorId ? annotationsByAnchor.get(anchorId) ?? 0 : 0;
+            return (
+              <div class="av2-row" data-pair={i + 1} id={`row-${i + 1}`}>
+                {noteCount > 0 ? (
+                  <button type="button" class="av2-row__num is-button" data-open-anchor={anchorId} aria-label={`§ ${i + 1} · ${noteCount} notes`}>
+                    § {i + 1} <span class="anchor-count">{noteCount}</span>
+                  </button>
+                ) : (
+                  <span class="av2-row__num">§ {i + 1}</span>
+                )}
+                <div class="av2-orig av2-prose" lang="en" set:html={renderBody(s.body_en)} />
+                <div class="av2-trans av2-prose" lang="zh" set:html={renderBody(s.body_zh)} />
+              </div>
+            );
+          })}
+        </div>
+
+        <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--c-hairline)">
+          <a href={pick.source_url} class="btn btn-primary" rel="noopener">
+            <span class="lang-zh">打开原文 ↗</span>
+            <span class="lang-en">Open source ↗</span>
+          </a>
+        </div>
+
+        {/* Footer extras — used to live in a sticky right rail; moved below
+            the body so the bilingual columns get the full reading width. */}
+        <section class="av2-footer" aria-label="More">
+          <div class="av2-footer__grid">
+            <div class="av2-footer__col av2-footer__col--side">
+              <div class="av2-footer__sec">
+                <div class="av2-footer__label">
+                  <span class="lang-zh">标签</span><span class="lang-en">Tags</span>
+                </div>
+                <div class="aside-tags">
+                  {pick.tags.map((t) => (
+                    <a href={`/tag/${t.slug}`} class={`badge badge--cat-${t.family}`}>
+                      <span class="lang-zh">{t.name_zh}</span><span class="lang-en">{t.name_en}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {pick.next_hints.length > 0 && (
+                <div class="av2-footer__sec">
+                  <div class="av2-footer__label">
+                    <span class="lang-zh">读完这条，下一步</span><span class="lang-en">What to read next</span>
+                  </div>
+                  <div class="row" style="gap: 6px; flex-wrap: wrap">
+                    {pick.next_hints.map((h) => (
+                      <a class="badge" href={`/tag/${h.toLowerCase().replace(/\s+/g, "-")}`} style="text-decoration: none">→ {h}</a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {pick.glossary.length > 0 && (
+              <div class="av2-footer__col av2-footer__col--main">
+                <div class="av2-footer__sec">
+                  <div class="av2-footer__label">
+                    <span class="lang-zh">术语</span><span class="lang-en">Glossary</span>
+                  </div>
+                  <dl class="av2-glossary">
+                    {pick.glossary.map((g) => (
+                      <div class="av2-glossary__row">
+                        <dt class="av2-glossary__term">
+                          {g.en} · <span class="text-muted">{g.zh}</span>
+                        </dt>
+                        <dd class="av2-glossary__def">{g.meaning}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {pick.annotations.length > 0 && (
+            <div class="av2-footer__sec av2-footer__sec--notes">
+              <div class="av2-footer__label">
+                <span class="lang-zh">编辑注</span><span class="lang-en">Notes</span>
+              </div>
+              <ol class="av2-notes">
+                {pick.annotations.map((a) => (
+                  <li>
+                    <div class="av2-notes__anchor">{a.anchor}</div>
+                    <p class="av2-notes__body">
+                      <span class="lang-zh">{a.body_zh}</span>
+                      <span class="lang-en">{a.body_en}</span>
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </section>
+
+        {(prev || next) && (
+        <nav class="pn-nav" aria-label="上一篇 / 下一篇 · prev / next">
+          {prev ? (
+            <a class="pn-card pn-card--prev" href={`/a/${prev.slug}`}>
+              <span class="pn-card__dir">
+                ← <span class="lang-zh">上一条{neighborLabel(prev.daily_date) ? ` · ${neighborLabel(prev.daily_date)}` : " · 同日"}</span><span class="lang-en">Previous{neighborLabel(prev.daily_date) ? ` · ${neighborLabel(prev.daily_date)}` : " · same day"}</span>
+              </span>
+              <span class="pn-card__title">
+                <span class="lang-zh">{prev.title_zh}</span><span class="lang-en">{prev.title_en}</span>
+              </span>
+            </a>
+          ) : <span class="pn-card pn-card--empty" aria-hidden="true"></span>}
+          {next ? (
+            <a class="pn-card pn-card--next" href={`/a/${next.slug}`}>
+              <span class="pn-card__dir">
+                <span class="lang-zh">下一条{neighborLabel(next.daily_date) ? ` · ${neighborLabel(next.daily_date)}` : " · 同日"}</span><span class="lang-en">Next{neighborLabel(next.daily_date) ? ` · ${neighborLabel(next.daily_date)}` : " · same day"}</span> →
+              </span>
+              <span class="pn-card__title">
+                <span class="lang-zh">{next.title_zh}</span><span class="lang-en">{next.title_en}</span>
+              </span>
+            </a>
+          ) : <span class="pn-card pn-card--empty" aria-hidden="true"></span>}
+        </nav>
+        )}
+      </article>
+    </div>
+  </div>
+
+  <script is:inline>
+    (function () {
+      const body = document.querySelector(".av2-body");
+      const buttons = document.querySelectorAll(".av2-modebar__btn");
+      if (!body || !buttons.length) return;
+      const apply = (mode) => {
+        body.setAttribute("data-mode", mode);
+        buttons.forEach((b) => {
+          const active = b.getAttribute("data-mode-set") === mode;
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        try { localStorage.setItem("glean.readMode", mode); } catch (_) {}
+      };
+      buttons.forEach((b) =>
+        b.addEventListener("click", () => apply(b.getAttribute("data-mode-set")))
+      );
+      try {
+        const saved = localStorage.getItem("glean.readMode");
+        if (saved && ["orig", "trans", "parallel"].includes(saved)) apply(saved);
+      } catch (_) {}
+    })();
+  </script>
+</Site>

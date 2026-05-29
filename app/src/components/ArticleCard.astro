@@ -1,0 +1,74 @@
+---
+import TagBadge from "./TagBadge.astro";
+
+export interface ArticleCardPick {
+  slug: string;
+  title_zh: string;
+  title_en: string;
+  summary_zh: string;
+  summary_en: string;
+  bullets: { zh: string; en: string }[];
+  editor_note_zh: string | null;
+  editor_note_en: string | null;
+  source_url: string;
+  source_host: string;
+  read_minutes: number;
+  category: "infra" | "data" | "code";
+  submitter_name: string | null;
+  published_at: Date | null;
+  tags: { slug: string; name_zh: string; name_en: string; family: "infra" | "data" | "code" }[];
+}
+
+interface Props {
+  pick: ArticleCardPick;
+  /** Render as the lead/featured slot of a daily strip — includes head badge. */
+  featured?: boolean;
+  /** Render in dark-surface variant (used inside admin / weekly cover). */
+  dark?: boolean;
+}
+const { pick, featured = false, dark = false } = Astro.props;
+const classes = ["article-card"];
+if (dark) classes.push("article-card--featured");
+const showBullets = featured && pick.bullets.length > 0;
+const showEditor = featured && (pick.editor_note_zh || pick.editor_note_en);
+---
+<article class={classes.join(" ")}>
+  <div class="article-card__head">
+    {featured && <span class="badge badge--coral"><span class="lang-zh">头条</span><span class="lang-en">Lead</span></span>}
+    <span>{pick.source_host} · {pick.read_minutes} min read</span>
+  </div>
+  <h3 class="article-card__title">
+    <a href={`/a/${pick.slug}`}>
+      <span class="lang-zh">{pick.title_zh}</span>
+      <span class="lang-en">{pick.title_en}</span>
+    </a>
+  </h3>
+  <p class="article-card__summary">
+    <span class="lang-zh">{pick.summary_zh}</span>
+    <span class="lang-en">{pick.summary_en}</span>
+  </p>
+  {showBullets && (
+    <ul class="article-card__bullets">
+      {pick.bullets.map((b) => (
+        <li>
+          <span class="lang-zh">{b.zh}</span>
+          <span class="lang-en">{b.en}</span>
+        </li>
+      ))}
+    </ul>
+  )}
+  {showEditor && (
+    <div class="article-card__editorial">
+      <span class="article-card__editorial-label">编辑短评 · Editor's note</span>
+      <span class="lang-zh">{pick.editor_note_zh}</span>
+      <span class="lang-en">{pick.editor_note_en}</span>
+    </div>
+  )}
+  <div class="article-card__footer">
+    <div class="article-card__meta">
+      {pick.tags.map((t) => (
+        <TagBadge slug={t.slug} nameZh={t.name_zh} nameEn={t.name_en} family={t.family} href={`/tag/${t.slug}`} />
+      ))}
+    </div>
+  </div>
+</article>

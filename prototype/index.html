@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glean · 拾遗 · 每日前沿技术日刊与周刊</title>
+    <meta
+      name="description"
+      content="Glean — a small team picks up what the feed forgets. Daily &amp; weekly bilingual tech curation. 拾遗 · 团队替你从信息洪流里捡起一条值得读的链接。"
+    />
+    <link
+      rel="preconnect"
+      href="https://fonts.googleapis.com"
+      crossorigin
+    />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <!-- =================================================================== -->
+    <!-- Promise strip -->
+    <!-- =================================================================== -->
+    <!-- =================================================================== -->
+    <!-- Top nav -->
+    <!-- =================================================================== -->
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="index.html" class="brand">
+          <svg
+            class="brand__mark"
+            viewBox="0 0 30 24"
+            fill="currentColor"
+            aria-hidden="true"
+          ><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+        </a>
+        <nav class="nav-links" id="primary-nav" aria-label="主导航">
+          <a class="nav-link" aria-current="page" href="index.html">首页</a>
+          <a class="nav-link" href="weekly-list.html">周刊</a>
+          <a class="nav-link" href="daily.html">日刊</a>
+          <a class="nav-link" href="tag-edge.html">标签</a>
+          <a class="nav-link" href="about.html">关于</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <div
+            class="lang-toggle"
+            role="tablist"
+            aria-label="Language"
+          >
+            <button
+              type="button"
+              data-lang-set="zh"
+              class="is-active"
+              role="tab"
+              aria-selected="true"
+            >
+              中
+            </button>
+            <button
+              type="button"
+              data-lang-set="en"
+              role="tab"
+              aria-selected="false"
+            >
+              EN
+            </button>
+          </div>
+          <a href="submit.html" class="nav-link nav-link--cta">
+            <span class="lang-zh">提交链接</span>
+            <span class="lang-en">Submit a link</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- =================================================================== -->
+    <!-- Hero -->
+    <!-- =================================================================== -->
+    <section class="hero">
+      <div class="container">
+        <div class="grid grid--hero">
+          <div class="stack stack--lg">
+            <span class="eyebrow">
+              <span class="dot"></span>
+              <span class="lang-zh">2026 年 第 21 周 · 2026-05-25 周一</span>
+              <span class="lang-en">Week 21 · Mon, May 25 2026</span>
+            </span>
+            <h1 class="t-display-xl">
+              <span class="lang-zh">每天 2-3 条值得读的</span>
+              <span class="lang-en">2–3 picks worth reading every day</span>
+            </h1>
+            <p class="t-body-md text-body" style="max-width: 56ch">
+              <span class="lang-zh"
+                >双语技术刊 · 周一汇总成一期。</span
+              >
+              <span class="lang-en"
+                >A bilingual tech zine. Weekly digest on Mondays.</span
+              >
+            </p>
+            <div class="row" style="gap: 12px; flex-wrap: wrap">
+              <a href="weekly-1.html" class="btn btn-primary">
+                <span class="lang-zh">读最新周刊 →</span>
+                <span class="lang-en">Read latest weekly →</span>
+              </a>
+              <a href="daily.html" class="btn btn-secondary">
+                <span class="lang-zh">看今日日刊</span>
+                <span class="lang-en">See today's daily</span>
+              </a>
+              <a href="#subscribe" class="btn btn-text" style="padding: 0 8px">
+                <span class="lang-zh">每周一送到邮箱 ↓</span>
+                <span class="lang-en">Get it Mondays in email ↓</span>
+              </a>
+            </div>
+            <p class="t-body-sm text-muted">
+              <span class="lang-zh"
+                >终端：<span class="kbd">curl glean.team/cli | sh</span> · 然后 <span class="kbd">glean &lt;url&gt;</span> 投递。</span
+              >
+              <span class="lang-en"
+                >Terminal: <span class="kbd">curl glean.team/cli | sh</span> · then <span class="kbd">glean &lt;url&gt;</span>.</span
+              >
+            </p>
+          </div>
+
+          <!-- Hero artifact: a code-window mockup showing the CLI flow -->
+          <aside class="card card--dark" style="padding: 28px">
+            <div
+              class="row row--between"
+              style="margin-bottom: 16px; color: var(--c-on-dark-soft)"
+            >
+              <div class="traffic-lights" aria-hidden="true">
+                <span class="traffic-lights__dot traffic-lights__dot--close"></span>
+                <span class="traffic-lights__dot traffic-lights__dot--minimize"></span>
+                <span class="traffic-lights__dot traffic-lights__dot--maximize"></span>
+              </div>
+              <span class="t-code text-muted-soft">~/work/glean</span>
+            </div>
+            <pre
+              class="t-code"
+              style="
+                margin: 0;
+                color: var(--c-on-dark);
+                line-height: 1.65;
+                white-space: pre-wrap;
+                word-break: break-all;
+              "
+            ><span style="color: var(--c-accent-amber)">$</span> glean https://blog.cloudflare.com/<wbr />durable-objects-2026/ <span style="color: var(--c-muted-soft)">\</span>
+   --note <span style="color: var(--c-accent-teal)">"DO 终于支持跨地域副本"</span> --by <span style="color: var(--c-accent-teal)">"linyi"</span>
+
+<span style="color: var(--c-on-dark-soft)">→</span> Submitted. id=<span style="color: var(--c-accent-amber)">01HXR7…</span>
+<span style="color: var(--c-on-dark-soft)">→</span> queued for analysis
+<span style="color: var(--c-on-dark-soft)">→</span> awaiting editor review
+
+<span style="color: var(--c-success)">✓ done in 0.3s</span>
+</pre>
+            <div
+              style="
+                margin-top: 16px;
+                padding-top: 12px;
+                border-top: 1px solid var(--scrim-light-8);
+                display: flex;
+                gap: 12px;
+                align-items: center;
+                color: var(--c-on-dark-soft);
+              "
+            >
+              <span class="badge badge--on-dark">CLI v0.1</span>
+              <span class="t-body-sm">
+                <span class="lang-zh">无需登录 · 匿名可投</span>
+                <span class="lang-en">No login · anonymous OK</span>
+              </span>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- Today's daily strip -->
+    <!-- =================================================================== -->
+    <section class="section section--tight">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow"
+              ><span class="lang-zh">今日日刊</span>
+              <span class="lang-en">Today</span></span
+            >
+            <h2 class="section-head__title" style="margin-top: 8px">
+              <span class="lang-zh">今日 · 3 / 12</span>
+              <span class="lang-en">Today · 3 of 12</span>
+            </h2>
+          </div>
+          <div class="section-head__meta">
+            <a href="daily.html" class="btn btn-text">
+              <span class="lang-zh">查看全部 →</span>
+              <span class="lang-en">See all →</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="daily-strip">
+          <!-- Card 1 — lead pick: gets bullets + editor's note to earn its
+               wider footprint. -->
+          <article class="article-card">
+            <div class="article-card__head">
+              <span class="badge badge--coral">头条</span>
+              <span>blog.cloudflare.com · 12 min read</span>
+            </div>
+            <h3 class="article-card__title">
+              <a href="article.html">
+                <span class="lang-zh">Durable Objects 跨区域副本正式 GA</span>
+                <span class="lang-en"
+                  >Durable Objects now ship cross-region replicas</span
+                >
+              </a>
+            </h3>
+            <p class="article-card__summary">
+              <span class="lang-zh"
+                >Cloudflare 把 DO 的强一致性扩展到了多区域副本，写延迟保持在
+                100ms 以内，读路径自动就近落地。</span
+              >
+              <span class="lang-en"
+                >Cloudflare extends DO's strong consistency to multi-region
+                replicas, keeping write latency under 100ms while reads hit
+                the nearest replica.</span
+              >
+            </p>
+            <ul class="article-card__bullets">
+              <li>
+                <span class="lang-zh">修改版 Raft，leader 区域可按对象配置</span>
+                <span class="lang-en">Modified Raft, leader region configurable per object</span>
+              </li>
+              <li>
+                <span class="lang-zh">读走最近副本，freshness 默认 50ms 可调</span>
+                <span class="lang-en">Reads served from nearest replica, freshness window 50ms (configurable)</span>
+              </li>
+              <li>
+                <span class="lang-zh">Workers 付费用户全量；wrangler 一行打开</span>
+                <span class="lang-en">GA for all Workers paid plans; one-line wrangler.toml change</span>
+              </li>
+            </ul>
+            <div class="article-card__editorial">
+              <span class="article-card__editorial-label">编辑短评 · Editor's note</span>
+              <span class="lang-zh">在写 multi-region 的状态服务，今天可以少一层 Redis 了。</span>
+              <span class="lang-en">If you maintain multi-region stateful services, you can drop a Redis layer today.</span>
+            </div>
+            <div class="article-card__footer">
+              <div class="article-card__meta">
+                <span class="badge badge--cat-infra">Edge</span>
+                <span class="badge badge--cat-data">Database</span>
+              </div>
+              <span class="t-body-sm text-muted-soft">by linyi</span>
+            </div>
+          </article>
+
+          <!-- Card 2 -->
+          <article class="article-card">
+            <div class="article-card__head">
+              <span>overreacted.io · Dan Abramov · 9 min read</span>
+            </div>
+            <h3 class="article-card__title">
+              <a href="article.html">
+                <span class="lang-zh"
+                  >RSC 一年回顾：我们到底学到了什么</span
+                >
+                <span class="lang-en"
+                  >A year of RSC: what we actually learned</span
+                >
+              </a>
+            </h3>
+            <p class="article-card__summary">
+              <span class="lang-zh"
+                >Dan
+                把过去一年生产环境用上服务端组件的踩坑过了一遍，结论是：边界不在
+                "client/server"，而在"数据时效"。</span
+              >
+              <span class="lang-en"
+                >Dan walks through a year of RSC in production. The boundary
+                that matters isn't client/server — it's data freshness.</span
+              >
+            </p>
+            <div class="article-card__footer">
+              <div class="article-card__meta">
+                <span class="badge badge--cat-code">React</span>
+                <span class="badge badge--cat-code">Framework</span>
+              </div>
+              <span class="t-body-sm text-muted-soft">by mei</span>
+            </div>
+          </article>
+
+          <!-- Card 3 -->
+          <article class="article-card">
+            <div class="article-card__head">
+              <span>sqlite.org · 6 min read</span>
+            </div>
+            <h3 class="article-card__title">
+              <a href="article.html">
+                <span class="lang-zh"
+                  >SQLite 改写 query planner，复杂连接快 4 倍</span
+                >
+                <span class="lang-en"
+                  >SQLite rewrites the query planner: 4× on complex
+                  joins</span
+                >
+              </a>
+            </h3>
+            <p class="article-card__summary">
+              <span class="lang-zh"
+                >新的 NGQP+ 启发式按选择度重排连接顺序，对 7
+                表以上的查询尤其明显；ATTACH 数据库的代价模型也修了。</span
+              >
+              <span class="lang-en"
+                >NGQP+ reorders joins by selectivity, especially benefitting
+                7+ table queries; the cost model for ATTACH-ed databases
+                also got fixed.</span
+              >
+            </p>
+            <div class="article-card__footer">
+              <div class="article-card__meta">
+                <span class="badge badge--cat-data">Database</span>
+                <span class="badge badge--cat-code">Performance</span>
+              </div>
+              <span class="t-body-sm text-muted-soft">by anon</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- Latest weekly cover (showcase: extra breathing room above) -->
+    <!-- =================================================================== -->
+    <section class="section--showcase">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow"
+              ><span class="lang-zh">最新周刊</span>
+              <span class="lang-en">This week's issue</span></span
+            >
+            <h2 class="section-head__title" style="margin-top: 8px">
+              <span class="lang-zh">每周一</span>
+              <span class="lang-en">Mondays</span>
+            </h2>
+          </div>
+          <div class="section-head__meta">
+            <a href="weekly-list.html" class="btn btn-text">
+              <span class="lang-zh">查看历史期号 →</span>
+              <span class="lang-en">All past issues →</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: 1.05fr 0.95fr">
+          <!-- Issue cover (dark) -->
+          <a
+            class="issue-cover"
+            href="weekly-1.html"
+            style="text-decoration: none"
+          >
+            <span class="issue-cover__no">ISSUE · 005 · CURRENT</span>
+            <h3 class="issue-cover__title">
+              <span class="lang-zh"
+                >Agent、Edge、和正在重写的浏览器
+              </span>
+              <span class="lang-en"
+                >Agents, the edge, and a browser being rewritten</span
+              >
+            </h3>
+            <p class="issue-cover__lead">
+              <span class="lang-zh"
+                >本周两条主线：Anthropic Skills 突然热起来；Cloudflare 把 Workers 推到了 RPC-first。挑了 8 条。</span
+              >
+              <span class="lang-en"
+                >Two threads this week: Anthropic Skills clicked; Cloudflare pushed Workers to RPC-first. Eight picks.</span
+              >
+            </p>
+            <div
+              style="
+                margin-top: 16px;
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+              "
+            >
+              <span class="badge badge--on-dark">8 articles</span>
+              <span class="badge badge--on-dark">May 18 – May 24</span>
+              <span class="badge badge--on-dark">~24 min read</span>
+            </div>
+          </a>
+
+          <!-- Picks preview -->
+          <div class="card card--canvas" style="padding: 28px">
+            <div class="t-caption-up text-muted" style="margin-bottom: 16px">
+              <span class="lang-zh">本期亮点</span>
+              <span class="lang-en">Inside this issue</span>
+            </div>
+            <ol
+              style="
+                list-style: none;
+                margin: 0;
+                padding: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                counter-reset: pick;
+              "
+            >
+              <li
+                style="
+                  display: grid;
+                  grid-template-columns: 28px 1fr;
+                  gap: 12px;
+                  align-items: baseline;
+                "
+              >
+                <span class="t-code text-muted-soft">01</span>
+                <div>
+                  <div class="t-title-sm">
+                    <span class="lang-zh"
+                      >Anthropic Skills：把"工作流"变成"技能"</span
+                    >
+                    <span class="lang-en"
+                      >Anthropic Skills: turning workflows into skills</span
+                    >
+                  </div>
+                  <div class="t-body-sm text-muted">anthropic.com</div>
+                </div>
+              </li>
+              <li
+                style="
+                  display: grid;
+                  grid-template-columns: 28px 1fr;
+                  gap: 12px;
+                  align-items: baseline;
+                "
+              >
+                <span class="t-code text-muted-soft">02</span>
+                <div>
+                  <div class="t-title-sm">
+                    <span class="lang-zh"
+                      >Cloudflare Workers RPC：跨服务直接调函数</span
+                    >
+                    <span class="lang-en"
+                      >Cloudflare Workers RPC: cross-service function
+                      calls</span
+                    >
+                  </div>
+                  <div class="t-body-sm text-muted">blog.cloudflare.com</div>
+                </div>
+              </li>
+              <li
+                style="
+                  display: grid;
+                  grid-template-columns: 28px 1fr;
+                  gap: 12px;
+                  align-items: baseline;
+                "
+              >
+                <span class="t-code text-muted-soft">03</span>
+                <div>
+                  <div class="t-title-sm">
+                    <span class="lang-zh"
+                      >TypeScript 5.7：推断好到不像 TS</span
+                    >
+                    <span class="lang-en"
+                      >TypeScript 5.7: inference that doesn't feel like TS</span
+                    >
+                  </div>
+                  <div class="t-body-sm text-muted">
+                    devblogs.microsoft.com
+                  </div>
+                </div>
+              </li>
+            </ol>
+            <hr class="hairline" />
+            <a href="weekly-1.html" class="btn btn-secondary" style="width: 100%">
+              <span class="lang-zh">读完整一期 →</span>
+              <span class="lang-en">Read the full issue →</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- =================================================================== -->
+    <!-- Email subscribe -->
+    <!-- =================================================================== -->
+    <section id="subscribe" class="section--tight">
+      <div class="container">
+        <div class="subscribe-card">
+          <div class="subscribe-card__lead">
+            <span class="eyebrow">
+              <span class="lang-zh">订阅周刊</span>
+              <span class="lang-en">Subscribe</span>
+            </span>
+            <h2 class="balance">
+              <span class="lang-zh">每周一早上 · 一封邮件</span>
+              <span class="lang-en">Mondays · one email</span>
+            </h2>
+            <p>
+              <span class="lang-zh"
+                >上周最有意思的 6–10 条 + 一段编辑首语。随时取消，没有广告。</span
+              >
+              <span class="lang-en"
+                >Past week's top 6–10 picks + a short editor's note. Unsubscribe any time. No ads.</span
+              >
+            </p>
+          </div>
+          <form class="subscribe-card__form" data-subscribe-form>
+            <div class="subscribe-card__row">
+              <input
+                type="email"
+                class="input"
+                placeholder="you@example.com"
+                aria-label="Email address"
+                required
+              />
+              <button type="submit" class="btn btn-primary">
+                <span class="subscribe-card__cta-default">
+                  <span class="lang-zh">订阅</span>
+                  <span class="lang-en">Subscribe</span>
+                </span>
+                <span class="subscribe-card__cta-done" aria-hidden="true">
+                  <span class="lang-zh">✓ 已订阅</span>
+                  <span class="lang-en">✓ Subscribed</span>
+                </span>
+              </button>
+            </div>
+            <p class="subscribe-card__status" role="status" aria-live="polite"></p>
+            <div class="subscribe-card__channels">
+              <a href="#">RSS</a>
+              <a href="#">微信公众号</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- =================================================================== -->
+    <!-- Footer -->
+    <!-- =================================================================== -->
+    <footer class="footer" id="about">
+      <div class="container">
+        <div class="footer__grid">
+          <div>
+            <div class="footer__brand">
+              <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+              <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+            </div>
+            <p class="t-body-sm footer__blurb">
+              <span class="lang-zh"
+                >双语技术刊 · 每条人审。</span
+              >
+              <span class="lang-en"
+                >A small team's bilingual tech daily &amp; weekly. We glean
+                the good links so you don't have to. Every link passes a
+                human review.</span
+              >
+            </p>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">阅读</span><span class="lang-en">Read</span></h2>
+            <ul>
+              <li><a href="weekly-1.html"><span class="lang-zh">最新周刊</span><span class="lang-en">Latest weekly</span></a></li>
+              <li><a href="daily.html"><span class="lang-zh">今日日刊</span><span class="lang-en">Today</span></a></li>
+              <li><a href="tag-edge.html"><span class="lang-zh">所有标签</span><span class="lang-en">All tags</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 日刊</span><span class="lang-en">RSS · daily</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 周刊</span><span class="lang-en">RSS · weekly</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">参与</span><span class="lang-en">Contribute</span></h2>
+            <ul>
+              <li><a href="submit.html"><span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span></a></li>
+              <li><a href="#"><span class="lang-zh">CLI 工具</span><span class="lang-en">CLI tool</span></a></li>
+              <li><a href="standards.html"><span class="lang-zh">编辑标准</span><span class="lang-en">Editorial standards</span></a></li>
+              <li><a href="design-system.html"><span class="lang-zh">设计系统</span><span class="lang-en">Design system</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">关于</span><span class="lang-en">About</span></h2>
+            <ul>
+              <li><a href="about.html"><span class="lang-zh">关于</span><span class="lang-en">About</span></a></li>
+              <li><a href="#"><span class="lang-zh">技术栈</span><span class="lang-en">Stack</span></a></li>
+              <li><a href="#"><span class="lang-zh">联系</span><span class="lang-en">Contact</span></a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer__bottom">
+          <span
+            ><span class="lang-zh">© 2026 Glean · 拾遗 · 双语技术内容</span>
+            <span class="lang-en">© 2026 Glean · Bilingual tech curation</span></span
+          >
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Subscribe / notify form — toggle .is-subscribed class and announce
+      // status to assistive tech. Preserves the bilingual span structure so
+      // the language switch keeps working after subscription.
+      (function () {
+        document.querySelectorAll("[data-subscribe-form]").forEach((form) => {
+          form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            form.classList.add("is-subscribed");
+            const status = form.querySelector(".subscribe-card__status");
+            if (status) {
+              const lang = document.body.getAttribute("data-lang") || "zh";
+              status.textContent = lang === "zh"
+                ? "已订阅。下周一早上会收到第一封。"
+                : "Subscribed. The next weekly lands Monday morning.";
+            }
+            const btn = form.querySelector("button[type=submit]");
+            if (btn) btn.disabled = true;
+          });
+        });
+      })();
+
+      // Minimal lang toggle for the prototype.
+      // Mobile nav toggle.
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        const close = () => {
+          links.classList.remove("is-open");
+          toggle.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          document.body.style.overflow = open ? "hidden" : "";
+        });
+        // Close on link click
+        links.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+        // Close on Escape
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") close();
+        });
+      })();
+
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-lang-set]");
+        if (!t) return;
+        const lang = t.getAttribute("data-lang-set");
+        document.body.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document
+          .querySelectorAll("[data-lang-set]")
+          .forEach((b) => {
+            const active = b.getAttribute("data-lang-set") === lang;
+            b.classList.toggle("is-active", active);
+            b.setAttribute("aria-selected", active ? "true" : "false");
+          });
+      });
+    </script>
+  </body>
+</html>

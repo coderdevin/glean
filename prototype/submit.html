@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>提交链接 · Glean 拾遗</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="index.html" class="brand">
+          <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+        </a>
+        <nav class="nav-links" id="primary-nav" aria-label="主导航">
+          <a class="nav-link" href="index.html">首页</a>
+          <a class="nav-link" href="weekly-list.html">周刊</a>
+          <a class="nav-link" href="daily.html">日刊</a>
+          <a class="nav-link" href="tag-edge.html">标签</a>
+          <a class="nav-link" href="about.html">关于</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <div class="lang-toggle" role="tablist" aria-label="Language">
+            <button type="button" data-lang-set="zh" class="is-active" role="tab" aria-selected="true">中</button>
+            <button type="button" data-lang-set="en" role="tab" aria-selected="false">EN</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section id="main" class="page-banner">
+      <div class="container">
+        <span class="eyebrow">
+          <span class="lang-zh">投一条链接</span>
+          <span class="lang-en">Submit a link</span>
+        </span>
+        <h1 style="margin-top: 12px">
+          <span class="lang-zh">提交链接</span>
+          <span class="lang-en">Submit a link</span>
+        </h1>
+        <p>
+          <span class="lang-zh">贴一条 URL · AI 起草 · 我审完发。</span>
+          <span class="lang-en">Paste a URL · AI drafts · I approve and ship.</span>
+        </p>
+      </div>
+    </section>
+
+    <section class="section--tight">
+      <div class="container">
+        <div class="grid" style="grid-template-columns: 1.1fr 0.9fr; gap: 48px">
+          <!-- Form -->
+          <form class="card card--canvas" style="padding: 36px" action="submit-success.html" method="get" novalidate>
+            <div class="stack stack--lg">
+              <div class="field">
+                <label for="url">
+                  <span class="lang-zh">文章链接 URL <span style="color: var(--c-primary)">*</span></span>
+                  <span class="lang-en">Article URL <span style="color: var(--c-primary)">*</span></span>
+                </label>
+                <input
+                  id="url"
+                  name="url"
+                  type="url"
+                  class="input"
+                  placeholder="https://blog.cloudflare.com/durable-objects-2026/"
+                  required
+                />
+                <span class="hint">
+                  <span class="lang-zh">中英皆可 · 自动翻译。</span>
+                  <span class="lang-en">CN or EN · auto-translated.</span>
+                </span>
+              </div>
+
+              <div class="field">
+                <label for="note">
+                  <span class="lang-zh">为什么推荐？(可选)</span>
+                  <span class="lang-en">Why do you recommend it? (optional)</span>
+                </label>
+                <textarea
+                  id="note"
+                  name="note"
+                  class="textarea"
+                  placeholder="一句话告诉编辑这条值得读的理由。"
+                ></textarea>
+                <span class="hint">
+                  <span class="lang-zh">只给编辑 · 不公开。</span>
+                  <span class="lang-en">Editor only · not public.</span>
+                </span>
+              </div>
+
+              <div class="field">
+                <label for="submitter">
+                  <span class="lang-zh">署名 (可选)</span>
+                  <span class="lang-en">Sign as (optional)</span>
+                </label>
+                <input
+                  id="submitter"
+                  name="submitter"
+                  type="text"
+                  class="input"
+                  placeholder="linyi"
+                  maxlength="40"
+                />
+                <span class="hint">
+                  <span class="lang-zh">卡片底部署名 · 留空 = by anon。</span>
+                  <span class="lang-en">Shows as "by ___" · blank = "by anon".</span>
+                </span>
+              </div>
+
+              <!-- Anti-spam · Turnstile placeholder -->
+              <div class="field">
+                <div
+                  style="
+                    display: flex;
+                    gap: 10px;
+                    align-items: center;
+                    padding: 10px 14px;
+                    background: var(--c-surface-soft);
+                    border: 1px solid var(--c-hairline);
+                    border-radius: var(--r-md);
+                    font-size: 13px;
+                    color: var(--c-body);
+                  "
+                >
+                  <span
+                    style="
+                      width: 18px;
+                      height: 18px;
+                      border-radius: 4px;
+                      background: var(--c-accent-teal);
+                      display: inline-flex;
+                      align-items: center;
+                      justify-content: center;
+                      color: white;
+                      font-size: 12px;
+                      flex: 0 0 18px;
+                    "
+                    aria-hidden="true"
+                    >✓</span
+                  >
+                  <span class="lang-zh">验证你是人· Cloudflare Turnstile</span>
+                  <span class="lang-en">Verified human · Cloudflare Turnstile</span>
+                </div>
+              </div>
+
+              <!-- honeypot -->
+              <input
+                type="text"
+                name="website"
+                class="honeypot"
+                tabindex="-1"
+                autocomplete="off"
+              />
+
+              <div class="row" style="gap: 12px; align-items: center">
+                <button type="submit" class="btn btn-primary">
+                  <span class="lang-zh">提交 →</span>
+                  <span class="lang-en">Submit →</span>
+                </button>
+                <span class="t-body-sm text-muted-soft">
+                  <span class="lang-zh">无需登录 · 每 IP 每小时 10 条</span>
+                  <span class="lang-en">No login · 10 per IP per hour</span>
+                </span>
+              </div>
+            </div>
+          </form>
+
+          <!-- Sidebar: what happens next -->
+          <aside class="stack stack--xl">
+            <div>
+              <span class="eyebrow">
+                <span class="lang-zh">之后发生什么</span>
+                <span class="lang-en">What happens next</span>
+              </span>
+              <h2 class="t-display-sm" style="margin-top: 12px">
+                <span class="lang-zh">从粘贴到上刊 · 4 步</span>
+                <span class="lang-en">Paste to publish · 4 steps</span>
+              </h2>
+            </div>
+
+            <ol class="stack stack--lg" style="list-style: none; margin: 0; padding: 0; counter-reset: step">
+              <li style="display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start">
+                <span class="badge badge--coral" style="height: 24px; justify-content: center; min-width: 28px">1</span>
+                <div>
+                  <div class="t-title-md">
+                    <span class="lang-zh">入队</span>
+                    <span class="lang-en">Queued</span>
+                  </div>
+                  <p class="t-body-sm text-body" style="margin: 4px 0 0">
+                    <span class="lang-zh">URL 落库 · 给你一个查询 ID。</span>
+                    <span class="lang-en">URL stored · you get a lookup ID.</span>
+                  </p>
+                </div>
+              </li>
+              <li style="display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start">
+                <span class="badge badge--coral" style="height: 24px; justify-content: center; min-width: 28px">2</span>
+                <div>
+                  <div class="t-title-md">
+                    <span class="lang-zh">AI 加工</span>
+                    <span class="lang-en">AI pass</span>
+                  </div>
+                  <p class="t-body-sm text-body" style="margin: 4px 0 0">
+                    <span class="lang-zh">抓正文 · 双语 · 要点 · 标签 · 一句点评。~30 秒。</span>
+                    <span class="lang-en">Extract · translate · bullets · tags · note. ~30s.</span>
+                  </p>
+                </div>
+              </li>
+              <li style="display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start">
+                <span class="badge badge--coral" style="height: 24px; justify-content: center; min-width: 28px">3</span>
+                <div>
+                  <div class="t-title-md">
+                    <span class="lang-zh">人工审核</span>
+                    <span class="lang-en">Human review</span>
+                  </div>
+                  <p class="t-body-sm text-body" style="margin: 4px 0 0">
+                    <span class="lang-zh">我读一眼 · 可改可拒 · 通常 1 小时内。</span>
+                    <span class="lang-en">I read, edit, or reject · usually within an hour.</span>
+                  </p>
+                </div>
+              </li>
+              <li style="display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start">
+                <span class="badge badge--coral" style="height: 24px; justify-content: center; min-width: 28px">4</span>
+                <div>
+                  <div class="t-title-md">
+                    <span class="lang-zh">进当日日刊</span>
+                    <span class="lang-en">Lands in today's daily</span>
+                  </div>
+                  <p class="t-body-sm text-body" style="margin: 4px 0 0">
+                    <span class="lang-zh">通过即公开 · 高分会进下周一的周刊。</span>
+                    <span class="lang-en">Public on approval · top picks land in Monday's weekly.</span>
+                  </p>
+                </div>
+              </li>
+            </ol>
+
+            <div class="card card--dark" style="padding: 24px">
+              <div class="t-caption-up" style="color: var(--c-accent-amber); margin-bottom: 8px">
+                <span class="lang-zh">命令行用户</span>
+                <span class="lang-en">Terminal-first?</span>
+              </div>
+              <pre class="t-code" style="margin: 0; color: var(--c-on-dark); line-height: 1.7"><span style="color: var(--c-accent-amber)">$</span> curl -fsSL glean.team/cli | sh
+<span style="color: var(--c-accent-amber)">$</span> glean https://example.com/article</pre>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="footer__grid">
+          <div>
+            <div class="footer__brand">
+              <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+              <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+            </div>
+            <p class="t-body-sm footer__blurb">
+              <span class="lang-zh">双语技术日刊与周刊。从信息洪流里把值得读的拣回来；每条人审。</span>
+              <span class="lang-en">A bilingual tech daily &amp; weekly. I pick up the links worth reading. Every link human-reviewed.</span>
+            </p>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">阅读</span><span class="lang-en">Read</span></h2>
+            <ul>
+              <li><a href="weekly-1.html"><span class="lang-zh">最新周刊</span><span class="lang-en">Latest weekly</span></a></li>
+              <li><a href="daily.html"><span class="lang-zh">今日日刊</span><span class="lang-en">Today</span></a></li>
+              <li><a href="tag-edge.html"><span class="lang-zh">所有标签</span><span class="lang-en">All tags</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 日刊</span><span class="lang-en">RSS · daily</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 周刊</span><span class="lang-en">RSS · weekly</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">参与</span><span class="lang-en">Contribute</span></h2>
+            <ul>
+              <li><a href="submit.html"><span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span></a></li>
+              <li><a href="#"><span class="lang-zh">CLI 工具</span><span class="lang-en">CLI tool</span></a></li>
+              <li><a href="standards.html"><span class="lang-zh">编辑标准</span><span class="lang-en">Editorial standards</span></a></li>
+              <li><a href="design-system.html"><span class="lang-zh">设计系统</span><span class="lang-en">Design system</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">关于</span><span class="lang-en">About</span></h2>
+            <ul>
+              <li><a href="about.html"><span class="lang-zh">关于</span><span class="lang-en">About</span></a></li>
+              <li><a href="#"><span class="lang-zh">技术栈</span><span class="lang-en">Stack</span></a></li>
+              <li><a href="#"><span class="lang-zh">联系</span><span class="lang-en">Contact</span></a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer__bottom">
+          <span><span class="lang-zh">© 2026 Glean · 拾遗 · 双语技术内容</span><span class="lang-en">© 2026 Glean · Bilingual tech curation</span></span>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Mobile nav toggle.
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        const close = () => {
+          links.classList.remove("is-open");
+          toggle.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          document.body.style.overflow = open ? "hidden" : "";
+        });
+        // Close on link click
+        links.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+        // Close on Escape
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") close();
+        });
+      })();
+
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-lang-set]");
+        if (!t) return;
+        const lang = t.getAttribute("data-lang-set");
+        document.body.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document.querySelectorAll("[data-lang-set]").forEach((b) => {
+          const active = b.getAttribute("data-lang-set") === lang;
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+      });
+    </script>
+  </body>
+</html>

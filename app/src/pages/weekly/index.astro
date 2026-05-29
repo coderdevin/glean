@@ -1,0 +1,123 @@
+---
+export const prerender = false;
+import Site from "~/layouts/Site.astro";
+import { db } from "~/db/client";
+import { allWeeklies } from "~/lib/queries";
+
+const env = Astro.locals.runtime.env;
+const issues = await allWeeklies(db(env.DB));
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+);
+const fmt = (s: string, e: string) => `${s} → ${e}`;
+const fmtPubZh = (d: Date | null) => {
+  if (!d) return "";
+  const dt = new Date(d);
+  return `${dt.getUTCMonth() + 1} 月 ${dt.getUTCDate()} 日`;
+};
+const fmtPubEn = (d: Date | null) => {
+  if (!d) return "";
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+};
+---
+<Site
+  title="所有周刊 · All weeklies — Glean · 拾遗"
+  description="One issue every Monday, grouped by theme."
+>
+  <section class="page-banner">
+    <div class="container">
+      <span class="eyebrow">
+        {issues.length > 0 ? (
+          <>
+            <span class="lang-zh">{issues.length} 期 · 每周一</span>
+            <span class="lang-en">{issues.length} {issues.length === 1 ? "issue" : "issues"} · Mondays</span>
+          </>
+        ) : (
+          <>
+            <span class="lang-zh">首期筹备中 · 每周一</span>
+            <span class="lang-en">First issue coming · Mondays</span>
+          </>
+        )}
+      </span>
+      <h1 style="margin-top: 12px">
+        <span class="lang-zh">每周一一期 · 按主题分章</span>
+        <span class="lang-en">One issue every Monday · grouped by theme</span>
+      </h1>
+      <p style="max-width: 60ch">
+        <span class="lang-zh">每期 6–10 条 · 分章节 · 双语 · 一句点评。</span>
+        <span class="lang-en">Each issue: 6–10 picks · sectioned · bilingual · one-line note.</span>
+      </p>
+    </div>
+  </section>
+
+  <section class="section--tight" style="padding-top: 16px">
+    <div class="container">
+      {issues.length === 0 && (
+        <div class="prose-block" style="text-align: center; padding: 48px 0">
+          <p>
+            <span class="lang-zh">还没有发布的周刊。第一期会在周一发布。</span>
+            <span class="lang-en">No weekly issues yet. Issue 001 will land on a Monday.</span>
+          </p>
+        </div>
+      )}
+      <div class="issue-list">
+        {issues.map((iss, i) => (
+          <a class="issue-list-card" href={`/weekly/${iss.number}`}>
+            <div class={`issue-list-card__cover${i % 3 === 1 ? " issue-list-card__cover--cream" : ""}`} data-bigno={String(iss.number).padStart(3, "0")}>
+              <div class="issue-list-card__cover-no">Issue · {String(iss.number).padStart(3, "0")}{i === 0 ? " · CURRENT" : ""}</div>
+              <div class="issue-list-card__cover-theme">
+                <span class="lang-zh">{iss.titleZh}</span>
+                <span class="lang-en">{iss.titleEn}</span>
+              </div>
+            </div>
+            <div class="issue-list-card__body">
+              <div class="issue-list-card__date">
+                {fmt(iss.dateStart, iss.dateEnd)}
+                {iss.publishedAt && (
+                  <>
+                    {" · "}
+                    <span class="lang-zh">{fmtPubZh(iss.publishedAt)}发布</span>
+                    <span class="lang-en">published {fmtPubEn(iss.publishedAt)}</span>
+                  </>
+                )}
+              </div>
+              <h2 class="issue-list-card__title">
+                <span class="lang-zh">{iss.titleZh}</span>
+                <span class="lang-en">{iss.titleEn}</span>
+              </h2>
+              <p class="issue-list-card__lead">
+                <span class="lang-zh">{iss.introZh}</span>
+                <span class="lang-en">{iss.introEn}</span>
+              </p>
+              <div class="issue-list-card__meta">
+                <span>
+                  <span class="lang-zh">{iss.pick_count} 篇</span>
+                  <span class="lang-en">{iss.pick_count} picks</span>
+                </span>
+                {iss.read_minutes > 0 && (
+                  <>
+                    <span class="dot-sep"></span>
+                    <span>
+                      <span class="lang-zh">约 {iss.read_minutes} 分钟</span>
+                      <span class="lang-en">~{iss.read_minutes} min read</span>
+                    </span>
+                  </>
+                )}
+                {iss.section_count > 0 && (
+                  <>
+                    <span class="dot-sep"></span>
+                    <span>
+                      <span class="lang-zh">{iss.section_count} 个章节</span>
+                      <span class="lang-en">{iss.section_count} sections</span>
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Site>

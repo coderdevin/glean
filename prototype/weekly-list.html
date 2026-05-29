@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>所有周刊 · Glean 拾遗</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-lang="zh">
+    <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>
+    <header class="top-nav">
+      <div class="top-nav__inner">
+        <a href="index.html" class="brand">
+          <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+          <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+        </a>
+        <nav class="nav-links" id="primary-nav" aria-label="主导航">
+          <a class="nav-link" href="index.html">首页</a>
+          <a class="nav-link" aria-current="page" href="weekly-list.html">周刊</a>
+          <a class="nav-link" href="daily.html">日刊</a>
+          <a class="nav-link" href="tag-edge.html">标签</a>
+          <a class="nav-link" href="about.html">关于</a>
+        </nav>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-spacer"></div>
+        <div class="nav-right">
+          <div class="lang-toggle" role="tablist" aria-label="Language">
+            <button type="button" data-lang-set="zh" class="is-active" role="tab" aria-selected="true">中</button>
+            <button type="button" data-lang-set="en" role="tab" aria-selected="false">EN</button>
+          </div>
+          <a href="submit.html" class="nav-link nav-link--cta">
+            <span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- =================================================================== -->
+    <!-- Page header -->
+    <!-- =================================================================== -->
+    <section class="page-banner">
+      <div class="container">
+        <span class="eyebrow">
+          <span class="lang-zh">5 期 · 每周一</span>
+          <span class="lang-en">5 issues · Mondays</span>
+        </span>
+        <h1 style="margin-top: 12px">
+          <span class="lang-zh">每周一一期 · 按主题分章</span>
+          <span class="lang-en">One issue every Monday · grouped by theme</span>
+        </h1>
+        <p style="max-width: 60ch">
+          <span class="lang-zh">每期 6–10 条 · 分章节 · 双语 · 一句点评。</span>
+          <span class="lang-en">Each issue: 6–10 picks · sectioned · bilingual · one-line note.</span>
+        </p>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- Issue list -->
+    <!-- =================================================================== -->
+    <section class="section--tight" style="padding-top: 16px">
+      <div class="container">
+        <div class="issue-list">
+
+          <!-- Issue 005 — current -->
+          <a class="issue-list-card" href="weekly-1.html">
+            <div class="issue-list-card__cover" data-bigno="005">
+              <div class="issue-list-card__cover-no">Issue · 005 · CURRENT</div>
+              <div class="issue-list-card__cover-theme">
+                <span class="lang-zh">Agent、Edge、和正在重写的浏览器</span>
+                <span class="lang-en">Agents, the edge, and a browser being rewritten</span>
+              </div>
+            </div>
+            <div class="issue-list-card__body">
+              <div class="issue-list-card__date">2026-05-18 → 2026-05-24 · <span class="lang-zh">5 月 25 日发布</span><span class="lang-en">published May 25</span></div>
+              <h2 class="issue-list-card__title">
+                <span class="lang-zh">Agent、Edge、和正在重写的浏览器</span>
+                <span class="lang-en">Agents, the edge, and a browser being rewritten</span>
+              </h2>
+              <p class="issue-list-card__lead">
+                <span class="lang-zh">Anthropic Skills 把工作流变成技能、Cloudflare 把 RPC 加进 Workers——这一周两条主线都在做减法。第三条暗线：基础设施层在被悄悄重写。</span>
+                <span class="lang-en">Anthropic Skills packages workflows; Cloudflare puts RPC into Workers — both threads run on subtraction. A third, quieter thread: the infra layer is being quietly rewritten.</span>
+              </p>
+              <div class="issue-list-card__meta">
+                <span><span class="lang-zh">8 篇</span><span class="lang-en">8 picks</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">约 24 分钟</span><span class="lang-en">~24 min read</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">5 个章节</span><span class="lang-en">5 sections</span></span>
+              </div>
+            </div>
+          </a>
+
+          <!-- Issue 004 -->
+          <a class="issue-list-card" href="weekly-1.html">
+            <div class="issue-list-card__cover issue-list-card__cover--cream" data-bigno="004">
+              <div class="issue-list-card__cover-no">Issue · 004</div>
+              <div class="issue-list-card__cover-theme">
+                <span class="lang-zh">工具的小阳春</span>
+                <span class="lang-en">The tool renaissance</span>
+              </div>
+            </div>
+            <div class="issue-list-card__body">
+              <div class="issue-list-card__date">2026-05-11 → 2026-05-17 · <span class="lang-zh">5 月 18 日</span><span class="lang-en">May 18</span></div>
+              <h2 class="issue-list-card__title">
+                <span class="lang-zh">工具的小阳春</span>
+                <span class="lang-en">The tool renaissance</span>
+              </h2>
+              <p class="issue-list-card__lead">
+                <span class="lang-zh">Zed 加入 collab inline diff、Helix 24.05 改命令树、JetBrains 把 AI 嵌进 IDE 主线——这一周编辑器领域发生的事比前三个月加起来都多。</span>
+                <span class="lang-en">Zed adds collab inline diff, Helix 24.05 reshapes its command tree, JetBrains threads AI into the IDE mainline — more happened in editors this week than the last three months combined.</span>
+              </p>
+              <div class="issue-list-card__meta">
+                <span><span class="lang-zh">9 篇</span><span class="lang-en">9 picks</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">约 28 分钟</span><span class="lang-en">~28 min read</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">4 个章节</span><span class="lang-en">4 sections</span></span>
+              </div>
+            </div>
+          </a>
+
+          <!-- Issue 003 -->
+          <a class="issue-list-card" href="weekly-1.html">
+            <div class="issue-list-card__cover" data-bigno="003">
+              <div class="issue-list-card__cover-no">Issue · 003</div>
+              <div class="issue-list-card__cover-theme">
+                <span class="lang-zh">三个 RS 字头，让你重新看 Web</span>
+                <span class="lang-en">Three RS-words reshaping the web</span>
+              </div>
+            </div>
+            <div class="issue-list-card__body">
+              <div class="issue-list-card__date">2026-05-04 → 2026-05-10 · <span class="lang-zh">5 月 11 日</span><span class="lang-en">May 11</span></div>
+              <h2 class="issue-list-card__title">
+                <span class="lang-zh">RSC、RSP、RPC：三个 RS 字头让你重新看 Web</span>
+                <span class="lang-en">RSC, RSP, RPC: three RS-words reshaping the web</span>
+              </h2>
+              <p class="issue-list-card__lead">
+                <span class="lang-zh">React Server Components、Resumable State Patterns 与 Workers RPC 一周内三连发——本期把三者的边界画一遍，给你一张思维图。</span>
+                <span class="lang-en">React Server Components, Resumable State Patterns, and Workers RPC all landed within a week — we redraw the boundaries between them and give you one mental map.</span>
+              </p>
+              <div class="issue-list-card__meta">
+                <span><span class="lang-zh">7 篇</span><span class="lang-en">7 picks</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">约 21 分钟</span><span class="lang-en">~21 min read</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">5 个章节</span><span class="lang-en">5 sections</span></span>
+              </div>
+            </div>
+          </a>
+
+          <!-- Issue 002 -->
+          <a class="issue-list-card" href="weekly-1.html">
+            <div class="issue-list-card__cover issue-list-card__cover--coral" data-bigno="002">
+              <div class="issue-list-card__cover-no">Issue · 002</div>
+              <div class="issue-list-card__cover-theme">
+                <span class="lang-zh">数据库的安静一周</span>
+                <span class="lang-en">A quiet week for databases</span>
+              </div>
+            </div>
+            <div class="issue-list-card__body">
+              <div class="issue-list-card__date">2026-04-27 → 2026-05-03 · <span class="lang-zh">5 月 4 日</span><span class="lang-en">May 4</span></div>
+              <h2 class="issue-list-card__title">
+                <span class="lang-zh">数据库的安静一周</span>
+                <span class="lang-en">A quiet week for databases</span>
+              </h2>
+              <p class="issue-list-card__lead">
+                <span class="lang-zh">Postgres 17 落地、TursoDB 把 SQLite 推到边缘多副本、DuckDB 0.10 加 BigQuery 直连——存储层在不声不响地长出新枝。</span>
+                <span class="lang-en">Postgres 17 lands, Turso pushes SQLite to multi-region replicas, DuckDB 0.10 talks BigQuery natively — the storage layer is growing new branches in silence.</span>
+              </p>
+              <div class="issue-list-card__meta">
+                <span><span class="lang-zh">6 篇</span><span class="lang-en">6 picks</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">约 18 分钟</span><span class="lang-en">~18 min read</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">3 个章节</span><span class="lang-en">3 sections</span></span>
+              </div>
+            </div>
+          </a>
+
+          <!-- Issue 001 — founding -->
+          <a class="issue-list-card" href="weekly-1.html">
+            <div class="issue-list-card__cover issue-list-card__cover--cream" data-bigno="001">
+              <div class="issue-list-card__cover-no">Issue · 001 · FOUNDING</div>
+              <div class="issue-list-card__cover-theme">
+                <span class="lang-zh">开刊号</span>
+                <span class="lang-en">Founding issue</span>
+              </div>
+            </div>
+            <div class="issue-list-card__body">
+              <div class="issue-list-card__date">2026-04-20 → 2026-04-26 · <span class="lang-zh">4 月 27 日</span><span class="lang-en">April 27</span></div>
+              <h2 class="issue-list-card__title">
+                <span class="lang-zh">我们为什么做拾遗</span>
+                <span class="lang-en">Why we're starting Glean</span>
+              </h2>
+              <p class="issue-list-card__lead">
+                <span class="lang-zh">一封写给小团队的开刊词：我们想把"每天分享一条好链接"做成一个日常仪式，让前沿技术不只属于刷 X 的人。本期附 6 条创刊精选。</span>
+                <span class="lang-en">A letter to our small team. We want "share one good link a day" to become a daily ritual — so frontier tech isn't only available to people who live on X. Plus 6 founding picks.</span>
+              </p>
+              <div class="issue-list-card__meta">
+                <span><span class="lang-zh">6 篇</span><span class="lang-en">6 picks</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">约 16 分钟</span><span class="lang-en">~16 min read</span></span>
+                <span class="dot-sep"></span>
+                <span><span class="lang-zh">2 个章节</span><span class="lang-en">2 sections</span></span>
+              </div>
+            </div>
+          </a>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- Subscribe CTA -->
+    <!-- =================================================================== -->
+    <section class="section--tight">
+      <div class="container">
+        <div class="cta-band cta-band--coral">
+          <span class="t-caption-up" style="opacity: 0.85">
+            <span class="lang-zh">不想错过</span><span class="lang-en">Don't miss one</span>
+          </span>
+          <h2 class="t-display-md" style="color: var(--c-on-primary); margin: 0">
+            <span class="lang-zh">每周一早，一封信。</span><span class="lang-en">One email, every Monday morning.</span>
+          </h2>
+          <p class="t-body-md" style="max-width: 60ch; opacity: 0.9; margin: 0">
+            <span class="lang-zh">订阅 RSS 或邮件，新一期落地立刻送到。</span>
+            <span class="lang-en">Subscribe via RSS or email — every new issue lands at your door.</span>
+          </p>
+          <div class="row" style="gap: 12px">
+            <a href="#" class="btn btn-cream-on-coral">
+              <span class="lang-zh">RSS 订阅</span><span class="lang-en">Subscribe via RSS</span>
+            </a>
+            <a href="#" class="btn" style="background: transparent; color: var(--c-on-primary); border: 1px solid color-mix(in oklch, var(--white) 40%, transparent)">
+              <span class="lang-zh">邮件订阅</span><span class="lang-en">Email subscribe</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer__grid">
+          <div>
+            <div class="footer__brand">
+              <svg class="brand__mark" viewBox="0 0 30 24" fill="currentColor" aria-hidden="true"><circle cx="10" cy="5" r="2.4"/><path d="M2 12 Q10 22 18 12 Z"/><circle class="brand__mark-pick" cx="25" cy="15" r="1.6"/></svg>
+              <span class="brand__wordmark"><span class="brand__name">Glean</span><span class="brand__subname">拾遗</span></span>
+            </div>
+            <p class="t-body-sm footer__blurb">
+              <span class="lang-zh">双语技术日刊与周刊。从信息洪流里把值得读的拣回来；每条人审。</span>
+              <span class="lang-en">A bilingual tech daily &amp; weekly. I pick up the links worth reading. Every link human-reviewed.</span>
+            </p>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">阅读</span><span class="lang-en">Read</span></h2>
+            <ul>
+              <li><a href="weekly-list.html"><span class="lang-zh">所有周刊</span><span class="lang-en">All weeklies</span></a></li>
+              <li><a href="daily.html"><span class="lang-zh">今日日刊</span><span class="lang-en">Today</span></a></li>
+              <li><a href="tag-edge.html"><span class="lang-zh">所有标签</span><span class="lang-en">All tags</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 日刊</span><span class="lang-en">RSS · daily</span></a></li>
+              <li><a href="#"><span class="lang-zh">RSS · 周刊</span><span class="lang-en">RSS · weekly</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">参与</span><span class="lang-en">Contribute</span></h2>
+            <ul>
+              <li><a href="submit.html"><span class="lang-zh">提交链接</span><span class="lang-en">Submit a link</span></a></li>
+              <li><a href="#"><span class="lang-zh">CLI 工具</span><span class="lang-en">CLI tool</span></a></li>
+              <li><a href="standards.html"><span class="lang-zh">编辑标准</span><span class="lang-en">Editorial standards</span></a></li>
+              <li><a href="design-system.html"><span class="lang-zh">设计系统</span><span class="lang-en">Design system</span></a></li>
+            </ul>
+          </div>
+          <div class="footer__col">
+            <h2><span class="lang-zh">关于</span><span class="lang-en">About</span></h2>
+            <ul>
+              <li><a href="about.html"><span class="lang-zh">关于</span><span class="lang-en">About</span></a></li>
+              <li><a href="#"><span class="lang-zh">技术栈</span><span class="lang-en">Stack</span></a></li>
+              <li><a href="#"><span class="lang-zh">联系</span><span class="lang-en">Contact</span></a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer__bottom">
+          <span><span class="lang-zh">© 2026 Glean · 拾遗 · 双语技术内容</span><span class="lang-en">© 2026 Glean · Bilingual tech curation</span></span>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      // Mobile nav toggle.
+      (function () {
+        const toggle = document.querySelector(".nav-toggle");
+        const links = document.getElementById("primary-nav");
+        if (!toggle || !links) return;
+        const close = () => {
+          links.classList.remove("is-open");
+          toggle.setAttribute("aria-expanded", "false");
+          document.body.style.overflow = "";
+        };
+        toggle.addEventListener("click", () => {
+          const open = links.classList.toggle("is-open");
+          toggle.setAttribute("aria-expanded", String(open));
+          document.body.style.overflow = open ? "hidden" : "";
+        });
+        // Close on link click
+        links.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+        // Close on Escape
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") close();
+        });
+      })();
+
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-lang-set]");
+        if (!t) return;
+        const lang = t.getAttribute("data-lang-set");
+        document.body.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+        document.querySelectorAll("[data-lang-set]").forEach((b) => {
+          const active = b.getAttribute("data-lang-set") === lang;
+          b.classList.toggle("is-active", active);
+          b.setAttribute("aria-selected", active ? "true" : "false");
+        });
+      });
+    </script>
+  </body>
+</html>
