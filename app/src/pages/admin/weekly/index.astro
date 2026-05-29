@@ -12,37 +12,151 @@ const issues = await allWeekliesAdmin(db(env.DB));
 const range = thisWeekToDate(new Date(), siteTz(env));
 ---
 <Admin title="周刊 · Weekly">
-  <div class="container" style="padding: 24px 0">
-    <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:24px">
-      <h1>周刊 · Weekly</h1>
-      <form method="POST" action="/api/admin/weekly/generate" style="display:flex; gap:8px; align-items:flex-end">
-        <label style="font-size:0.8em; opacity:0.7">开始<br><input type="date" name="date_start" value={range.dateStart} /></label>
-        <label style="font-size:0.8em; opacity:0.7">结束<br><input type="date" name="date_end" value={range.dateEnd} /></label>
-        <button type="submit" class="btn btn-primary">生成周刊</button>
+  <div class="wk container">
+    <header class="wk-head">
+      <div>
+        <div class="wk-eyebrow">编辑台 · Editor</div>
+        <h1 class="wk-title">周刊 · Weekly</h1>
+      </div>
+      <form method="POST" action="/api/admin/weekly/generate" class="wk-gen">
+        <div class="admin-field"><label>开始 · From</label>
+          <input class="input" type="date" name="date_start" value={range.dateStart} /></div>
+        <div class="admin-field"><label>结束 · To</label>
+          <input class="input" type="date" name="date_end" value={range.dateEnd} /></div>
+        <button type="submit" class="btn btn-primary wk-gen__btn">生成周刊</button>
       </form>
-    </div>
+    </header>
 
-    {issues.length === 0 && <p>还没有任何周刊。选好日期范围，点「生成周刊」开始。</p>}
-
-    <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:12px">
-      {issues.map((iss) => (
-        <li style="border:1px solid var(--rule, #ddd); border-radius:8px; padding:16px">
-          <div style="display:flex; justify-content:space-between; gap:16px">
-            <div>
-              <strong>#{String(iss.number).padStart(3, "0")}</strong>
-              {" — "}
-              <span>{iss.titleZh}</span> / <span>{iss.titleEn}</span>
-              <div style="font-size:0.85em; opacity:0.7; margin-top:4px">
-                {iss.dateStart} → {iss.dateEnd}
-                {iss.publishedAt
-                  ? <span style="color:green"> · 已发布</span>
-                  : <span style="color:#b45309"> · 草稿</span>}
-              </div>
-            </div>
-            <a class="btn btn-text" href={`/admin/weekly/${iss.id}`}>编辑 →</a>
-          </div>
-        </li>
-      ))}
-    </ul>
+    {issues.length === 0 ? (
+      <div class="card card--canvas wk-empty">
+        <p class="wk-empty__title">还没有任何周刊</p>
+        <p class="wk-empty__hint">选好上面的日期范围，点「生成周刊」——AI 会把那段时间已发布的篇目汇成一期草稿。</p>
+      </div>
+    ) : (
+      <ul class="wk-list">
+        {issues.map((iss) => (
+          <li class="wk-row">
+            <a class="wk-row__link" href={`/admin/weekly/${iss.id}`}>
+              <span class="wk-row__no">#{String(iss.number).padStart(3, "0")}</span>
+              <span class="wk-row__body">
+                <span class="wk-row__title">
+                  <span class="wk-row__zh">{iss.titleZh}</span>
+                  <span class="wk-row__en">{iss.titleEn}</span>
+                </span>
+                <span class="wk-row__meta">{iss.dateStart} → {iss.dateEnd}</span>
+              </span>
+              <span class={`badge ${iss.publishedAt ? "badge--teal" : "badge--amber"} wk-row__badge`}>
+                {iss.publishedAt ? "已发布" : "草稿"}
+              </span>
+              <span class="wk-row__chevron" aria-hidden="true">→</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
   </div>
 </Admin>
+
+<style>
+  .wk {
+    max-width: 860px;
+    padding: var(--s-lg) 0 var(--s-xxl);
+  }
+
+  .wk-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-lg);
+    flex-wrap: wrap;
+    margin-bottom: var(--s-xl);
+  }
+  .wk-eyebrow {
+    font-family: var(--f-mono);
+    font-size: 11px;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: var(--c-muted);
+  }
+  .wk-title {
+    font-size: clamp(28px, 5vw, 38px);
+    margin: 6px 0 0;
+    letter-spacing: -0.01em;
+  }
+
+  /* Generate toolbar */
+  .wk-gen {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--s-sm);
+  }
+  .wk-gen .admin-field { margin-bottom: 0; }
+  .wk-gen .input { height: 40px; font-size: 14px; width: 160px; }
+  .wk-gen__btn { flex: none; }
+
+  /* Empty state */
+  .wk-empty { padding: var(--s-xl); text-align: center; }
+  .wk-empty__title { margin: 0 0 var(--s-xs); font-weight: 600; color: var(--c-ink); }
+  .wk-empty__hint { margin: 0 auto; max-width: 46ch; color: var(--c-muted); font-size: 14px; line-height: 1.6; }
+
+  /* Issue list */
+  .wk-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-sm);
+  }
+  .wk-row__link {
+    display: flex;
+    align-items: center;
+    gap: var(--s-md);
+    padding: var(--s-md) var(--s-lg);
+    border: 1px solid var(--c-hairline);
+    border-radius: var(--r-lg);
+    background: var(--c-canvas);
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .wk-row__link:hover {
+    border-color: var(--c-primary);
+    background: var(--c-surface-soft);
+  }
+  .wk-row__no {
+    flex: none;
+    font-family: var(--f-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--c-muted);
+    width: 3.2em;
+  }
+  .wk-row__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .wk-row__title { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .wk-row__zh {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--c-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wk-row__en {
+    font-size: 12.5px;
+    color: var(--c-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wk-row__meta { font-size: 12px; color: var(--c-muted-soft); margin-top: 2px; }
+  .wk-row__badge { flex: none; }
+  .wk-row__chevron { flex: none; color: var(--c-muted-soft); font-size: 16px; }
+
+  @media (max-width: 620px) {
+    .wk-head { flex-direction: column; align-items: stretch; }
+    .wk-gen { flex-wrap: wrap; }
+    .wk-gen .input { width: 100%; }
+    .wk-gen .admin-field { flex: 1 1 40%; }
+  }
+</style>
