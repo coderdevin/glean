@@ -3,9 +3,10 @@ export const prerender = false;
 import Admin from "~/layouts/Admin.astro";
 import { db } from "~/db/client";
 import { picks as picksTable } from "~/db/schema";
-import { weeklyById } from "~/lib/queries";
+import { weeklyById, confirmedSubscriberCount } from "~/lib/queries";
 import { eq } from "drizzle-orm";
 import type { LayoutSection } from "~/lib/weekly";
+import { siteTz, formatDateISO } from "~/lib/datetime";
 
 const env = Astro.locals.runtime.env;
 const id = Astro.params.id!;
@@ -17,6 +18,8 @@ const layout: LayoutSection[] = issue.layoutJson ? JSON.parse(issue.layoutJson) 
 const linked = await drizzleDb.select().from(picksTable).where(eq(picksTable.weeklyIssueId, id));
 const titleById = new Map(linked.map((p) => [p.id, `${p.titleZh} / ${p.titleEn}`]));
 const isDraft = !issue.publishedAt;
+const subscriberCount = await confirmedSubscriberCount(drizzleDb);
+const sentDate = issue.emailSentAt ? formatDateISO(issue.emailSentAt, siteTz(env)) : null;
 ---
 <Admin title={`周刊 #${issue.number} · 编辑`}>
   <div class="container" style="padding: 24px 0; max-width: 820px">
@@ -69,6 +72,30 @@ const isDraft = !issue.publishedAt;
         ? <form method="POST" action={`/api/admin/weekly/${id}/publish`}><button class="btn btn-primary">发布</button></form>
         : <form method="POST" action={`/api/admin/weekly/${id}/unpublish`}><button class="btn">取消发布</button></form>}
       <form method="POST" action={`/api/admin/weekly/${id}/delete`} onsubmit="return confirm('删除这一期？篇目会被解除关联。')"><button class="btn">删除</button></form>
+    </div>
+
+    <div style="margin-top:24px; padding:16px; border:1px solid #ddd; border-radius:8px; background:#faf8f4">
+      <h2 style="margin:0 0 8px">邮件投递 · Email</h2>
+      <p style="margin:0 0 12px; font-size:0.9em; color:#6b6357">
+        已确认订阅者：<strong>{subscriberCount}</strong> 人。
+        {sentDate ? <span> · 本期已于 <strong>{sentDate}</strong> 发送。</span> : <span> · 本期尚未发送。</span>}
+      </p>
+      {isDraft ? (
+        <p style="margin:0; color:#b45309; font-size:0.9em">发布之后才能给订阅者发邮件。</p>
+      ) : (
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <form method="POST" action={`/api/admin/weekly/${id}/send`}
+                onsubmit={`return confirm('给 ${subscriberCount} 位已确认订阅者发送这一期？')`}>
+            <button class="btn btn-primary">{sentDate ? "给新订阅者补发" : "发送给订阅者"}</button>
+          </form>
+          {sentDate && (
+            <form method="POST" action={`/api/admin/weekly/${id}/send?resend=1`}
+                  onsubmit="return confirm('重新发送给所有已确认订阅者（包括已收到的人）？')">
+              <button class="btn">全部重发</button>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   </div>
 

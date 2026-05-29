@@ -5,6 +5,8 @@ import { subscribers } from "~/db/schema";
 import { verifyTurnstile } from "~/lib/turnstile";
 import { rateLimit } from "~/lib/ratelimit";
 import { signToken } from "~/lib/auth";
+import { emailEnabled, sendEmail } from "~/lib/email";
+import { renderConfirmEmail } from "~/lib/email-templates";
 
 export const prerender = false;
 
@@ -55,17 +57,41 @@ export const POST: APIRoute = async (ctx) => {
       source,
       confirmToken: token,
       confirmedAt: null,
+      unsubscribedAt: null,
       createdAt: new Date(),
     }).onConflictDoUpdate({
       target: subscribers.email,
-      set: { langPref, source, confirmToken: token },
+      // Re-subscribing clears a prior opt-out and re-arms the confirm token.
+      set: { langPref, source, confirmToken: token, unsubscribedAt: null },
     });
   } catch (err) {
     console.error("subscribe insert failed", err);
     return json({ ok: false, error: "server" }, 500);
   }
 
-  return json({ ok: true });
+  // Double opt-in: email the confirmation link. Best-effort — a send failure
+  // must not 500 the signup (the row exists; the editor can re-trigger). When
+  // no provider key is configured (local dev), needsConfirm is false so the UI
+  // shows a generic "you're on the list" instead of "check your inbox".
+  const needsConfirm = emailEnabled(env);
+  if (needsConfirm) {
+    const base = (env.SITE_URL || "").replace(/\/$/, "");
+    const confirmUrl = `${base}/api/subscribe/confirm?t=${encodeURIComponent(token)}`;
+    const mail = renderConfirmEmail({
+      lang: langPref,
+      siteName: env.SITE_NAME || "Glean",
+      confirmUrl,
+    });
+    const res = await sendEmail(env, {
+      to: email.toLowerCase(),
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+    });
+    if (!res.ok) console.error("confirm email send failed", res.error);
+  }
+
+  return json({ ok: true, needsConfirm });
 };
 
 function json(body: unknown, status = 200): Response {

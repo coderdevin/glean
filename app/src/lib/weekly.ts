@@ -1,21 +1,13 @@
 /**
  * Pure helpers for assembling a weekly issue. No I/O — unit-tested via
- * scripts/weekly-*.test.ts (run with `npx tsx`).
+ * scripts/weekly-*.test.ts (run with `npx tsx`). Relative import (not the `~`
+ * alias) keeps this module resolvable when the tests run under tsx.
  */
+import { formatDateISO } from "./datetime";
 
 export interface WeekRange {
   dateStart: string; // YYYY-MM-DD (inclusive, Monday)
   dateEnd: string; //   YYYY-MM-DD (inclusive, Sunday)
-}
-
-/** YYYY-MM-DD for an instant in a given IANA timezone (en-CA → ISO-shaped). */
-function isoDateInTz(d: Date, tz: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
 }
 
 /** Add `days` to a YYYY-MM-DD string, returning a YYYY-MM-DD string (UTC math). */
@@ -29,7 +21,7 @@ function addDays(isoDate: string, days: number): string {
  * "Last week" = the full week immediately before the week `now` falls in.
  */
 export function lastWeekRange(now: Date, tz: string): WeekRange {
-  const today = isoDateInTz(now, tz); // local calendar date
+  const today = formatDateISO(now, tz); // local calendar date
   const dow = new Date(today + "T00:00:00Z").getUTCDay(); // 0=Sun..6=Sat
   const daysSinceMonday = (dow + 6) % 7; // Mon=0..Sun=6
   const thisMonday = addDays(today, -daysSinceMonday);
@@ -96,4 +88,33 @@ export function reconcileLayout(
   const inLayout = new Set(linkIds);
   const unlinkIds = previouslyLinkedIds.filter((id) => !inLayout.has(id));
   return { linkIds, unlinkIds };
+}
+
+export interface WeeklyGroup<P> {
+  zh: string;
+  en: string;
+  picks: P[];
+}
+
+/**
+ * Group picks into themed sections in layout order, mapping each pick by id.
+ * Picks present in the issue but absent from the layout (defensive) fall into a
+ * trailing "其他 · More" group so nothing silently disappears. Shared by the
+ * public issue page and the weekly email render so they never drift.
+ */
+export function buildWeeklyGroups<P extends { id: string }>(
+  layout: LayoutSection[],
+  picks: P[],
+): WeeklyGroup<P>[] {
+  const byId = new Map(picks.map((p) => [p.id, p]));
+  const groups: WeeklyGroup<P>[] = [];
+  const seen = new Set<string>();
+  for (const sec of layout) {
+    const list = sec.pick_ids.map((id) => byId.get(id)).filter((p): p is P => Boolean(p));
+    list.forEach((p) => seen.add(p.id));
+    if (list.length > 0) groups.push({ zh: sec.heading_zh, en: sec.heading_en, picks: list });
+  }
+  const leftover = picks.filter((p) => !seen.has(p.id));
+  if (leftover.length > 0) groups.push({ zh: "其他", en: "More", picks: leftover });
+  return groups;
 }

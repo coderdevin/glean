@@ -27,6 +27,12 @@ interface Env {
   SITE_TZ?: string;
   CONTACT_EMAIL?: string;
   CORRECTIONS_EMAIL?: string;
+  // Transactional email (Resend). RESEND_API_KEY is a secret; EMAIL_FROM is a
+  // public var like "Glean 拾遗 <weekly@your-domain>". When RESEND_API_KEY is
+  // unset, lib/email.ts logs to console instead of sending (local dev).
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
+  EMAIL_REPLY_TO?: string;
   // Comma-separated allowlist of admin emails. Even when Cloudflare Access
   // fronts /admin*, the app enforces this list as a second gate. Unset = no
   // admin access in production (devBypass still works in local dev).

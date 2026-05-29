@@ -209,12 +209,18 @@ const isActive = (prefix: string): boolean => {
               const fd = new FormData(form);
               const res = await fetch("/api/subscribe", { method: "POST", body: fd });
               if (!res.ok) throw new Error(await res.text());
+              let needsConfirm = false;
+              try { needsConfirm = (await res.json()).needsConfirm === true; } catch {}
               form.classList.add("is-subscribed");
               if (status) {
                 const lang = document.body.getAttribute("data-lang") || "zh";
-                status.textContent = lang === "zh"
-                  ? "登记好了，到时第一时间通知你。"
-                  : "You’re on the list — we’ll be in touch.";
+                status.textContent = needsConfirm
+                  ? (lang === "zh"
+                      ? "确认邮件已发出，去邮箱点一下链接就好。"
+                      : "Check your inbox — click the link to confirm.")
+                  : (lang === "zh"
+                      ? "登记好了，到时第一时间通知你。"
+                      : "You’re on the list — we’ll be in touch.");
               }
             } catch (err) {
               if (status) status.textContent = String(err.message ?? err);

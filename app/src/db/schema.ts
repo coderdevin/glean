@@ -91,6 +91,8 @@ export const weeklyIssues = sqliteTable("weekly_issues", {
   coverImageKey: text("cover_image_key"),
   layoutJson: text("layout_json"),
 
+  emailSentAt: integer("email_sent_at", { mode: "timestamp" }),
+
   publishedAt: integer("published_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
@@ -181,17 +183,36 @@ export const submissions = sqliteTable(
   }),
 );
 
-/** Email subscribers (v1: D1 only, no broadcast). */
+/** Email subscribers. Double opt-in: confirmedAt set after the user clicks the
+ *  confirmation link; weekly delivery targets confirmed, non-unsubscribed rows. */
 export const subscribers = sqliteTable("subscribers", {
   email: text("email").primaryKey(),
   langPref: text("lang_pref", { enum: ["zh", "en"] as const }).notNull(),
   source: text("source").notNull(),
   confirmToken: text("confirm_token"),
   confirmedAt: integer("confirmed_at", { mode: "timestamp" }),
+  unsubscribedAt: integer("unsubscribed_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+/** One row per (issue, recipient) email attempt. Makes re-sending idempotent
+ *  (skip rows already 'sent') and provides a who-got-what audit trail. */
+export const weeklyDeliveries = sqliteTable(
+  "weekly_deliveries",
+  {
+    issueId: text("issue_id").notNull(),
+    email: text("email").notNull(),
+    status: text("status", { enum: ["sent", "failed"] as const }).notNull(),
+    error: text("error"),
+    sentAt: integer("sent_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.issueId, t.email] }),
+    issueIdx: index("weekly_deliveries_issue_idx").on(t.issueId),
+  }),
+);
 
 export const EVENT_STAGES = ["queue", "extract", "llm", "pipeline"] as const;
 export type EventStage = (typeof EVENT_STAGES)[number];

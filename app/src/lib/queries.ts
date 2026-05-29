@@ -3,13 +3,15 @@
  * components (ArticleCard etc) so pages don't have to do their own joins.
  */
 
-import { and, asc, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { DB } from "~/db/client";
 import {
   pickTags,
   picks,
   tags as tagsTable,
   weeklyIssues,
+  weeklyDeliveries,
+  subscribers,
   articleAnnotations,
 } from "~/db/schema";
 import type { ArticleCardPick } from "~/components/ArticleCard.astro";
@@ -429,4 +431,37 @@ export async function homeFeed(db: DB, today: string): Promise<{
   }
   const weekly = await latestWeeklyCover(db);
   return { date, picks: picksList.slice(0, 3), weekly };
+}
+
+// --- Newsletter delivery --------------------------------------------------
+
+export interface Recipient {
+  email: string;
+  langPref: "zh" | "en";
+}
+
+/** Confirmed, non-unsubscribed subscribers — the weekly blast audience. */
+export async function confirmedSubscribers(db: DB): Promise<Recipient[]> {
+  return db
+    .select({ email: subscribers.email, langPref: subscribers.langPref })
+    .from(subscribers)
+    .where(and(isNotNull(subscribers.confirmedAt), isNull(subscribers.unsubscribedAt)));
+}
+
+/** Count of the weekly blast audience (for the admin editor). */
+export async function confirmedSubscriberCount(db: DB): Promise<number> {
+  const r = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(subscribers)
+    .where(and(isNotNull(subscribers.confirmedAt), isNull(subscribers.unsubscribedAt)));
+  return r[0]?.n ?? 0;
+}
+
+/** Emails already successfully sent this issue — used to make re-sending idempotent. */
+export async function sentEmailsForIssue(db: DB, issueId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ email: weeklyDeliveries.email })
+    .from(weeklyDeliveries)
+    .where(and(eq(weeklyDeliveries.issueId, issueId), eq(weeklyDeliveries.status, "sent")));
+  return new Set(rows.map((r) => r.email));
 }

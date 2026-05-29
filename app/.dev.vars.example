@@ -13,6 +13,12 @@
 # TURNSTILE_SECRET=
 # COOKIE_SIGNING_KEY=dev-key-please-change
 
+# Transactional email (Resend). Leave RESEND_API_KEY unset in dev — confirmation
+# and weekly emails are then logged to the console instead of actually sent.
+# RESEND_API_KEY=re_...
+# EMAIL_FROM=Glean 拾遗 <weekly@glean.smartcoder.ai>
+# EMAIL_REPLY_TO=hello@glean.smartcoder.ai
+
 # Admin allowlist. In DEV you can also send the `x-glean-admin-dev: 1` header
 # to bypass auth entirely; ADMIN_EMAILS is only enforced when a real Access
 # identity reaches the middleware.
