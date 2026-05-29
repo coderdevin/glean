@@ -62,3 +62,19 @@ export async function bustForPick(
   }
   await bust(kv, keys);
 }
+
+/** Fan-out bust on weekly issue generate / save / publish / unpublish / delete. */
+export async function bustForWeekly(
+  kv: KVNamespace,
+  issue: { number: number },
+): Promise<void> {
+  const langs: ("zh" | "en")[] = ["zh", "en"];
+  const keys: string[] = [];
+  for (const lang of langs) {
+    keys.push(cacheKeys.home(lang));
+    keys.push(cacheKeys.weeklyArchive(lang));
+    keys.push(cacheKeys.weeklyIssue(issue.number, lang));
+    keys.push(cacheKeys.rssWeekly(lang));
+  }
+  await bust(kv, keys);
+}
