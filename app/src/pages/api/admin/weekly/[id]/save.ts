@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "~/db/client";
 import { picks, weeklyIssues } from "~/db/schema";
 import { weeklyById } from "~/lib/queries";
@@ -62,11 +62,11 @@ export const POST: APIRoute = async (ctx) => {
     })
     .where(eq(weeklyIssues.id, id));
 
-  for (const pid of unlinkIds) {
-    await drizzleDb.update(picks).set({ weeklyIssueId: null }).where(eq(picks.id, pid));
+  if (unlinkIds.length > 0) {
+    await drizzleDb.update(picks).set({ weeklyIssueId: null }).where(inArray(picks.id, unlinkIds));
   }
-  for (const pid of linkIds) {
-    await drizzleDb.update(picks).set({ weeklyIssueId: id }).where(eq(picks.id, pid));
+  if (linkIds.length > 0) {
+    await drizzleDb.update(picks).set({ weeklyIssueId: id }).where(inArray(picks.id, linkIds));
   }
 
   await bustForWeekly(env.CACHE, { number });

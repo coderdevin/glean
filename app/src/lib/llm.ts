@@ -620,6 +620,25 @@ export interface WeeklyPickInput {
   category: string;
 }
 
+/** Map a published pick row (camelCase DB shape) to the weekly LLM input. */
+export function toWeeklyPickInput(p: {
+  id: string;
+  titleZh: string;
+  titleEn: string;
+  summaryZh: string;
+  summaryEn: string;
+  category: string;
+}): WeeklyPickInput {
+  return {
+    id: p.id,
+    title_zh: p.titleZh,
+    title_en: p.titleEn,
+    summary_zh: p.summaryZh,
+    summary_en: p.summaryEn,
+    category: p.category,
+  };
+}
+
 export interface CallLlmWeeklyArgs extends CallLlmArgs {
   picks: WeeklyPickInput[];
   dateStart: string;

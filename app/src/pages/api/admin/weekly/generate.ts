@@ -1,9 +1,9 @@
 import type { APIRoute } from "astro";
-import { and, asc, eq, gte, isNull, lte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { ulid } from "~/lib/ulid";
 import { db } from "~/db/client";
 import { picks, weeklyIssues } from "~/db/schema";
-import { callLlmWeekly, type WeeklyPickInput } from "~/lib/llm";
+import { callLlmWeekly, toWeeklyPickInput } from "~/lib/llm";
 import { lastWeekRange, repairWeeklyDraft } from "~/lib/weekly";
 import { maxWeeklyNumber } from "~/lib/queries";
 import { bustForWeekly } from "~/lib/cache";
@@ -37,14 +37,7 @@ export const POST: APIRoute = async (ctx) => {
     );
   }
 
-  const aiPicks: WeeklyPickInput[] = eligible.map((p) => ({
-    id: p.id,
-    title_zh: p.titleZh,
-    title_en: p.titleEn,
-    summary_zh: p.summaryZh,
-    summary_en: p.summaryEn,
-    category: p.category,
-  }));
+  const aiPicks = eligible.map(toWeeklyPickInput);
 
   let ai;
   try {
@@ -78,8 +71,8 @@ export const POST: APIRoute = async (ctx) => {
   });
 
   const linkIds = layout.flatMap((s) => s.pick_ids);
-  for (const pid of linkIds) {
-    await drizzleDb.update(picks).set({ weeklyIssueId: id }).where(eq(picks.id, pid));
+  if (linkIds.length > 0) {
+    await drizzleDb.update(picks).set({ weeklyIssueId: id }).where(inArray(picks.id, linkIds));
   }
 
   await bustForWeekly(env.CACHE, { number });
