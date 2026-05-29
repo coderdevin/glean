@@ -1,0 +1,89 @@
+---
+export const prerender = false;
+import Admin from "~/layouts/Admin.astro";
+import { db } from "~/db/client";
+import { picks as picksTable } from "~/db/schema";
+import { weeklyById } from "~/lib/queries";
+import { eq } from "drizzle-orm";
+import type { LayoutSection } from "~/lib/weekly";
+
+const env = Astro.locals.runtime.env;
+const id = Astro.params.id!;
+const drizzleDb = db(env.DB);
+const issue = await weeklyById(drizzleDb, id);
+if (!issue) return new Response("Not found", { status: 404 });
+
+const layout: LayoutSection[] = issue.layoutJson ? JSON.parse(issue.layoutJson) : [];
+const linked = await drizzleDb.select().from(picksTable).where(eq(picksTable.weeklyIssueId, id));
+const titleById = new Map(linked.map((p) => [p.id, `${p.titleZh} / ${p.titleEn}`]));
+const isDraft = !issue.publishedAt;
+---
+<Admin title={`周刊 #${issue.number} · 编辑`}>
+  <div class="container" style="padding: 24px 0; max-width: 820px">
+    <a class="btn btn-text" href="/admin/weekly">← 所有周刊</a>
+    <h1 style="margin:12px 0">
+      #{String(issue.number).padStart(3, "0")} · {isDraft ? "草稿" : "已发布"}
+    </h1>
+
+    <form method="POST" action={`/api/admin/weekly/${id}/save`} id="weekly-form">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px">
+        <label>期号<input name="number" value={issue.number} type="number" /></label>
+        <label>Slug<input name="slug" value={issue.slug} /></label>
+        <label>开始日期<input name="date_start" value={issue.dateStart} /></label>
+        <label>结束日期<input name="date_end" value={issue.dateEnd} /></label>
+      </div>
+      <label style="display:block; margin-bottom:8px">标题(中)<input name="title_zh" value={issue.titleZh} style="width:100%" /></label>
+      <label style="display:block; margin-bottom:8px">标题(英)<input name="title_en" value={issue.titleEn} style="width:100%" /></label>
+      <label style="display:block; margin-bottom:8px">导语(中)<textarea name="intro_zh" rows="3" style="width:100%">{issue.introZh}</textarea></label>
+      <label style="display:block; margin-bottom:16px">导语(英)<textarea name="intro_en" rows="3" style="width:100%">{issue.introEn}</textarea></label>
+
+      <h2>章节</h2>
+      <div id="sections">
+        {layout.map((sec, si) => (
+          <fieldset class="weekly-section" data-si={si} style="margin-bottom:16px; border:1px solid #ddd; padding:12px">
+            <input class="sec-zh" value={sec.heading_zh} placeholder="章节标题(中)" style="width:48%" />
+            <input class="sec-en" value={sec.heading_en} placeholder="章节标题(英)" style="width:48%" />
+            <ul style="list-style:none; padding:0; margin-top:8px">
+              {sec.pick_ids.map((pid) => (
+                <li class="pick-row" data-pid={pid} style="padding:4px 0">
+                  <label>
+                    <input type="checkbox" class="pick-keep" checked />
+                    {titleById.get(pid) ?? pid}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+        ))}
+      </div>
+
+      <input type="hidden" name="layout_json" id="layout_json" />
+      <div style="display:flex; gap:8px; margin-top:16px">
+        <button type="submit" class="btn btn-primary" id="save-btn">保存草稿</button>
+      </div>
+    </form>
+
+    <div style="display:flex; gap:8px; margin-top:12px">
+      <form method="POST" action={`/api/admin/weekly/${id}/regenerate`}><button class="btn">重新让 AI 起草</button></form>
+      {isDraft
+        ? <form method="POST" action={`/api/admin/weekly/${id}/publish`}><button class="btn btn-primary">发布</button></form>
+        : <form method="POST" action={`/api/admin/weekly/${id}/unpublish`}><button class="btn">取消发布</button></form>}
+      <form method="POST" action={`/api/admin/weekly/${id}/delete`} onsubmit="return confirm('删除这一期？篇目会被解除关联。')"><button class="btn">删除</button></form>
+    </div>
+  </div>
+
+  <script is:inline>
+    // Serialize the visible section editor into the hidden layout_json field
+    // right before the save form submits. Unchecked picks are dropped.
+    document.getElementById("weekly-form").addEventListener("submit", () => {
+      const sections = [...document.querySelectorAll(".weekly-section")].map((fs) => ({
+        heading_zh: fs.querySelector(".sec-zh").value,
+        heading_en: fs.querySelector(".sec-en").value,
+        pick_ids: [...fs.querySelectorAll(".pick-row")]
+          .filter((row) => row.querySelector(".pick-keep").checked)
+          .map((row) => row.getAttribute("data-pid")),
+      }));
+      document.getElementById("layout_json").value = JSON.stringify(sections);
+    });
+  </script>
+</Admin>

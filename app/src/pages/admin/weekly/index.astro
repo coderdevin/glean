@@ -1,0 +1,42 @@
+---
+export const prerender = false;
+import Admin from "~/layouts/Admin.astro";
+import { db } from "~/db/client";
+import { allWeekliesAdmin } from "~/lib/queries";
+
+const env = Astro.locals.runtime.env;
+const issues = await allWeekliesAdmin(db(env.DB));
+---
+<Admin title="周刊 · Weekly">
+  <div class="container" style="padding: 24px 0">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px">
+      <h1>周刊 · Weekly</h1>
+      <form method="POST" action="/api/admin/weekly/generate">
+        <button type="submit" class="btn btn-primary">生成上周周刊</button>
+      </form>
+    </div>
+
+    {issues.length === 0 && <p>还没有任何周刊。点「生成上周周刊」开始。</p>}
+
+    <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:12px">
+      {issues.map((iss) => (
+        <li style="border:1px solid var(--rule, #ddd); border-radius:8px; padding:16px">
+          <div style="display:flex; justify-content:space-between; gap:16px">
+            <div>
+              <strong>#{String(iss.number).padStart(3, "0")}</strong>
+              {" — "}
+              <span>{iss.titleZh}</span> / <span>{iss.titleEn}</span>
+              <div style="font-size:0.85em; opacity:0.7; margin-top:4px">
+                {iss.dateStart} → {iss.dateEnd}
+                {iss.publishedAt
+                  ? <span style="color:green"> · 已发布</span>
+                  : <span style="color:#b45309"> · 草稿</span>}
+              </div>
+            </div>
+            <a class="btn btn-text" href={`/admin/weekly/${iss.id}`}>编辑 →</a>
+          </div>
+        </li>
+      ))}
+    </ul>
+  </div>
+</Admin>
