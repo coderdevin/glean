@@ -4,7 +4,7 @@ import { ulid } from "~/lib/ulid";
 import { db } from "~/db/client";
 import { picks, weeklyIssues } from "~/db/schema";
 import { callLlmWeekly, toWeeklyPickInput } from "~/lib/llm";
-import { lastWeekRange, repairWeeklyDraft } from "~/lib/weekly";
+import { thisWeekToDate, repairWeeklyDraft } from "~/lib/weekly";
 import { maxWeeklyNumber } from "~/lib/queries";
 import { bustForWeekly } from "~/lib/cache";
 import { siteTz } from "~/lib/datetime";
@@ -15,7 +15,16 @@ export const POST: APIRoute = async (ctx) => {
   const env = ctx.locals.runtime.env;
   const drizzleDb = db(env.DB);
 
-  const { dateStart, dateEnd } = lastWeekRange(new Date(), siteTz(env));
+  // Range is editable from the generate form; default to the current week so
+  // far. Fall back to that default for any missing/malformed date field.
+  const def = thisWeekToDate(new Date(), siteTz(env));
+  const form = await ctx.request.formData().catch(() => null);
+  const pickDate = (key: string, fallback: string): string => {
+    const v = form?.get(key);
+    return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : fallback;
+  };
+  const dateStart = pickDate("date_start", def.dateStart);
+  const dateEnd = pickDate("date_end", def.dateEnd);
 
   const eligible = await drizzleDb
     .select()
@@ -32,7 +41,7 @@ export const POST: APIRoute = async (ctx) => {
 
   if (eligible.length === 0) {
     return new Response(
-      `上周（${dateStart} → ${dateEnd}）没有可收录的篇目。No eligible picks for last week.`,
+      `${dateStart} → ${dateEnd} 没有可收录的篇目。No eligible picks in this range.`,
       { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } },
     );
   }

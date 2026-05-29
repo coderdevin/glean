@@ -17,16 +17,15 @@ function addDays(isoDate: string, days: number): string {
 }
 
 /**
- * Last complete Monday→Sunday week, relative to `now` in the editorial tz.
- * "Last week" = the full week immediately before the week `now` falls in.
+ * The current week so far: this week's Monday → today (editorial tz). Used as
+ * the editable default when generating an issue mid-week — `dateEnd` is today
+ * (not Sunday) so the range never claims dates that haven't happened yet.
  */
-export function lastWeekRange(now: Date, tz: string): WeekRange {
-  const today = formatDateISO(now, tz); // local calendar date
+export function thisWeekToDate(now: Date, tz: string): WeekRange {
+  const today = formatDateISO(now, tz);
   const dow = new Date(today + "T00:00:00Z").getUTCDay(); // 0=Sun..6=Sat
   const daysSinceMonday = (dow + 6) % 7; // Mon=0..Sun=6
-  const thisMonday = addDays(today, -daysSinceMonday);
-  const lastMonday = addDays(thisMonday, -7);
-  return { dateStart: lastMonday, dateEnd: addDays(lastMonday, 6) };
+  return { dateStart: addDays(today, -daysSinceMonday), dateEnd: today };
 }
 
 export interface LayoutSection {

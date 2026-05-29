@@ -3,20 +3,26 @@ export const prerender = false;
 import Admin from "~/layouts/Admin.astro";
 import { db } from "~/db/client";
 import { allWeekliesAdmin } from "~/lib/queries";
+import { thisWeekToDate } from "~/lib/weekly";
+import { siteTz } from "~/lib/datetime";
 
 const env = Astro.locals.runtime.env;
 const issues = await allWeekliesAdmin(db(env.DB));
+// Editable default range for the generate form: the current week so far.
+const range = thisWeekToDate(new Date(), siteTz(env));
 ---
 <Admin title="周刊 · Weekly">
   <div class="container" style="padding: 24px 0">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px">
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:24px">
       <h1>周刊 · Weekly</h1>
-      <form method="POST" action="/api/admin/weekly/generate">
-        <button type="submit" class="btn btn-primary">生成上周周刊</button>
+      <form method="POST" action="/api/admin/weekly/generate" style="display:flex; gap:8px; align-items:flex-end">
+        <label style="font-size:0.8em; opacity:0.7">开始<br><input type="date" name="date_start" value={range.dateStart} /></label>
+        <label style="font-size:0.8em; opacity:0.7">结束<br><input type="date" name="date_end" value={range.dateEnd} /></label>
+        <button type="submit" class="btn btn-primary">生成周刊</button>
       </form>
     </div>
 
-    {issues.length === 0 && <p>还没有任何周刊。点「生成上周周刊」开始。</p>}
+    {issues.length === 0 && <p>还没有任何周刊。选好日期范围，点「生成周刊」开始。</p>}
 
     <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:12px">
       {issues.map((iss) => (
