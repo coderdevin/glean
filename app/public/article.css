@@ -1268,16 +1268,13 @@
 
       /* ---------- Responsive ---------- */
       @media (max-width: 1024px) {
-        /* Parallel collapses to a stacked, reader's-lang-first layout */
-        .av2-body[data-mode="parallel"] .av2-row {
-          grid-template-columns: 1fr;
-          column-gap: 0;
-          row-gap: var(--s-sm);
-        }
-        .av2-body[data-mode="parallel"] .av2-orig {
-          padding-top: var(--s-sm);
-          border-top: 1px dashed var(--c-hairline);
-        }
+        /* Parallel stacking (single column, reader's-lang-first, with one
+           dashed separator BETWEEN the two blocks) is handled by the
+           max-width:1023px block above, which is language-aware. A second
+           near-identical rule used to live here and unconditionally bordered
+           .av2-orig — for EN readers that's the TOP block, so it drew a stray
+           dashed line above the first paragraph. Removed; this block now only
+           nudges the sticky modebar offset. */
         .av2-modebar { top: 76px; }
       }
       @media (max-width: 640px) {
