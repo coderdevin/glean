@@ -63,6 +63,9 @@ export const POST: APIRoute = async (ctx) => {
     .set({
       status: "pending",
       rejectReason: null,
+      // Clear stale failure metadata so the re-run doesn't carry last time's error.
+      failureStage: null,
+      aiSectionsError: null,
       processedAt: null,
       processingStartedAt: new Date(),
       processingModel: modelOverride || "deepseek-v4-pro",

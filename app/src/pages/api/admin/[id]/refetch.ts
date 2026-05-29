@@ -18,6 +18,10 @@ export const POST: APIRoute = async (ctx) => {
     status: "pending",
     processedAt: null,
     rejectReason: null,
+    // Clear stale failure metadata from a prior failed run so the re-running
+    // row doesn't show last time's error/stage.
+    failureStage: null,
+    aiSectionsError: null,
     processingStartedAt: new Date(),
     processingModel: "extract",
     rawR2Key: null,
