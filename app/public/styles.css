@@ -384,6 +384,11 @@ html,
 body {
   margin: 0;
   padding: 0;
+  /* Stop mobile WebKit/Blink from auto-inflating font sizes when a block is
+     wider than the viewport (the "text suddenly gets bigger near a code block
+     / image" bug). Layout overflow is fixed separately in article.css. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   /* Prevent off-canvas drawers and any width: 100vw children from creating
      phantom horizontal scroll on mobile. Two declarations on purpose:
        - `hidden` is the cross-browser fallback (iOS Safari 15.x, older

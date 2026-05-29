@@ -490,6 +490,11 @@
         font-size: 17px;
         line-height: 1.65;
         color: var(--c-ink);
+        /* Grid items default to min-width:auto (min-content), so a wide child
+           (code block, long token, image) forces the column past the viewport
+           and the layout warps on mobile. min-width:0 lets it shrink; the
+           wide child then scrolls (pre) or wraps (prose) inside its track. */
+        min-width: 0;
       }
       .av2-orig { font-style: normal; }
       .av2-trans {
@@ -530,6 +535,13 @@
          <ul>, <ol>, <blockquote>, <strong>, <img> nodes. These rules style
          them inside the bilingual columns without competing with the body
          font. Reset code inside <pre> to avoid the inline pill background. */
+      .av2-prose {
+        /* Break long unbreakable tokens (URLs, inline code, identifiers) so a
+           single long word can't push the column past the viewport on mobile.
+           Block-level <pre> opts out below — code scrolls instead of wrapping. */
+        overflow-wrap: break-word;
+        word-break: break-word;
+      }
       .av2-prose > * + * { margin-top: 0.65em; }
       .av2-prose h2, .av2-prose h3, .av2-prose h4, .av2-prose h5, .av2-prose h6 {
         font-family: var(--f-display);
