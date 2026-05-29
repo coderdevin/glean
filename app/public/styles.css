@@ -356,6 +356,21 @@
    controls, scrollbars, and autofill match. */
 html { color-scheme: light dark; }
 
+/* Touch: drop the 300ms double-tap-zoom delay on interactive controls so
+   taps register immediately. Applied to controls only (not the whole page)
+   so pinch-zoom on content/images is preserved. */
+a,
+button,
+summary,
+[role="button"],
+[role="tab"],
+input,
+textarea,
+select,
+label {
+  touch-action: manipulation;
+}
+
 /* When the "dark surface" component family (.issue-cover, .issue-masthead,
    .article-card--featured) flips to a cream surface in dark mode, the
    amber accent eyebrow goes from light-amber-on-dark to light-amber-on-cream
@@ -4801,7 +4816,10 @@ body[data-lang="zh"] em {
   right: 0;
   top: 0;
   bottom: 0;
-  width: min(520px, 92vw);
+  /* All drawers (Source / Body / AI) share one width: ~2/3 of the viewport so
+     the panels feel consistent and the Body drawer's side-by-side EN/ZH columns
+     read comfortably (mobile breakpoint below forces 100vw). */
+  width: min(66.667vw, 96vw);
   background: var(--c-canvas);
   border-left: 1px solid var(--c-hairline);
   box-shadow: -20px 0 40px rgba(0,0,0,0.08);
@@ -4811,9 +4829,6 @@ body[data-lang="zh"] em {
   transition: transform 0.22s ease;
 }
 .drawer.is-open .drawer__panel { transform: translateX(0); }
-/* Body drawer holds two side-by-side bilingual columns — give it ~2/3 of the
-   viewport so EN/ZH read comfortably (mobile breakpoint below forces 100vw). */
-.drawer--wide .drawer__panel { width: min(66.667vw, 96vw); }
 
 /* Toolbar badges on the Body button: count chip + status dot / bang. */
 .r2-strip__tool-count {
@@ -5733,10 +5748,8 @@ body[data-lang="zh"] em {
   .q2-hero__cta { width: 100%; justify-content: center; }
   .q2-row { grid-template-columns: minmax(0, 1fr) auto; }
   .q2-row__score, .q2-row__meta { display: none; }
-  /* Selector matches .drawer--wide .drawer__panel specificity so the wide
-     (Body) drawer also goes full-width on mobile instead of its 2/3 desktop width. */
-  .drawer__panel,
-  .drawer--wide .drawer__panel { width: 100vw; border-left: 0; }
+  /* All drawers go full-width on mobile instead of their 2/3 desktop width. */
+  .drawer__panel { width: 100vw; border-left: 0; }
 }
 
 /* ---- Article prev/next nav (global timeline) ---- */
