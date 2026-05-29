@@ -89,6 +89,7 @@ export const weeklyIssues = sqliteTable("weekly_issues", {
   introEn: text("intro_en").notNull(),
 
   coverImageKey: text("cover_image_key"),
+  layoutJson: text("layout_json"),
 
   publishedAt: integer("published_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
