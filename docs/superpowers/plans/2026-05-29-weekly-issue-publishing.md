@@ -673,7 +673,9 @@ export const POST: APIRoute = async (ctx) => {
 
   let ai;
   try {
-    const res = await callLlmWeekly(env, { picks: aiPicks, dateStart, dateEnd });
+    // title/body are required by CallLlmArgs but unused by the weekly message
+    // builder (it builds from picks), so pass empty strings.
+    const res = await callLlmWeekly(env, { title: "", body: "", picks: aiPicks, dateStart, dateEnd });
     ai = res.output;
   } catch (err) {
     return new Response(`AI 起草失败：${String(err)}`, { status: 502 });
@@ -920,6 +922,8 @@ export const POST: APIRoute = async (ctx) => {
   let ai;
   try {
     const res = await callLlmWeekly(env, {
+      title: "",
+      body: "",
       picks: aiPicks,
       dateStart: issue.dateStart,
       dateEnd: issue.dateEnd,
