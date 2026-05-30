@@ -72,9 +72,7 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
           <strong class="wk-draft-error__title">AI 起草失败</strong>
           <p class="wk-draft-error__msg">{issue.draftError ?? "未知错误，请重试。"}</p>
         </div>
-        <form method="POST" action={`/api/admin/weekly/${id}/regenerate`} class="wk-draft-error__retry">
-          <button class="btn btn-primary">重试 · 重新让 AI 起草</button>
-        </form>
+        <button form="weekly-form" type="submit" formaction={`/api/admin/weekly/${id}/regenerate`} class="btn btn-primary wk-draft-error__retry">重试 · 重新让 AI 起草</button>
       </div>
     )}
 
@@ -151,9 +149,9 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
     <!-- Action toolbar -->
     <div class="wk-actions">
       <button form="weekly-form" type="submit" class="btn btn-primary">保存草稿</button>
-      <form method="POST" action={`/api/admin/weekly/${id}/regenerate`}>
-        <button class="btn btn-secondary">重新让 AI 起草</button>
-      </form>
+      <!-- Submits weekly-form (incl. the date range) to regenerate so editing
+           the dates + re-drafting works in one click. -->
+      <button form="weekly-form" type="submit" formaction={`/api/admin/weekly/${id}/regenerate`} class="btn btn-secondary">重新让 AI 起草</button>
       {isDraft ? (
         <form method="POST" action={`/api/admin/weekly/${id}/publish`}>
           <button class="btn btn-publish">发布</button>
