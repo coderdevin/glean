@@ -8,6 +8,7 @@ import { verifyTurnstile } from "~/lib/turnstile";
 import { rateLimit, ipHash } from "~/lib/ratelimit";
 import { normalizeUrl } from "~/lib/normalize-url";
 import { logEvent } from "~/lib/ingest";
+import { buildSubmitError } from "~/lib/submitError";
 
 export const prerender = false;
 
@@ -70,11 +71,15 @@ async function handleSubmit(ctx: Parameters<APIRoute>[0]): Promise<Response> {
     }
   } else {
     try { raw = (await ctx.request.json()) as Record<string, string>; }
-    catch { return redirectTo("/submit?error=bad_url", 303); }
+    catch { return redirectTo(buildSubmitError("bad_url"), 303); }
   }
 
   const parsed = Body.safeParse(raw);
-  if (!parsed.success) return redirectTo("/submit?error=bad_url", 303);
+  // Echo back the raw url/note so a bad URL can be corrected in place rather
+  // than retyped — the zod parse failed, so parsed.data isn't available here.
+  if (!parsed.success) {
+    return redirectTo(buildSubmitError("bad_url", { url: raw.url, note: raw.note }), 303);
+  }
   const { url, note, submitter, website } = parsed.data;
 
   if (website && website.length > 0) {
@@ -90,11 +95,11 @@ async function handleSubmit(ctx: Parameters<APIRoute>[0]): Promise<Response> {
   const devBypass = import.meta.env.DEV && !env.TURNSTILE_SECRET;
   if (!devBypass && !isJsonApi) {
     const tsOk = await verifyTurnstile(env.TURNSTILE_SECRET ?? "", tsToken ?? null, ip);
-    if (!tsOk) return redirectTo("/submit?error=turnstile", 303);
+    if (!tsOk) return redirectTo(buildSubmitError("turnstile", { url, note }), 303);
   }
 
   const rl = await rateLimit(env.CACHE, "submit", 10, 3600, ip);
-  if (!rl.ok) return redirectTo("/submit?error=rate_limit", 303);
+  if (!rl.ok) return redirectTo(buildSubmitError("rate_limit", { url, note }), 303);
 
   const normalized = normalizeUrl(url);
 
@@ -153,7 +158,7 @@ async function handleSubmit(ctx: Parameters<APIRoute>[0]): Promise<Response> {
     });
   } catch (err) {
     console.error("submit insert/enqueue failed", err);
-    return redirectTo("/submit?error=server", 303);
+    return redirectTo(buildSubmitError("server", { url, note }), 303);
   }
 
   return redirectTo(`/submit/success?id=${id}`, 303);

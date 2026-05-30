@@ -13,6 +13,10 @@ const errorLabels: Record<string, { zh: string; en: string }> = {
   server:      { zh: "服务器出错。请稍后重试。",           en: "Server error. Try again later." },
 };
 const errorCopy = submitError ? errorLabels[submitError] : null;
+// Repopulate the form after an error redirect so the visitor doesn't lose
+// what they typed (the POST → 303 → GET round-trip would otherwise blank it).
+const prefillUrl = Astro.url.searchParams.get("url") ?? "";
+const prefillNote = Astro.url.searchParams.get("note") ?? "";
 // Host shown in the curl example — derived from Astro.site (SITE_URL) so it
 // matches the deployed domain rather than a hardcoded placeholder.
 const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example").host;
@@ -62,6 +66,7 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
                 type="url"
                 class="input"
                 placeholder="https://blog.cloudflare.com/durable-objects-2026/"
+                value={prefillUrl}
                 required
               />
               <span class="hint">
@@ -81,7 +86,7 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
                 class="textarea"
                 placeholder="一句话告诉编辑这条值得读的理由。"
                 maxlength="500"
-              ></textarea>
+              >{prefillNote}</textarea>
               <span class="hint">
                 <span class="lang-zh">只给编辑 · 不公开。</span>
                 <span class="lang-en">Editor only · not public.</span>
