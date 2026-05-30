@@ -18,19 +18,32 @@ const range = thisWeekToDate(new Date(), siteTz(env));
         <div class="wk-eyebrow">编辑台 · Editor</div>
         <h1 class="wk-title">周刊 · Weekly</h1>
       </div>
-      <form method="POST" action="/api/admin/weekly/generate" class="wk-gen">
-        <div class="admin-field"><label>开始 · From</label>
-          <input class="input" type="date" name="date_start" value={range.dateStart} /></div>
-        <div class="admin-field"><label>结束 · To</label>
-          <input class="input" type="date" name="date_end" value={range.dateEnd} /></div>
-        <button type="submit" class="btn btn-primary wk-gen__btn">生成周刊</button>
-      </form>
+      <button type="button" class="btn btn-primary wk-gen-open" id="open-generate">生成周刊</button>
     </header>
+
+    <dialog id="generate-modal" class="wk-modal" aria-labelledby="generate-modal-title">
+      <form method="POST" action="/api/admin/weekly/generate" class="wk-modal__form">
+        <div class="wk-modal__head">
+          <h2 class="wk-modal__title" id="generate-modal-title">生成周刊 · New issue</h2>
+          <p class="wk-modal__hint">选好日期范围，AI 会把该区间内已发布、且尚未收录的篇目汇成一期草稿。</p>
+        </div>
+        <div class="wk-modal__fields">
+          <div class="admin-field"><label>开始 · From</label>
+            <input class="input" type="date" name="date_start" value={range.dateStart} required /></div>
+          <div class="admin-field"><label>结束 · To</label>
+            <input class="input" type="date" name="date_end" value={range.dateEnd} required /></div>
+        </div>
+        <div class="wk-modal__actions">
+          <button type="button" class="btn btn-secondary" id="cancel-generate">取消</button>
+          <button type="submit" class="btn btn-primary">生成周刊</button>
+        </div>
+      </form>
+    </dialog>
 
     {issues.length === 0 ? (
       <div class="card card--canvas wk-empty">
         <p class="wk-empty__title">还没有任何周刊</p>
-        <p class="wk-empty__hint">选好上面的日期范围，点「生成周刊」——AI 会把那段时间已发布的篇目汇成一期草稿。</p>
+        <p class="wk-empty__hint">点右上角「生成周刊」，选好日期范围——AI 会把那段时间已发布的篇目汇成一期草稿。</p>
       </div>
     ) : (
       <ul class="wk-list">
@@ -45,9 +58,15 @@ const range = thisWeekToDate(new Date(), siteTz(env));
                 </span>
                 <span class="wk-row__meta">{iss.dateStart} → {iss.dateEnd}</span>
               </span>
-              <span class={`badge ${iss.publishedAt ? "badge--teal" : "badge--amber"} wk-row__badge`}>
-                {iss.publishedAt ? "已发布" : "草稿"}
-              </span>
+              {iss.draftStatus === "drafting" ? (
+                <span class="badge badge--amber wk-row__badge">起草中…</span>
+              ) : iss.draftStatus === "failed" ? (
+                <span class="badge badge--coral wk-row__badge">起草失败</span>
+              ) : (
+                <span class={`badge ${iss.publishedAt ? "badge--teal" : "badge--amber"} wk-row__badge`}>
+                  {iss.publishedAt ? "已发布" : "草稿"}
+                </span>
+              )}
               <span class="wk-row__chevron" aria-hidden="true">→</span>
             </a>
           </li>
@@ -55,6 +74,19 @@ const range = thisWeekToDate(new Date(), siteTz(env));
       </ul>
     )}
   </div>
+
+  <script is:inline>
+    (function () {
+      const dlg = document.getElementById("generate-modal");
+      const openBtn = document.getElementById("open-generate");
+      const cancelBtn = document.getElementById("cancel-generate");
+      if (!dlg || !openBtn) return;
+      openBtn.addEventListener("click", () => dlg.showModal());
+      cancelBtn && cancelBtn.addEventListener("click", () => dlg.close());
+      // Click the backdrop (outside the form) to dismiss.
+      dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+    })();
+  </script>
 </Admin>
 
 <style>
@@ -84,15 +116,42 @@ const range = thisWeekToDate(new Date(), siteTz(env));
     letter-spacing: -0.01em;
   }
 
-  /* Generate toolbar */
-  .wk-gen {
+  .wk-gen-open { flex: none; }
+
+  /* Generate modal */
+  .wk-modal {
+    width: min(440px, calc(100vw - 32px));
+    padding: 0;
+    border: 1px solid var(--c-hairline);
+    border-radius: var(--r-lg);
+    background: var(--c-canvas);
+    color: inherit;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+  }
+  .wk-modal::backdrop {
+    background: rgba(30, 24, 20, 0.36);
+    backdrop-filter: blur(2px);
+  }
+  .wk-modal__form { padding: var(--s-lg); }
+  .wk-modal__head { margin-bottom: var(--s-md); }
+  .wk-modal__title { font-size: 20px; margin: 0 0 var(--s-xs); }
+  .wk-modal__hint { margin: 0; color: var(--c-muted); font-size: 13px; line-height: 1.6; }
+  .wk-modal__fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-md);
+    margin-bottom: var(--s-lg);
+  }
+  .wk-modal__fields .admin-field { margin-bottom: 0; }
+  .wk-modal__fields .input { height: 40px; font-size: 14px; }
+  .wk-modal__actions {
     display: flex;
-    align-items: flex-end;
+    justify-content: flex-end;
     gap: var(--s-sm);
   }
-  .wk-gen .admin-field { margin-bottom: 0; }
-  .wk-gen .input { height: 40px; font-size: 14px; width: 160px; }
-  .wk-gen__btn { flex: none; }
+  @media (max-width: 480px) {
+    .wk-modal__fields { grid-template-columns: 1fr; }
+  }
 
   /* Empty state */
   .wk-empty { padding: var(--s-xl); text-align: center; }
@@ -155,8 +214,6 @@ const range = thisWeekToDate(new Date(), siteTz(env));
 
   @media (max-width: 620px) {
     .wk-head { flex-direction: column; align-items: stretch; }
-    .wk-gen { flex-wrap: wrap; }
-    .wk-gen .input { width: 100%; }
-    .wk-gen .admin-field { flex: 1 1 40%; }
+    .wk-gen-open { width: 100%; }
   }
 </style>

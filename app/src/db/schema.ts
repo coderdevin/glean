@@ -91,6 +91,12 @@ export const weeklyIssues = sqliteTable("weekly_issues", {
   coverImageKey: text("cover_image_key"),
   layoutJson: text("layout_json"),
 
+  // Async AI drafting (see migration 0011). 'drafting' | 'ready' | 'failed';
+  // null only on rows predating the migration (treated as 'ready').
+  draftStatus: text("draft_status"),
+  draftError: text("draft_error"),
+  draftStartedAt: integer("draft_started_at", { mode: "timestamp" }),
+
   emailSentAt: integer("email_sent_at", { mode: "timestamp" }),
 
   publishedAt: integer("published_at", { mode: "timestamp" }),

@@ -59,6 +59,10 @@ export const POST: APIRoute = async (ctx) => {
       introZh: get("intro_zh"),
       introEn: get("intro_en"),
       layoutJson: JSON.stringify(layout),
+      // A manual save means the editor has taken the draft over — clear any
+      // prior 'failed' state so the error banner doesn't linger on reload.
+      draftStatus: "ready",
+      draftError: null,
     })
     .where(eq(weeklyIssues.id, id));
 

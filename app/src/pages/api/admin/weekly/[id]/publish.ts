@@ -15,6 +15,11 @@ export const POST: APIRoute = async (ctx) => {
 
   const issue = await weeklyById(drizzleDb, id);
   if (!issue) return new Response("not found", { status: 404 });
+  // A re-draft in flight is concurrently rewriting title/intro/layout — don't
+  // publish a half-written row out from under the worker.
+  if (issue.draftStatus === "drafting") {
+    return new Response("cannot publish: AI draft still in progress", { status: 409 });
+  }
   if (!issue.titleZh.trim() || !issue.titleEn.trim() || !issue.introZh.trim() || !issue.introEn.trim()) {
     return new Response("cannot publish: title and intro (zh + en) are required", { status: 422 });
   }

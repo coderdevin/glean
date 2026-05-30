@@ -18,6 +18,13 @@ const layout: LayoutSection[] = issue.layoutJson ? JSON.parse(issue.layoutJson) 
 const linked = await drizzleDb.select().from(picksTable).where(eq(picksTable.weeklyIssueId, id));
 const pickById = new Map(linked.map((p) => [p.id, p]));
 const isDraft = !issue.publishedAt;
+// Async AI drafting state (migration 0011). While 'drafting', the editor is
+// replaced by a polling placeholder; 'failed' shows a retry banner above it.
+const isDrafting = issue.draftStatus === "drafting";
+const draftFailed = issue.draftStatus === "failed";
+const draftWaitedMin = issue.draftStartedAt
+  ? Math.max(0, Math.floor((Date.now() - new Date(issue.draftStartedAt).getTime()) / 60_000))
+  : 0;
 const subscriberCount = await confirmedSubscriberCount(drizzleDb);
 const sentDate = issue.emailSentAt ? formatDateISO(issue.emailSentAt, siteTz(env)) : null;
 
@@ -44,6 +51,32 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
         </p>
       </div>
     </header>
+
+    {isDrafting ? (
+      <section class="card card--canvas wk-drafting">
+        <div class="wk-drafting__spinner" aria-hidden="true"></div>
+        <h2 class="wk-drafting__title">AI 起草中…</h2>
+        <p class="wk-drafting__hint">
+          正在让 AI 把本期 {linked.length} 篇 picks 编排成草稿，通常 30 秒 – 2 分钟。
+          本页每 4 秒自动刷新，完成后会显示可编辑的草稿。
+        </p>
+        {draftWaitedMin > 0 && (
+          <p class="wk-drafting__elapsed">已等待约 {draftWaitedMin} 分钟</p>
+        )}
+      </section>
+    ) : (
+    <Fragment>
+    {draftFailed && (
+      <div class="wk-draft-error">
+        <div class="wk-draft-error__body">
+          <strong class="wk-draft-error__title">AI 起草失败</strong>
+          <p class="wk-draft-error__msg">{issue.draftError ?? "未知错误，请重试。"}</p>
+        </div>
+        <form method="POST" action={`/api/admin/weekly/${id}/regenerate`} class="wk-draft-error__retry">
+          <button class="btn btn-primary">重试 · 重新让 AI 起草</button>
+        </form>
+      </div>
+    )}
 
     <form method="POST" action={`/api/admin/weekly/${id}/save`} id="weekly-form" class="wk-stack">
       <!-- Issue metadata -->
@@ -166,21 +199,33 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
         </div>
       )}
     </section>
+    </Fragment>
+    )}
   </div>
 
-  <script is:inline>
+  <script is:inline define:vars={{ isDrafting }}>
+    // While the AI is drafting, the editor form isn't rendered — just poll by
+    // reloading every 4s until draft_status flips to ready/failed.
+    if (isDrafting) {
+      setTimeout(() => location.reload(), 4000);
+    }
+
     // Serialize the visible section editor into the hidden layout_json field
-    // right before the save form submits. Unchecked picks are dropped.
-    document.getElementById("weekly-form").addEventListener("submit", () => {
-      const sections = [...document.querySelectorAll(".weekly-section")].map((fs) => ({
-        heading_zh: fs.querySelector(".sec-zh").value,
-        heading_en: fs.querySelector(".sec-en").value,
-        pick_ids: [...fs.querySelectorAll(".pick-row")]
-          .filter((row) => row.querySelector(".pick-keep").checked)
-          .map((row) => row.getAttribute("data-pid")),
-      }));
-      document.getElementById("layout_json").value = JSON.stringify(sections);
-    });
+    // right before the save form submits. Unchecked picks are dropped. Guarded
+    // because the form is absent while drafting.
+    const weeklyForm = document.getElementById("weekly-form");
+    if (weeklyForm) {
+      weeklyForm.addEventListener("submit", () => {
+        const sections = [...document.querySelectorAll(".weekly-section")].map((fs) => ({
+          heading_zh: fs.querySelector(".sec-zh").value,
+          heading_en: fs.querySelector(".sec-en").value,
+          pick_ids: [...fs.querySelectorAll(".pick-row")]
+            .filter((row) => row.querySelector(".pick-keep").checked)
+            .map((row) => row.getAttribute("data-pid")),
+        }));
+        document.getElementById("layout_json").value = JSON.stringify(sections);
+      });
+    }
   </script>
 </Admin>
 
@@ -193,6 +238,59 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
     display: inline-block;
     margin-bottom: var(--s-md);
   }
+
+  /* Async-drafting placeholder */
+  .wk-drafting {
+    margin-top: var(--s-xl);
+    padding: var(--s-xxl) var(--s-lg);
+    text-align: center;
+  }
+  .wk-drafting__spinner {
+    width: 32px; height: 32px;
+    margin: 0 auto var(--s-md);
+    border: 3px solid var(--c-hairline);
+    border-top-color: var(--c-primary);
+    border-radius: 50%;
+    animation: wk-spin 0.8s linear infinite;
+  }
+  @keyframes wk-spin { to { transform: rotate(360deg); } }
+  .wk-drafting__title { font-size: 20px; margin: 0 0 var(--s-xs); }
+  .wk-drafting__hint {
+    margin: 0 auto;
+    max-width: 48ch;
+    color: var(--c-muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .wk-drafting__elapsed {
+    margin: var(--s-sm) 0 0;
+    font-family: var(--f-mono);
+    font-size: 12px;
+    color: var(--c-muted-soft);
+  }
+
+  /* Draft-failed banner */
+  .wk-draft-error {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-md);
+    flex-wrap: wrap;
+    margin-top: var(--s-xl);
+    padding: var(--s-md) var(--s-lg);
+    border: 1px solid var(--c-border-red, #e0b4b4);
+    border-radius: var(--r-lg);
+    background: var(--c-surface-red, #fbf0f0);
+  }
+  .wk-draft-error__title { color: var(--c-text-red-dark, #9b3b3b); font-size: 15px; }
+  .wk-draft-error__msg {
+    margin: 4px 0 0;
+    color: var(--c-body);
+    font-size: 13px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .wk-draft-error__retry { margin: 0; flex: none; }
 
   /* Masthead */
   .wk-eyebrow {

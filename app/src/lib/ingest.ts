@@ -27,12 +27,21 @@ import {
   picks,
   pickTags,
   tags as tagsTable,
+  weeklyIssues,
   type EventStage,
   type EventStatus,
 } from "~/db/schema";
-import { callLlmAnalysis, callLlmSections, NO_RETRY_MARKER, type LlmEnv } from "./llm";
+import {
+  callLlmAnalysis,
+  callLlmSections,
+  callLlmWeekly,
+  toWeeklyPickInput,
+  NO_RETRY_MARKER,
+  type LlmEnv,
+} from "./llm";
 import { extractFromUrl } from "./extract";
-import { bustForPick } from "./cache";
+import { bustForPick, bustForWeekly } from "./cache";
+import { repairWeeklyDraft } from "./weekly";
 import { ulid } from "./ulid";
 
 export interface IngestEnv extends LlmEnv {
@@ -749,4 +758,133 @@ export async function markFailed(
   if (result.length > 0) {
     await logEvent(env, id, "pipeline", "failed", { message: reason.slice(0, 500) });
   }
+}
+
+/* ============================================================
+ * Weekly issue drafting (async)
+ * ============================================================ */
+
+/**
+ * Draft (or re-draft) a weekly issue with the LLM. Mirrors runSectionsPhase:
+ * runs in a queue worker (15-min budget), is non-throwing, and writes its own
+ * terminal state onto the row (draft_status = 'ready' | 'failed') so the editor
+ * page can stop polling. The caller must have already created the issue row,
+ * linked the picks (weekly_issue_id), and set draft_status='drafting'.
+ *
+ * The "every pick exactly once / only known ids" invariant is enforced by
+ * repairWeeklyDraft against the currently-linked pick set — so an editor who
+ * unlinked picks before re-drafting gets a layout over the remaining ones.
+ */
+export async function runWeeklyDraft(
+  env: IngestEnv,
+  issueId: string,
+): Promise<{ status: "ready" | "failed"; reason?: string }> {
+  const db = drizzle(env.DB, { schema });
+
+  const issRows = await db.select().from(weeklyIssues).where(eq(weeklyIssues.id, issueId)).limit(1);
+  const issue = issRows[0];
+  if (!issue) {
+    await logEvent(env, issueId, "llm", "failed", {
+      message: `weekly issue ${issueId} not found`,
+      meta: { kind: "weekly" },
+    });
+    return { status: "failed", reason: "not found" };
+  }
+
+  const linked = await db.select().from(picks).where(eq(picks.weeklyIssueId, issueId));
+  if (linked.length === 0) {
+    const reason = "本期没有关联的篇目 · no picks linked to this issue";
+    await db
+      .update(weeklyIssues)
+      .set({ draftStatus: "failed", draftError: reason })
+      .where(eq(weeklyIssues.id, issueId));
+    await logEvent(env, issueId, "llm", "failed", { message: reason, meta: { kind: "weekly" } });
+    return { status: "failed", reason };
+  }
+
+  await logEvent(env, issueId, "llm", "started", {
+    meta: { kind: "weekly", picks: linked.length },
+  });
+
+  try {
+    const aiPicks = linked.map(toWeeklyPickInput);
+    const res = await callLlmWeekly(env, {
+      title: "",
+      body: "",
+      picks: aiPicks,
+      dateStart: issue.dateStart,
+      dateEnd: issue.dateEnd,
+    });
+    const ai = res.output;
+    const layout = repairWeeklyDraft(ai, linked.map((p) => p.id));
+
+    await db
+      .update(weeklyIssues)
+      .set({
+        titleZh: ai.title_zh,
+        titleEn: ai.title_en,
+        introZh: ai.intro_zh,
+        introEn: ai.intro_en,
+        layoutJson: JSON.stringify(layout),
+        draftStatus: "ready",
+        draftError: null,
+      })
+      .where(eq(weeklyIssues.id, issueId));
+
+    if (env.CACHE) await bustForWeekly(env.CACHE, { number: issue.number });
+
+    await logEvent(env, issueId, "llm", "ok", {
+      meta: {
+        kind: "weekly",
+        model: res.provider.model,
+        latencyMs: res.latencyMs,
+        tokens: res.totalTokens,
+        sections: layout.length,
+      },
+    });
+    return { status: "ready" };
+  } catch (err) {
+    const reason = (err as Error).message ?? "unknown weekly draft error";
+    await db
+      .update(weeklyIssues)
+      .set({ draftStatus: "failed", draftError: reason.slice(0, 500) })
+      .where(eq(weeklyIssues.id, issueId));
+    await logEvent(env, issueId, "llm", "failed", {
+      message: reason.slice(0, 500),
+      meta: { kind: "weekly" },
+    });
+    return { status: "failed", reason };
+  }
+}
+
+/**
+ * Reap weekly drafts stranded in 'drafting' past the wall-time ceiling — a
+ * platform eviction bypasses runWeeklyDraft's try/catch, so without this the
+ * editor would poll a perpetual "起草中…". Run from the worker's cron handler.
+ */
+export async function reapStalledWeeklyDrafts(
+  env: { DB: D1Database },
+  now: Date = new Date(),
+): Promise<number> {
+  const db = drizzle(env.DB, { schema });
+  const cutoff = new Date(now.getTime() - STALL_WINDOW_MS);
+  const message = `weekly draft exceeded ${STALL_WINDOW_MS / 60_000}min — re-draft from the admin UI`;
+  const reaped = await db
+    .update(weeklyIssues)
+    .set({ draftStatus: "failed", draftError: message })
+    .where(
+      and(
+        eq(weeklyIssues.draftStatus, "drafting"),
+        isNotNull(weeklyIssues.draftStartedAt),
+        lt(weeklyIssues.draftStartedAt, cutoff),
+      ),
+    )
+    .returning({ id: weeklyIssues.id });
+  for (const r of reaped) {
+    await logEvent(env, r.id, "pipeline", "failed", {
+      message,
+      meta: { kind: "weekly", source: "weekly-draft-watchdog" },
+    });
+  }
+  return reaped.length;
 }

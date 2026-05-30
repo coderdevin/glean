@@ -8,6 +8,7 @@
  *   "<ULID>|model=<name>"              same, with admin model override
  *   "<ULID>|phase=sections"            sections-only retry from admin UI
  *   "<ULID>|phase=sections&model=..."  sections-only with model override
+ *   "<ULID>|kind=weekly"               weekly-issue draft (generate / regenerate)
  *
  * Failure semantics (max_retries=0 on the queue):
  *   - Any error from processLlm (analysis phase) → markFailed + ack.
@@ -23,9 +24,11 @@
 import {
   processLlm,
   runSectionsPhase,
+  runWeeklyDraft,
   markFailed,
   reapStaleLlmQueueWait,
   reapStalledSubmissions,
+  reapStalledWeeklyDrafts,
   logEvent,
   type IngestEnv,
 } from "../../../src/lib/ingest";
@@ -46,20 +49,24 @@ function parseMessage(raw: string): {
   id: string;
   modelOverride?: string;
   phase?: "sections";
+  kind?: "weekly";
 } {
   const pipeIdx = raw.indexOf("|");
   const id = pipeIdx >= 0 ? raw.slice(0, pipeIdx) : raw;
   const tail = pipeIdx >= 0 ? raw.slice(pipeIdx + 1) : "";
   const modelMatch = tail.match(/(?:^|&)model=([^&]+)/);
   const phaseMatch = tail.match(/(?:^|&)phase=([^&]+)/);
+  const kindMatch = tail.match(/(?:^|&)kind=([^&]+)/);
   // Trim before truthy-check so whitespace-only values (`model=%20`) fall
   // through to the env default instead of producing an invalid model name.
   const trimmed = modelMatch ? decodeURIComponent(modelMatch[1]!).trim() : "";
   const phaseRaw = phaseMatch ? decodeURIComponent(phaseMatch[1]!).trim() : "";
+  const kindRaw = kindMatch ? decodeURIComponent(kindMatch[1]!).trim() : "";
   return {
     id,
     modelOverride: trimmed || undefined,
     phase: phaseRaw === "sections" ? "sections" : undefined,
+    kind: kindRaw === "weekly" ? "weekly" : undefined,
   };
 }
 
@@ -125,7 +132,28 @@ async function runSectionsOnly(env: Env, id: string, modelOverride?: string): Pr
 export default {
   async queue(batch: MessageBatch<string>, env: Env): Promise<void> {
     for (const msg of batch.messages) {
-      const { id, modelOverride, phase } = parseMessage(msg.body);
+      const { id, modelOverride, phase, kind } = parseMessage(msg.body);
+
+      // Weekly-issue draft. runWeeklyDraft is non-throwing and writes its own
+      // terminal state (draft_status = 'ready' | 'failed') onto the issue row,
+      // so we just ack regardless — same contract as the sections-only path.
+      if (kind === "weekly") {
+        try {
+          const result = await runWeeklyDraft(env, id);
+          console.log("weekly draft", { id, ...result });
+        } catch (err) {
+          // Defensive — runWeeklyDraft shouldn't throw, but if loading the
+          // row blows up we still want to ack and log.
+          const reason = (err as Error).message ?? "unknown weekly draft error";
+          console.error("weekly draft fail", { id, reason });
+          await logEvent(env, id, "llm", "failed", {
+            message: reason,
+            meta: { kind: "weekly", source: "weekly-throw" },
+          });
+        }
+        msg.ack();
+        continue;
+      }
 
       // Sections-only retry path. runSectionsPhase swallows its own errors
       // and sets status='failed' on the row, so we just ack regardless. No
@@ -188,6 +216,8 @@ export default {
     if (queued > 0) console.log(`reaper: marked ${queued} stale LLM queue wait submission(s) failed`);
     const n = await reapStalledSubmissions(env);
     if (n > 0) console.log(`reaper: marked ${n} stalled submission(s) failed`);
+    const w = await reapStalledWeeklyDrafts(env);
+    if (w > 0) console.log(`reaper: marked ${w} stalled weekly draft(s) failed`);
   },
 
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -196,6 +226,16 @@ export default {
       const explicitId = url.searchParams.get("id");
       const modelOverride = url.searchParams.get("model") || undefined;
       const phase = url.searchParams.get("phase") === "sections" ? "sections" : undefined;
+      const kind = url.searchParams.get("kind") === "weekly" ? "weekly" : undefined;
+
+      // Weekly draft (dev): the Pages route proxies here with an explicit id so
+      // the draft fires without waiting for the dev queue poller.
+      if (kind === "weekly") {
+        if (!explicitId) return json({ ok: false, error: "kind=weekly requires id" }, 400);
+        const result = await runWeeklyDraft(env, explicitId);
+        return json({ ok: result.status === "ready", stage: "weekly", id: explicitId, result });
+      }
+
       let targetId = explicitId;
       if (!targetId) {
         // Pick the oldest submission that has an extracted body but no AI output.
