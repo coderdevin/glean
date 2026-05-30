@@ -8,7 +8,9 @@
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import { isXUrl, extractFromX } from "./extract-x";
+import { isGithubRepoUrl, extractFromGithub } from "./extract-github";
 import { extractViaJina } from "./extract-jina";
+import { detectLang } from "./lang";
 
 const FETCH_TIMEOUT_MS = 25_000;
 const MAX_BODY_BYTES = 200_000;
@@ -22,7 +24,7 @@ export interface ExtractResult {
 
 /**
  * Three-tier extraction chain:
- *   1. site-specific (currently just X.com → fxtwitter API)
+ *   1. site-specific (X.com → fxtwitter API; github.com repos → GitHub API)
  *   2. Readability + linkedom — static-HTML article pages (free, in-Workers)
  *   3. Jina Reader (https://r.jina.ai) — SPA / JS-heavy / anti-bot sites
  *      Falls back here when (2) returns < 200 chars or throws. Anonymous tier,
@@ -30,10 +32,25 @@ export interface ExtractResult {
  */
 export async function extractFromUrl(
   url: string,
-  opts?: { baseUrl?: string; jinaApiKey?: string },
+  opts?: { baseUrl?: string; jinaApiKey?: string; githubToken?: string },
 ): Promise<ExtractResult> {
   if (isXUrl(url)) {
     return extractFromX(url);
+  }
+
+  // GitHub repos go through the API extractor first, but on failure (404 on a
+  // private/deleted repo, 403 rate-limit when GITHUB_TOKEN is unset, network
+  // error, or a non-repo path that merely looks like /owner/repo) we fall
+  // through to the generic Readability → Jina chain rather than hard-failing
+  // the whole submission — that's still better than nothing for a github.com
+  // page that the API couldn't serve.
+  let githubError: Error | null = null;
+  if (isGithubRepoUrl(url)) {
+    try {
+      return await extractFromGithub(url, { githubToken: opts?.githubToken });
+    } catch (err) {
+      githubError = err as Error;
+    }
   }
 
   // Tier 2: Readability — keep error to report if Jina also fails.
@@ -53,7 +70,8 @@ export async function extractFromUrl(
     return await extractViaJina(url, opts?.jinaApiKey ? { JINA_API_KEY: opts.jinaApiKey } : undefined);
   } catch (jinaErr) {
     throw new Error(
-      `extract failed — readability: ${readabilityError?.message ?? "n/a"}; ` +
+      `extract failed —${githubError ? ` github: ${githubError.message};` : ""} ` +
+        `readability: ${readabilityError?.message ?? "n/a"}; ` +
         `jina: ${(jinaErr as Error).message}`,
     );
   }
@@ -94,6 +112,8 @@ async function extractViaReadability(url: string, baseUrl: string): Promise<Extr
     truncated: body.length > MAX_BODY_BYTES,
   };
 }
+
+// (detectLang now lives in ./lang and is shared across extractors)
 
 /**
  * Walk Readability's cleaned HTML and turn it into plain text + inline image
@@ -230,13 +250,4 @@ async function fetchWithTimeout(url: string, ms: number): Promise<string> {
   const ct = res.headers.get("content-type") ?? "";
   if (!ct.includes("html")) throw new Error(`not html (${ct})`);
   return await res.text();
-}
-
-function detectLang(text: string): "zh" | "en" | "other" {
-  const sample = text.slice(0, 500);
-  const cjk = (sample.match(/[一-鿿]/g) ?? []).length;
-  const latin = (sample.match(/[A-Za-z]/g) ?? []).length;
-  if (cjk > latin * 0.3) return "zh";
-  if (latin > cjk * 2) return "en";
-  return "other";
 }

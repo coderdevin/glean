@@ -8,8 +8,12 @@
  *   - drop trailing slash on path (except root)
  *   - drop known tracking params (utm_*, fbclid, gclid, ref_src, share_*, spm,
  *     and Twitter's "s" / "t")
+ *   - collapse github.com/<owner>/<repo>/... to the repo root (the extractor
+ *     treats deep paths as the repo anyway, so /tree, /blob, ?tab=… dedup)
  *   - leave the rest of the query string alone
  */
+
+import { parseRepoUrl } from "./extract-github";
 
 const HOST_ALIASES: Record<string, string> = {
   "twitter.com": "x.com",
@@ -19,6 +23,7 @@ const HOST_ALIASES: Record<string, string> = {
   "mobile.x.com": "x.com",
   "www.youtube.com": "youtube.com",
   "m.youtube.com": "youtube.com",
+  "www.github.com": "github.com",
 };
 
 const DROP_PARAMS = new Set([
@@ -47,6 +52,13 @@ export function normalizeUrl(raw: string): string {
   u.protocol = u.protocol.toLowerCase();
   const host = u.hostname.toLowerCase();
   u.hostname = HOST_ALIASES[host] ?? host;
+  // Collapse a GitHub repo URL to its canonical root so deep links
+  // (/tree/main, /blob/…, ?tab=readme-ov-file) dedup against the bare repo.
+  const repo = parseRepoUrl(trimmed);
+  if (repo) {
+    u.pathname = `/${repo.owner}/${repo.repo}`;
+    u.search = "";
+  }
   for (const k of [...u.searchParams.keys()]) {
     if (DROP_PARAMS.has(k) || k.toLowerCase().startsWith("utm_")) {
       u.searchParams.delete(k);

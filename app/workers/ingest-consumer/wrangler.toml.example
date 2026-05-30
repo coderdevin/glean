@@ -46,3 +46,7 @@ port = 8787
 #   LLM_PROVIDER         — optional, "deepseek" | "openai"
 #   LLM_MODEL            — optional, override default ("deepseek-v4-flash" is cheaper)
 #   LLM_BASE_URL         — optional, override endpoint URL
+#   JINA_API_KEY         — optional, lifts Jina Reader (Tier-3 extract) past 20 req/min
+#   GITHUB_TOKEN         — optional, lifts the GitHub repo extractor from 60 → 5000
+#                          req/hour. Needed at extract time for github.com/<owner>/<repo>
+#                          submissions; a fine-grained PAT with public-repo read is enough.

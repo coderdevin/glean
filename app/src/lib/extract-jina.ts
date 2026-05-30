@@ -16,6 +16,7 @@
  * if it ever becomes a constraint.
  */
 import type { ExtractResult } from "./extract";
+import { detectLang } from "./lang";
 
 const JINA_BASE = "https://r.jina.ai/";
 const FETCH_TIMEOUT_MS = 30_000;
@@ -89,13 +90,4 @@ export async function extractViaJina(url: string, env?: { JINA_API_KEY?: string 
     detectedLang: detectLang(text),
     truncated: body.length > MAX_BODY_BYTES,
   };
-}
-
-function detectLang(text: string): "zh" | "en" | "other" {
-  const sample = text.slice(0, 500);
-  const cjk = (sample.match(/[一-鿿]/g) ?? []).length;
-  const latin = (sample.match(/[A-Za-z]/g) ?? []).length;
-  if (cjk > latin * 0.3) return "zh";
-  if (latin > cjk * 2) return "en";
-  return "other";
 }

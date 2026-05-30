@@ -16,6 +16,7 @@
  *      sub-200-word tweets. Users get a clear error in that case.
  */
 import type { ExtractResult } from "./extract";
+import { detectLang } from "./lang";
 
 const FXTWITTER_BASE = "https://api.fxtwitter.com";
 const FETCH_TIMEOUT_MS = 20_000;
@@ -222,15 +223,6 @@ function tweetToBody(tweet: FxTweet): { title: string; text: string } {
 
   const text = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   return { title: headline, text };
-}
-
-function detectLang(text: string): "zh" | "en" | "other" {
-  const sample = text.slice(0, 500);
-  const cjk = (sample.match(/[一-鿿]/g) ?? []).length;
-  const latin = (sample.match(/[A-Za-z]/g) ?? []).length;
-  if (cjk > latin * 0.3) return "zh";
-  if (latin > cjk * 2) return "en";
-  return "other";
 }
 
 /** ---- fxtwitter response types (subset we use) ---- */

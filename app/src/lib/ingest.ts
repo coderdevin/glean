@@ -41,6 +41,10 @@ export interface IngestEnv extends LlmEnv {
   /** Optional. Lifts Jina Reader (Tier 3 extract fallback) past the
    *  anonymous 20 req/min cap. Set with `wrangler secret put JINA_API_KEY`. */
   JINA_API_KEY?: string;
+  /** Optional. Lifts the GitHub repo extractor past the unauthenticated
+   *  60 req/hour limit to 5000 req/hour. Used only at extract time (the LLM
+   *  stage reads from R2). Set with `wrangler secret put GITHUB_TOKEN`. */
+  GITHUB_TOKEN?: string;
   /** Optional KV cache. runSectionsPhase invalidates pick-level cache keys
    *  when regenerating sections on an already-published row. Workers that
    *  don't bind CACHE just skip the bust — admin sees stale content until
@@ -173,7 +177,10 @@ export async function processExtract(env: IngestEnv, id: string): Promise<Extrac
     }
   }
   if (!body) {
-    const extracted = await extractFromUrl(row.url, { jinaApiKey: env.JINA_API_KEY });
+    const extracted = await extractFromUrl(row.url, {
+      jinaApiKey: env.JINA_API_KEY,
+      githubToken: env.GITHUB_TOKEN,
+    });
     body = {
       textContent: extracted.textContent,
       detectedLang: extracted.detectedLang,
