@@ -217,7 +217,10 @@ export function resolveProviderSpec(env: LlmEnv, spec?: string): LlmProvider {
   if (head === "modelscope") {
     name = "modelscope";
     model = tail || undefined;
-  } else if (head === "deepseek" || lower.startsWith("deepseek-")) {
+  } else if (head === "deepseek" || (lower.startsWith("deepseek-") && !s.includes("/"))) {
+    // The bare-name heuristic must NOT swallow namespaced ids like
+    // "deepseek-ai/DeepSeek-V4-Flash" (a ModelScope model id) — those contain
+    // "/" and belong to the env default provider, not the DeepSeek API.
     name = "deepseek";
     model = colon >= 0 ? tail || undefined : (lower.startsWith("deepseek-") ? s : undefined);
   } else if (head === "openai" || lower.startsWith("gpt-")) {
