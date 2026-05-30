@@ -24,10 +24,9 @@ LLM_FALLBACK_MODEL = "deepseek-v4-flash"
 queue = "glean-llm"
 max_batch_size = 1            # one LLM call per message; no point batching
 max_batch_timeout = 5
-# concurrency=1: V4-Pro streaming can hang past STREAM_TIMEOUT_MS in CF
-# Workers (abort doesn't always unstick reader.read() on idle SSE). Single
-# slot means one stuck call only blocks the next message, not 3.
-max_concurrency = 1
+# concurrency=3: keep LLM throughput moving when one V4-Pro sections stream is
+# slow or wedged, while still capping provider/token exposure to three calls.
+max_concurrency = 3
 # retries=0: any LLM failure (schema/truncation OR transient 429/5xx) is
 # treated as terminal. Retrying a failed run almost always burns more
 # DeepSeek budget for the same answer; the admin "Re-run V4-Pro" button is

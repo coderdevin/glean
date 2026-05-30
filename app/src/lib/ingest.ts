@@ -86,6 +86,11 @@ export interface ProcessLlmOptions {
 }
 
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
+const DEFAULT_DEEPSEEK_SECTIONS_MODEL = "deepseek-v4-flash";
+
+export function defaultSectionsModel(modelOverride?: string): string {
+  return modelOverride ?? DEFAULT_DEEPSEEK_SECTIONS_MODEL;
+}
 
 /**
  * Append one row to the submission_events log. Best-effort: a failure here
@@ -376,15 +381,75 @@ export async function processLlm(
  */
 export const STALL_WINDOW_MS = 20 * 60_000;
 
+export function isStaleLlmQueueWait(
+  status: string,
+  rawR2Key: string | null | undefined,
+  processingModel: string | null | undefined,
+  processingStartedAt: Date | null | undefined,
+  now: Date,
+  windowMs: number = STALL_WINDOW_MS,
+): boolean {
+  if (!rawR2Key || !processingStartedAt) return false;
+  const waitingForLlm =
+    status === "pending" ||
+    (status === "analyzing" && processingModel === "extract");
+  if (!waitingForLlm) return false;
+  return now.getTime() - processingStartedAt.getTime() > windowMs;
+}
+
 export function isStalledInFlight(
   status: string,
   processingStartedAt: Date | null | undefined,
   now: Date,
   windowMs: number = STALL_WINDOW_MS,
+  processingModel?: string | null,
+  rawR2Key?: string | null,
 ): boolean {
   if (status !== "analyzing" && status !== "composing") return false;
   if (!processingStartedAt) return false;
+  // Extract has finished and forwarded the row to glean-llm, but the LLM
+  // worker has not started yet. That is queue wait, not a stalled worker run.
+  if (status === "analyzing" && processingModel === "extract" && rawR2Key) return false;
   return now.getTime() - processingStartedAt.getTime() > windowMs;
+}
+
+/**
+ * Mark rows that have extracted raw text but never reached the LLM worker.
+ * This is distinct from `reapStalledSubmissions`: queue wait is not a worker
+ * eviction, and retrying blindly can duplicate expensive LLM calls. Fail with
+ * a precise reason so admin can intentionally re-run.
+ */
+export async function reapStaleLlmQueueWait(
+  env: { DB: D1Database },
+  now: Date = new Date(),
+): Promise<number> {
+  const db = drizzle(env.DB, { schema });
+  const cutoff = new Date(now.getTime() - STALL_WINDOW_MS);
+  const message = `LLM queue wait exceeded ${STALL_WINDOW_MS / 60_000}min — the queue message may not have been delivered; re-run from the admin UI`;
+  const reaped = await db
+    .update(submissions)
+    .set({
+      status: "failed",
+      failureStage: "analysis",
+      aiSectionsError: message,
+      processedAt: now,
+    })
+    .where(
+      and(
+        isNotNull(submissions.rawR2Key),
+        isNotNull(submissions.processingStartedAt),
+        lt(submissions.processingStartedAt, cutoff),
+        sql`(${submissions.status} = 'pending' OR (${submissions.status} = 'analyzing' AND COALESCE(${submissions.processingModel}, '') = 'extract'))`,
+      ),
+    )
+    .returning({ id: submissions.id });
+  for (const r of reaped) {
+    await logEvent(env, r.id, "pipeline", "failed", {
+      message,
+      meta: { source: "llm-queue-watchdog" },
+    });
+  }
+  return reaped.length;
 }
 
 /**
@@ -413,6 +478,7 @@ export async function reapStalledSubmissions(
         inArray(submissions.status, ["analyzing", "composing"]),
         isNotNull(submissions.processingStartedAt),
         lt(submissions.processingStartedAt, cutoff),
+        sql`NOT (${submissions.status} = 'analyzing' AND COALESCE(${submissions.processingModel}, '') = 'extract' AND ${submissions.rawR2Key} IS NOT NULL)`,
       ),
     )
     .returning({ id: submissions.id });
@@ -471,7 +537,7 @@ export async function runSectionsPhase(
   // log goes silent for the 2–4 minutes V4-Pro spends on sections and the
   // editor can't tell whether anything is happening. (We dropped the inline
   // dual-started events earlier; this is the surviving one per phase.)
-  const sectionsModel = args.modelOverride ?? DEFAULT_DEEPSEEK_MODEL;
+  const sectionsModel = defaultSectionsModel(args.modelOverride);
   // Reset the stall clock to NOW. The reaper measures staleness from
   // processing_started_at; sections runs in its own invocation (decoupled
   // pipeline) or hours after analysis (admin regenerate), so without this the
@@ -490,7 +556,7 @@ export async function runSectionsPhase(
       title: args.title,
       body: args.body,
       detectedLang: args.detectedLang,
-      modelOverride: args.modelOverride,
+      modelOverride: sectionsModel,
       submissionId: args.id,
       sourceHost: args.sourceHost,
       submitterNote: args.submitterNote,

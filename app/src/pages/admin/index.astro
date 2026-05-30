@@ -258,13 +258,25 @@ Astro.response.headers.set("Cache-Control", "no-store");
           </header>
           <div class="q2-section__list">
             {inFlight.map((r) => {
-              const stage: "extract" | "llm" = !r.rawR2Key ? "extract" : "llm";
+              const stage: "extract" | "llm-queued" | "analysis" | "sections" =
+                !r.rawR2Key ? "extract"
+                : r.status === "pending" || (r.status === "analyzing" && r.processingModel === "extract") ? "llm-queued"
+                : r.status === "composing" ? "sections"
+                : "analysis";
               const mins = minutesAgo(r.processingStartedAt ?? r.createdAt);
-              const stalled = stage === "extract" ? mins >= 2 : mins >= 12;
+              const stalled =
+                stage === "extract" ? mins >= 2
+                : stage === "llm-queued" ? mins >= 20
+                : mins >= 12;
+              const stageLabel =
+                stage === "extract" ? "抓取中"
+                : stage === "llm-queued" ? "AI 排队中"
+                : stage === "sections" ? "Sections 生成中"
+                : "AI 分析中";
               return (
                 <a href={`/admin/${r.id}`} class={`q2-row${stalled ? " q2-row--stalled" : ""}`}>
                   <span class="q2-row__title">
-                    ⏳ {stage === "extract" ? "抓取中" : "AI 分析中"} · {host(r.url)}
+                    ⏳ {stageLabel} · {host(r.url)}
                   </span>
                   <span class="q2-row__meta">
                     {stalled && <span class="q2-row__stall-pill">卡了 {mins}min</span>}

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { defaultSectionsModel } from "../src/lib/ingest";
 import { getLlmCallBudget } from "../src/lib/llm";
 
 // V4-Pro (reasoning) — analysis phase
@@ -10,7 +11,7 @@ assert.equal(proAnalysis.maxTokens, 12_000);
 
 // V4-Pro (reasoning) — sections phase. Bigger output, longer timeout.
 const proSections = getLlmCallBudget("deepseek-v4-pro", "sections");
-assert.equal(proSections.streamTimeoutMs, 840_000);
+assert.equal(proSections.streamTimeoutMs, 780_000);
 assert.equal(proSections.chunkIdleMs, 180_000);
 assert.equal(proSections.bodyCap, 120_000);
 assert.equal(proSections.maxTokens, 32_000);
@@ -31,5 +32,9 @@ assert.equal(flashSections.maxTokens, 32_000);
 // Default phase argument should fall back to 'analysis' for back-compat.
 const proDefault = getLlmCallBudget("deepseek-v4-pro");
 assert.equal(proDefault.maxTokens, proAnalysis.maxTokens);
+
+// Sections defaults to Flash for reliability; analysis keeps V4-Pro elsewhere.
+assert.equal(defaultSectionsModel(), "deepseek-v4-flash");
+assert.equal(defaultSectionsModel("deepseek-v4-pro"), "deepseek-v4-pro");
 
 console.log("llm budget assertions passed");

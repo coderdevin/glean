@@ -24,6 +24,7 @@ import {
   processLlm,
   runSectionsPhase,
   markFailed,
+  reapStaleLlmQueueWait,
   reapStalledSubmissions,
   logEvent,
   type IngestEnv,
@@ -183,6 +184,8 @@ export default {
   // worker wall-time ceiling. A platform eviction bypasses the in-worker
   // try/catch, so without this a stuck row would show "running…" forever.
   async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    const queued = await reapStaleLlmQueueWait(env);
+    if (queued > 0) console.log(`reaper: marked ${queued} stale LLM queue wait submission(s) failed`);
     const n = await reapStalledSubmissions(env);
     if (n > 0) console.log(`reaper: marked ${n} stalled submission(s) failed`);
   },
