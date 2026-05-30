@@ -1000,32 +1000,21 @@ async function callWithFallback<S extends z.ZodTypeAny>(
     return await callOnce(env, args, cfg, args.modelOverride);
   } catch (err) {
     const e = err as Error;
-    const fb = env.LLM_FALLBACK_MODEL;
-    if (fb && isTransientError(e) && shouldFallback(env, args.modelOverride, fb)) {
+    // Fallback only on the AUTO path (no explicit per-run provider/model). An
+    // explicit "Re-run ModelScope" must stay on ModelScope and surface its real
+    // error (e.g. a quota/rate 429) — silently serving DeepSeek would hide the
+    // provider's actual state and defeat the operator's explicit choice.
+    if (
+      env.LLM_FALLBACK_MODEL &&
+      !args.modelOverride &&
+      isTransientError(e)
+    ) {
       console.warn(
-        `LLM ${cfg.phase} primary failed (${e.message.slice(0, 120)}); falling back to ${fb}`,
+        `LLM ${cfg.phase} primary failed (${e.message.slice(0, 120)}); falling back to ${env.LLM_FALLBACK_MODEL}`,
       );
-      return await callOnce(env, args, cfg, fb);
+      return await callOnce(env, args, cfg, env.LLM_FALLBACK_MODEL);
     }
     throw err;
-  }
-}
-
-/**
- * Decide whether a transient failure should trigger the fallback call.
- *  - No explicit per-run override → always (the original behaviour).
- *  - Explicit override → only when the fallback is a DIFFERENT provider, i.e.
- *    a genuine provider failover (ModelScope quota/rate 429 → DeepSeek). A
- *    same-provider fallback under an explicit model choice is skipped so we
- *    don't silently swap the model the operator picked for a non-provider
- *    reason. Resolution errors (missing key) → no fallback.
- */
-function shouldFallback(env: LlmEnv, modelOverride: string | undefined, fallbackSpec: string): boolean {
-  if (!modelOverride) return true;
-  try {
-    return resolveProviderSpec(env, modelOverride).name !== resolveProviderSpec(env, fallbackSpec).name;
-  } catch {
-    return false;
   }
 }
 
