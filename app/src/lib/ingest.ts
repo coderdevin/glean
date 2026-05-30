@@ -36,6 +36,7 @@ import {
   callLlmSections,
   callLlmWeekly,
   toWeeklyPickInput,
+  defaultProviderName,
   NO_RETRY_MARKER,
   type LlmEnv,
 } from "./llm";
@@ -101,8 +102,14 @@ export interface ProcessLlmOptions {
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 const DEFAULT_DEEPSEEK_SECTIONS_MODEL = "deepseek-v4-flash";
 
-export function defaultSectionsModel(modelOverride?: string): string {
-  return modelOverride ?? DEFAULT_DEEPSEEK_SECTIONS_MODEL;
+/** Pick the model spec for the sections phase. An explicit override always
+ *  wins. Otherwise: on the DeepSeek default, sections (the big-output phase)
+ *  uses the cheaper Flash; on ModelScope/OpenAI, return undefined so the call
+ *  uses that provider's default model (ModelScope's free tier ships only
+ *  V4-Pro, and a "deepseek-*" name would 404 there). */
+export function defaultSectionsModel(modelOverride: string | undefined, env: LlmEnv): string | undefined {
+  if (modelOverride) return modelOverride;
+  return defaultProviderName(env) === "deepseek" ? DEFAULT_DEEPSEEK_SECTIONS_MODEL : undefined;
 }
 
 /**
@@ -553,7 +560,7 @@ export async function runSectionsPhase(
   // log goes silent for the 2–4 minutes V4-Pro spends on sections and the
   // editor can't tell whether anything is happening. (We dropped the inline
   // dual-started events earlier; this is the surviving one per phase.)
-  const sectionsModel = defaultSectionsModel(args.modelOverride);
+  const sectionsModel = defaultSectionsModel(args.modelOverride, env);
   // Reset the stall clock to NOW. The reaper measures staleness from
   // processing_started_at; sections runs in its own invocation (decoupled
   // pipeline) or hours after analysis (admin regenerate), so without this the

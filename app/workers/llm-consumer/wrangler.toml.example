@@ -15,10 +15,14 @@ binding = "RAW"
 bucket_name = "glean-raw"
 
 [vars]
-# Order: try V4-Pro first; on 429/5xx/timeout/network, fall back to V4-Flash
-# (non-reasoning). V4-Pro normally takes ~200s, so the LLM client gives it a
-# 720s stream window and only falls back on true transport/provider failure.
-LLM_FALLBACK_MODEL = "deepseek-v4-flash"
+# Default provider for the auto pipeline. ModelScope (DeepSeek-V4-Pro) has a
+# free daily quota; runtime-switchable from /admin (app_settings.llm_provider).
+LLM_PROVIDER = "modelscope"
+# Cross-provider fallback: when the ModelScope call fails (429 / quota gone /
+# 5xx / timeout) AND there's no explicit per-run override, retry once on
+# DeepSeek V4-Pro. The "deepseek-" prefix routes this spec to the DeepSeek
+# provider (baseUrl + DEEPSEEK_API_KEY), not just a model-name swap.
+LLM_FALLBACK_MODEL = "deepseek-v4-pro"
 
 [[queues.consumers]]
 queue = "glean-llm"
@@ -51,9 +55,10 @@ queue = "glean-llm"
 port = 8788
 
 # Secrets to set with `wrangler secret put <NAME> -c workers/llm-consumer/wrangler.toml`:
-#   DEEPSEEK_API_KEY     — default LLM (uses deepseek-v4-pro reasoning model)
+#   MODELSCOPE_API_KEY   — default LLM (ms-...; DeepSeek-V4-Pro, free daily quota)
+#   DEEPSEEK_API_KEY     — fallback provider (deepseek-v4-pro reasoning model)
 #   OPENAI_API_KEY       — alternative, or for any OpenAI-compatible endpoint
-#   LLM_PROVIDER         — optional, "deepseek" | "openai"
-#   LLM_MODEL            — optional, override default ("deepseek-v4-flash" is cheaper)
-#   LLM_BASE_URL         — optional, override endpoint URL
-#   LLM_FALLBACK_MODEL   — optional, model to fall back to on transient failure
+#   LLM_PROVIDER         — optional, "modelscope" | "deepseek" | "openai"
+#   LLM_MODEL            — optional, override default model for the env provider
+#   LLM_BASE_URL         — optional, override OpenAI endpoint URL
+#   LLM_FALLBACK_MODEL   — optional, provider/model spec to fall back to

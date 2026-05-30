@@ -33,6 +33,7 @@ import {
   type IngestEnv,
 } from "../../../src/lib/ingest";
 import { NO_RETRY_MARKER } from "../../../src/lib/llm";
+import { getLlmProviderSetting, withLlmProviderSetting } from "../../../src/lib/settings";
 import { drizzle } from "drizzle-orm/d1";
 import { asc, eq, inArray, isNotNull, and } from "drizzle-orm";
 import { submissions } from "../../../src/db/schema";
@@ -130,7 +131,11 @@ async function runSectionsOnly(env: Env, id: string, modelOverride?: string): Pr
 }
 
 export default {
-  async queue(batch: MessageBatch<string>, env: Env): Promise<void> {
+  async queue(batch: MessageBatch<string>, rawEnv: Env): Promise<void> {
+    // Apply the persisted default-provider toggle once per batch so every
+    // LLM call in this invocation honors it (admin can flip ModelScope ↔
+    // DeepSeek without a redeploy). Per-message model overrides still win.
+    const env = withLlmProviderSetting(rawEnv, await getLlmProviderSetting(rawEnv.DB));
     for (const msg of batch.messages) {
       const { id, modelOverride, phase, kind } = parseMessage(msg.body);
 
@@ -220,9 +225,11 @@ export default {
     if (w > 0) console.log(`reaper: marked ${w} stalled weekly draft(s) failed`);
   },
 
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, rawEnv: Env): Promise<Response> {
     const url = new URL(req.url);
     if (req.method === "POST" && url.pathname === "/process") {
+      // Dev path (Pages proxies here): honor the default-provider toggle too.
+      const env = withLlmProviderSetting(rawEnv, await getLlmProviderSetting(rawEnv.DB));
       const explicitId = url.searchParams.get("id");
       const modelOverride = url.searchParams.get("model") || undefined;
       const phase = url.searchParams.get("phase") === "sections" ? "sections" : undefined;

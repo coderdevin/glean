@@ -11,10 +11,12 @@ interface Env {
   INGEST_LLM: Queue<string>;
   TURNSTILE_SITEKEY: string;
   TURNSTILE_SECRET: string;
-  // LLM credentials — set at least one. If both are set,
-  // LLM_PROVIDER decides; defaults to deepseek when only DEEPSEEK_API_KEY is set.
+  // LLM credentials — set at least one. LLM_PROVIDER picks the default;
+  // otherwise auto-detect is free-first: ModelScope → DeepSeek → OpenAI.
   OPENAI_API_KEY?: string;
   DEEPSEEK_API_KEY?: string;
+  // ModelScope token (ms-...) — OpenAI-compatible, generous free daily quota.
+  MODELSCOPE_API_KEY?: string;
   LLM_PROVIDER?: string;
   LLM_MODEL?: string;
   LLM_BASE_URL?: string;

@@ -98,6 +98,7 @@ export function getAdminProcessingStatus(input: AdminProcessingStatusInput): Adm
 function modelShortLabel(model: string | null): string {
   if (!model) return "V4-Pro";
   const lower = model.toLowerCase();
+  if (lower === "modelscope" || lower.includes("modelscope") || lower.startsWith("deepseek-ai/")) return "ModelScope";
   if (lower.includes("flash")) return "V4-Flash";
   if (lower.includes("v4-pro")) return "V4-Pro";
   return model.replace(/^deepseek[-/]/i, "");

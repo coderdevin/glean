@@ -827,6 +827,10 @@ const sectionsTotalChars = aiSections.reduce(
               <input type="hidden" name="id" value={row.id} />
               <button class="btn btn-secondary" type="submit" name="model" value="deepseek-v4-flash">Re-run V4-Flash</button>
             </form>
+            <form action="/api/admin/process" method="post" style="display: inline">
+              <input type="hidden" name="id" value={row.id} />
+              <button class="btn btn-secondary" type="submit" name="model" value="modelscope" title="ModelScope · DeepSeek-V4-Pro（免费额度）">Re-run ModelScope</button>
+            </form>
           </div>
         </div>
       </div>

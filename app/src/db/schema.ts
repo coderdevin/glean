@@ -269,6 +269,17 @@ export const articleAnnotations = sqliteTable(
   }),
 );
 
+/** Generic key/value store for runtime-tunable app settings that must be
+ *  shared between the Pages app (admin writes) and the queue workers (read) —
+ *  e.g. the default LLM provider toggle. D1 is the only store both reach. */
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 export type Pick = typeof picks.$inferSelect;
 export type NewPick = typeof picks.$inferInsert;
 export type WeeklyIssue = typeof weeklyIssues.$inferSelect;

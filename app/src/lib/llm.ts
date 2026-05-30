@@ -32,12 +32,18 @@ import { isGithubHost } from "./extract-github";
 export interface LlmEnv {
   OPENAI_API_KEY?: string;
   DEEPSEEK_API_KEY?: string;
+  /** ModelScope token (ms-...). OpenAI-compatible endpoint with a generous
+   *  free daily quota — preferred as the default provider when set. */
+  MODELSCOPE_API_KEY?: string;
   LLM_PROVIDER?: string;
   LLM_MODEL?: string;
   LLM_BASE_URL?: string;
-  /** When set, automatically retry once with this model on 429 / 5xx / timeout.
-   *  Skipped if the caller passed an explicit modelOverride (respect explicit
-   *  intent — if admin picked V4-Pro, don't silently demote to V4-Flash). */
+  /** When set, automatically retry once with this model/provider spec on
+   *  429 / 5xx / timeout. Skipped if the caller passed an explicit
+   *  modelOverride (respect explicit intent — if admin picked a provider,
+   *  don't silently switch). A cross-provider spec (e.g. "deepseek-v4-pro"
+   *  while the default is ModelScope) makes this a provider fallback:
+   *  ModelScope free quota exhausted → retry on paid DeepSeek. */
   LLM_FALLBACK_MODEL?: string;
   /** Optional R2 bucket for dumping raw LLM stream output on parse failure
    *  (so the editor can debug / hand-repair without re-running the model). */
@@ -92,43 +98,140 @@ async function dumpLlmFailure(
   }
 }
 
+export type ProviderName = "openai" | "deepseek" | "modelscope";
+
 export interface LlmProvider {
-  name: "openai" | "deepseek";
+  name: ProviderName;
   baseUrl: string;
   apiKey: string;
   model: string;
 }
 
-export function pickProvider(env: LlmEnv): LlmProvider {
-  const explicit = env.LLM_PROVIDER?.toLowerCase();
-  const wantOpenAI = explicit === "openai" || (!explicit && env.OPENAI_API_KEY);
-  const wantDeepSeek = explicit === "deepseek" || (!explicit && env.DEEPSEEK_API_KEY);
+// Canonical per-provider endpoints + default models. ModelScope and DeepSeek
+// both serve OpenAI-compatible Chat Completions, so only the base URL + key +
+// model id differ. ModelScope ships DeepSeek-V4-Pro under a namespaced id.
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions";
+const OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions";
+export const MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1/chat/completions";
+export const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
+export const MODELSCOPE_DEFAULT_MODEL = "deepseek-ai/DeepSeek-V4-Pro";
 
-  if (wantOpenAI && env.OPENAI_API_KEY) {
-    return {
-      name: "openai",
-      baseUrl: env.LLM_BASE_URL || "https://api.openai.com/v1/chat/completions",
-      apiKey: env.OPENAI_API_KEY,
-      model: env.LLM_MODEL || "gpt-4o-mini",
-    };
+/** Build the full config for one named provider, or null if its key is unset.
+ *  Each provider has a fixed canonical base URL; LLM_MODEL only overrides the
+ *  default model for whichever provider is the env default (it is NOT carried
+ *  across providers — a deepseek model name would 404 on ModelScope). */
+export function providerConfig(env: LlmEnv, name: ProviderName): LlmProvider | null {
+  switch (name) {
+    case "openai":
+      if (!env.OPENAI_API_KEY) return null;
+      return {
+        name,
+        baseUrl: env.LLM_BASE_URL || OPENAI_BASE_URL,
+        apiKey: env.OPENAI_API_KEY,
+        model: defaultModelEnv(env, name) || "gpt-4o-mini",
+      };
+    case "deepseek":
+      if (!env.DEEPSEEK_API_KEY) return null;
+      return {
+        name,
+        baseUrl: DEEPSEEK_BASE_URL,
+        apiKey: env.DEEPSEEK_API_KEY,
+        // V4-Pro is the current flagship reasoning model. `deepseek-chat` /
+        // `deepseek-reasoner` are scheduled for deprecation on 2026-07-24.
+        model: defaultModelEnv(env, name) || DEFAULT_DEEPSEEK_MODEL,
+      };
+    case "modelscope":
+      if (!env.MODELSCOPE_API_KEY) return null;
+      return {
+        name,
+        baseUrl: MODELSCOPE_BASE_URL,
+        apiKey: env.MODELSCOPE_API_KEY,
+        model: defaultModelEnv(env, name) || MODELSCOPE_DEFAULT_MODEL,
+      };
   }
-  if (wantDeepSeek && env.DEEPSEEK_API_KEY) {
-    return {
-      name: "deepseek",
-      baseUrl: env.LLM_BASE_URL || "https://api.deepseek.com/v1/chat/completions",
-      apiKey: env.DEEPSEEK_API_KEY,
-      // V4-Pro is the current flagship reasoning model. `deepseek-chat` /
-      // `deepseek-reasoner` are scheduled for deprecation on 2026-07-24.
-      model: env.LLM_MODEL || "deepseek-v4-pro",
-    };
+}
+
+/** LLM_MODEL applies only to the env default provider — guards against a
+ *  stale deepseek model name leaking onto ModelScope after a default switch. */
+function defaultModelEnv(env: LlmEnv, name: ProviderName): string | undefined {
+  return defaultProviderName(env) === name ? env.LLM_MODEL : undefined;
+}
+
+/** The effective default provider name from env (LLM_PROVIDER, else free-first
+ *  auto-detect: ModelScope → DeepSeek → OpenAI). Does not validate the key. */
+export function defaultProviderName(env: LlmEnv): ProviderName {
+  const explicit = env.LLM_PROVIDER?.toLowerCase();
+  if (explicit === "openai" || explicit === "deepseek" || explicit === "modelscope") {
+    return explicit;
   }
-  if (explicit) {
-    throw new Error(
-      `LLM_PROVIDER=${explicit} but the matching API key is not set ` +
-        `(${explicit === "openai" ? "OPENAI_API_KEY" : "DEEPSEEK_API_KEY"})`,
-    );
+  if (env.MODELSCOPE_API_KEY) return "modelscope";
+  if (env.DEEPSEEK_API_KEY) return "deepseek";
+  return "openai";
+}
+
+/** Resolve the env default provider into a usable config (or throw). */
+export function pickProvider(env: LlmEnv): LlmProvider {
+  const name = defaultProviderName(env);
+  const cfg = providerConfig(env, name);
+  if (cfg) return cfg;
+  if (env.LLM_PROVIDER) {
+    const key = name === "openai" ? "OPENAI_API_KEY" : name === "deepseek" ? "DEEPSEEK_API_KEY" : "MODELSCOPE_API_KEY";
+    throw new Error(`LLM_PROVIDER=${env.LLM_PROVIDER} but ${key} is not set`);
   }
-  throw new Error("no LLM provider configured: set OPENAI_API_KEY or DEEPSEEK_API_KEY");
+  throw new Error("no LLM provider configured: set MODELSCOPE_API_KEY, DEEPSEEK_API_KEY or OPENAI_API_KEY");
+}
+
+/**
+ * Resolve an override "spec" (from the admin re-run buttons / queue message)
+ * into a concrete provider config. The spec carries an optional provider plus
+ * an optional model, letting one string select baseUrl + key + model:
+ *
+ *   ""  / undefined                       → env default provider
+ *   "modelscope"                          → ModelScope, default model
+ *   "modelscope:deepseek-ai/DeepSeek-V4-Pro" → ModelScope, explicit model
+ *   "deepseek-v4-pro" / "deepseek-v4-flash"  → DeepSeek, that model
+ *   "openai" / "gpt-4o-mini"              → OpenAI
+ *   anything else                         → treated as a model name on the
+ *                                            env default provider (back-compat)
+ *
+ * Throws if the resolved provider's API key is missing.
+ */
+export function resolveProviderSpec(env: LlmEnv, spec?: string): LlmProvider {
+  const s = spec?.trim();
+  if (!s) return pickProvider(env);
+
+  const lower = s.toLowerCase();
+  let name: ProviderName | null = null;
+  let model: string | undefined;
+
+  const colon = s.indexOf(":");
+  const head = (colon >= 0 ? s.slice(0, colon) : s).toLowerCase();
+  const tail = colon >= 0 ? s.slice(colon + 1).trim() : "";
+
+  if (head === "modelscope") {
+    name = "modelscope";
+    model = tail || undefined;
+  } else if (head === "deepseek" || lower.startsWith("deepseek-")) {
+    name = "deepseek";
+    model = colon >= 0 ? tail || undefined : (lower.startsWith("deepseek-") ? s : undefined);
+  } else if (head === "openai" || lower.startsWith("gpt-")) {
+    name = "openai";
+    model = colon >= 0 ? tail || undefined : (lower.startsWith("gpt-") ? s : undefined);
+  }
+
+  if (!name) {
+    // Bare model name with no recognizable provider prefix — apply it to the
+    // env default provider (preserves the old "model override" behaviour).
+    const base = pickProvider(env);
+    return { ...base, model: s };
+  }
+
+  const cfg = providerConfig(env, name);
+  if (!cfg) {
+    const key = name === "openai" ? "OPENAI_API_KEY" : name === "deepseek" ? "DEEPSEEK_API_KEY" : "MODELSCOPE_API_KEY";
+    throw new Error(`provider "${name}" requested but ${key} is not set`);
+  }
+  return model ? { ...cfg, model } : cfg;
 }
 
 /* ============================================================
@@ -939,10 +1042,9 @@ async function callOnce<S extends z.ZodTypeAny>(
   cfg: PhaseConfig<S>,
   modelOverride?: string,
 ): Promise<LlmCallResult<z.infer<S>>> {
-  const baseProvider = pickProvider(env);
-  const provider: LlmProvider = modelOverride
-    ? { ...baseProvider, model: modelOverride }
-    : baseProvider;
+  // `modelOverride` is a provider/model spec (see resolveProviderSpec): it can
+  // switch the whole provider (ModelScope ↔ DeepSeek), not just the model name.
+  const provider: LlmProvider = resolveProviderSpec(env, modelOverride);
   const budget = getLlmCallBudget(provider.model, cfg.phase);
   const trimmedBody = args.body.length > budget.bodyCap
     ? args.body.slice(0, budget.bodyCap) + "\n…(truncated; body exceeded " + budget.bodyCap.toLocaleString() + " chars)"
