@@ -45,6 +45,12 @@ export interface LlmEnv {
    *  while the default is ModelScope) makes this a provider fallback:
    *  ModelScope free quota exhausted → retry on paid DeepSeek. */
   LLM_FALLBACK_MODEL?: string;
+  /** Optional model spec for the sections phase only (split + bilingual
+   *  translation). Defaults to the active provider's Flash model — sections is
+   *  mechanical big-output work that doesn't need the reasoning model the
+   *  analysis phase uses. Same provider-spec syntax as LLM_FALLBACK_MODEL
+   *  (e.g. "modelscope:deepseek-ai/DeepSeek-V4-Flash"). */
+  LLM_SECTIONS_MODEL?: string;
   /** Optional R2 bucket for dumping raw LLM stream output on parse failure
    *  (so the editor can debug / hand-repair without re-running the model). */
   RAW?: R2Bucket;
@@ -816,9 +822,14 @@ export function getLlmCallBudget(model: string, phase: LlmPhase = "analysis"): L
   const isSections = phase === "sections";
   return {
     // Sections runs in its own worker invocation (see processLlm), so it has a
-    // full 15-min ceiling — but cap the stream at 13min to leave ~2min for
-    // cleanup + the failure DB-write before the platform evicts the worker.
-    streamTimeoutMs: reasoning ? (isSections ? 780_000 : 420_000) : 240_000,
+    // full 15-min ceiling — but cap the stream at 13min (reasoning) to leave
+    // ~2min for cleanup + the failure DB-write before the platform evicts the
+    // worker. Non-reasoning sections (Flash) is the common path now and still
+    // emits bulk bilingual output on long articles, so give it 8min — well
+    // past the 4min analysis budget but clear of the worker ceiling.
+    streamTimeoutMs: reasoning
+      ? (isSections ? 780_000 : 420_000)
+      : (isSections ? 480_000 : 240_000),
     chunkIdleMs: reasoning ? 180_000 : 60_000,
     bodyCap: 120_000,
     // DeepSeek V4-Pro/Flash advertised max output is 384K tokens, so these

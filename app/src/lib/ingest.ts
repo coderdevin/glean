@@ -101,15 +101,31 @@ export interface ProcessLlmOptions {
 
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 const DEFAULT_DEEPSEEK_SECTIONS_MODEL = "deepseek-v4-flash";
+// ModelScope ships Flash under a namespaced id (mirrors MODELSCOPE_DEFAULT_MODEL
+// = "deepseek-ai/DeepSeek-V4-Pro"); a bare "deepseek-*" name 404s there.
+const MODELSCOPE_SECTIONS_MODEL = "deepseek-ai/DeepSeek-V4-Flash";
 
-/** Pick the model spec for the sections phase. An explicit override always
- *  wins. Otherwise: on the DeepSeek default, sections (the big-output phase)
- *  uses the cheaper Flash; on ModelScope/OpenAI, return undefined so the call
- *  uses that provider's default model (ModelScope's free tier ships only
- *  V4-Pro, and a "deepseek-*" name would 404 there). */
+/** Pick the model spec for the sections phase. Precedence:
+ *   1. explicit modelOverride (admin "re-run V4-Pro / V4-Flash")
+ *   2. env.LLM_SECTIONS_MODEL (ops override, no redeploy)
+ *   3. the active provider's Flash model.
+ *  Sections is split + bilingual translation — a mechanical, big-output job
+ *  that does NOT need a reasoning model. Flash is multiples faster and skips
+ *  the chain-of-thought; the reasoning model stays on the analysis phase
+ *  (scoring / bias), where it earns its cost. OpenAI → undefined (keep its
+ *  configured default). */
 export function defaultSectionsModel(modelOverride: string | undefined, env: LlmEnv): string | undefined {
   if (modelOverride) return modelOverride;
-  return defaultProviderName(env) === "deepseek" ? DEFAULT_DEEPSEEK_SECTIONS_MODEL : undefined;
+  const envSpec = env.LLM_SECTIONS_MODEL?.trim();
+  if (envSpec) return envSpec;
+  switch (defaultProviderName(env)) {
+    case "modelscope":
+      return MODELSCOPE_SECTIONS_MODEL;
+    case "deepseek":
+      return DEFAULT_DEEPSEEK_SECTIONS_MODEL;
+    default:
+      return undefined;
+  }
 }
 
 /**

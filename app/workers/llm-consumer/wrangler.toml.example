@@ -62,3 +62,5 @@ port = 8788
 #   LLM_MODEL            — optional, override default model for the env provider
 #   LLM_BASE_URL         — optional, override OpenAI endpoint URL
 #   LLM_FALLBACK_MODEL   — optional, provider/model spec to fall back to
+#   LLM_SECTIONS_MODEL   — optional, model spec for the sections phase only;
+#                          defaults to the provider's Flash (V4-Flash) model
