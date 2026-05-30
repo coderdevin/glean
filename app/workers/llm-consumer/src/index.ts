@@ -34,6 +34,12 @@ import {
 } from "../../../src/lib/ingest";
 import { NO_RETRY_MARKER } from "../../../src/lib/llm";
 import { getLlmProviderSetting, withLlmProviderSetting } from "../../../src/lib/settings";
+import { autoPublishReady } from "../../../src/lib/publish";
+
+/** Daily auto-publish cron: 22:00 UTC = 06:00 Asia/Shanghai. Publishes the
+ *  oldest 5 'ready' submissions so the editor doesn't have to each morning. */
+const DAILY_PUBLISH_CRON = "0 22 * * *";
+const DAILY_PUBLISH_COUNT = 5;
 import { drizzle } from "drizzle-orm/d1";
 import { asc, eq, inArray, isNotNull, and } from "drizzle-orm";
 import { submissions } from "../../../src/db/schema";
@@ -216,13 +222,21 @@ export default {
   // Cron sweep: reap submissions stranded in an in-flight state past the
   // worker wall-time ceiling. A platform eviction bypasses the in-worker
   // try/catch, so without this a stuck row would show "running…" forever.
-  async scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+  async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    // Reapers run on every cron tick (cheap + idempotent).
     const queued = await reapStaleLlmQueueWait(env);
     if (queued > 0) console.log(`reaper: marked ${queued} stale LLM queue wait submission(s) failed`);
     const n = await reapStalledSubmissions(env);
     if (n > 0) console.log(`reaper: marked ${n} stalled submission(s) failed`);
     const w = await reapStalledWeeklyDrafts(env);
     if (w > 0) console.log(`reaper: marked ${w} stalled weekly draft(s) failed`);
+
+    // Daily-only: auto-publish the oldest N 'ready' submissions. Gated on the
+    // exact cron so it never fires on the */5 reaper tick.
+    if (controller.cron === DAILY_PUBLISH_CRON) {
+      const r = await autoPublishReady(env, DAILY_PUBLISH_COUNT);
+      console.log(`auto-publish: published ${r.published.length}, skipped ${r.skipped}`);
+    }
   },
 
   async fetch(req: Request, rawEnv: Env): Promise<Response> {
