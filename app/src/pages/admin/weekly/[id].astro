@@ -200,6 +200,24 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
         </div>
       )}
     </section>
+
+    <!-- HTML export (works for drafts too) -->
+    <section class="card card--canvas wk-export">
+      <div class="wk-export__head">
+        <h2 class="wk-export__title">导出 HTML · Export</h2>
+        <span class="wk-export__hint">可打印为 PDF，或复制到邮箱直接发送</span>
+      </div>
+      <p class="wk-export__note">
+        生成单文件 HTML：浏览器里「打印 / 另存为 PDF」，或「复制为邮件 HTML」后粘贴进 Outlook / Mac 邮件 / Gmail。
+      </p>
+      <div class="wk-export__btns">
+        <a class="btn btn-primary" href={`/api/admin/weekly/${id}/export?lang=zh&inline=1`} target="_blank" rel="noopener">预览 / 打印（中文）</a>
+        <a class="btn btn-secondary" href={`/api/admin/weekly/${id}/export?lang=en&inline=1`} target="_blank" rel="noopener">Preview / Print (EN)</a>
+        <span class="wk-export__sep"></span>
+        <a class="btn btn-text" href={`/api/admin/weekly/${id}/export?lang=zh`}>下载 .html（中文）</a>
+        <a class="btn btn-text" href={`/api/admin/weekly/${id}/export?lang=en`}>Download .html (EN)</a>
+      </div>
+    </section>
     </Fragment>
     )}
   </div>
@@ -467,6 +485,25 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
   .wk-email__note { margin: 0 0 var(--s-md); color: var(--c-body); font-size: 14px; }
   .wk-email__warn { margin: 0; color: var(--c-text-amber-dark); font-size: 14px; }
   .wk-email__btns { display: flex; flex-wrap: wrap; gap: var(--s-sm); }
+
+  /* Export panel */
+  .wk-export {
+    margin-top: var(--s-xl);
+    padding: var(--s-lg);
+  }
+  .wk-export__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-md);
+    flex-wrap: wrap;
+    margin-bottom: var(--s-xs);
+  }
+  .wk-export__title { font-size: 18px; margin: 0; }
+  .wk-export__hint { font-size: 12px; color: var(--c-muted); }
+  .wk-export__note { margin: 0 0 var(--s-md); color: var(--c-body); font-size: 14px; line-height: 1.6; }
+  .wk-export__btns { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-sm); }
+  .wk-export__sep { flex: 1 1 auto; }
 
   @media (max-width: 600px) {
     .wk-row2,
