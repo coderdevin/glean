@@ -1,0 +1,110 @@
+---
+export const prerender = false;
+import Admin from "~/layouts/Admin.astro";
+import { getLlmProviderSetting, getSetting } from "~/lib/settings";
+import { defaultProviderName, PROMPT_REGISTRY } from "~/lib/llm";
+
+const env = Astro.locals.runtime.env;
+
+// Default-provider toggle (moved here from the queue page). "auto" follows the
+// env default; show which provider that resolves to.
+const providerSetting = await getLlmProviderSetting(env.DB);
+const effectiveProvider = providerSetting === "auto" ? defaultProviderName(env) : providerSetting;
+const PROVIDER_OPTIONS: { value: "auto" | "modelscope" | "deepseek"; label: string }[] = [
+  { value: "modelscope", label: "ModelScope" },
+  { value: "deepseek", label: "DeepSeek" },
+  { value: "auto", label: "Auto" },
+];
+
+// Each prompt: prefill with the stored override if present, else the baked-in
+// default. `overridden` drives the "已自定义 / 默认" badge.
+const prompts = await Promise.all(
+  PROMPT_REGISTRY.map(async (p) => {
+    const override = await getSetting(env.DB, p.key);
+    const overridden = !!override?.trim();
+    return { ...p, value: overridden ? override! : p.default, overridden };
+  }),
+);
+
+Astro.response.headers.set("Cache-Control", "no-store");
+---
+<Admin title="设置">
+  <main id="main" class="q2">
+    <div class="container" style="max-width: 920px">
+      <header class="q2-header">
+        <h1>设置 · Settings</h1>
+        <p class="q2-header__sub">默认 AI 引擎与系统 prompt。改动立即对新投稿生效，无需部署。</p>
+      </header>
+
+      <section style="margin-block: 1.5rem">
+        <div class="q2-provider" role="group" aria-label="默认 AI 引擎">
+          <span class="q2-provider__label">默认引擎</span>
+          {PROVIDER_OPTIONS.map((opt) => (
+            <form action="/api/admin/llm-provider" method="post" style="display: inline">
+              <input type="hidden" name="provider" value={opt.value} />
+              <button
+                type="submit"
+                class={`q2-provider__btn${providerSetting === opt.value ? " is-active" : ""}`}
+                aria-pressed={providerSetting === opt.value}
+              >
+                {opt.label}
+                {opt.value === "auto" && <span class="q2-provider__hint">→ {effectiveProvider}</span>}
+              </button>
+            </form>
+          ))}
+          <span class="q2-provider__note">新投稿自动处理用此引擎；ModelScope 失败时自动回退 DeepSeek。</span>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="t-body" style="margin-bottom: .5rem">系统 Prompt</h2>
+        <p class="t-body-sm text-muted" style="margin-bottom: 1rem">
+          留空保存或点「重置为默认」即删除覆盖，回落到代码内置默认。被改坏时也会安全回落，不会让流程卡死。
+        </p>
+
+        {prompts.map((p) => (
+          <form
+            action="/api/admin/settings/prompt"
+            method="post"
+            class="prompt-edit"
+            style="margin-bottom: 1.75rem; border: 1px solid var(--rule, #e5e0d8); border-radius: 8px; padding: 1rem"
+          >
+            <input type="hidden" name="key" value={p.key} />
+            <div class="row row--between" style="align-items: center; margin-bottom: .5rem; gap: 8px">
+              <label for={`p-${p.key}`} class="t-body" style="font-weight: 600">
+                {p.label}
+                <span class="t-code text-muted-soft" style="font-size: 11px; margin-left: 8px">{p.key}</span>
+              </label>
+              <span
+                class="t-body-sm"
+                style={`color: ${p.overridden ? "var(--accent, #b25b2e)" : "var(--text-muted, #8a8275)"}`}
+              >
+                {p.overridden ? "已自定义" : "默认"}
+              </span>
+            </div>
+            <textarea
+              id={`p-${p.key}`}
+              name="value"
+              rows="12"
+              spellcheck="false"
+              style="width: 100%; font-family: var(--font-mono, monospace); font-size: 12px; line-height: 1.5; padding: .6rem; border: 1px solid var(--rule, #e5e0d8); border-radius: 6px; resize: vertical; white-space: pre"
+            >{p.value}</textarea>
+            <div class="row" style="gap: 8px; margin-top: .6rem">
+              <button type="submit" class="btn btn-primary">保存</button>
+              <button
+                type="submit"
+                name="action"
+                value="reset"
+                class="btn btn-secondary"
+                disabled={!p.overridden}
+                title={p.overridden ? "删除覆盖，回落默认" : "当前已是默认"}
+              >
+                重置为默认
+              </button>
+            </div>
+          </form>
+        ))}
+      </section>
+    </div>
+  </main>
+</Admin>

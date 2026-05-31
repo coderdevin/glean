@@ -28,6 +28,7 @@
 
 import { z } from "zod";
 import { isGithubHost } from "./extract-github";
+import { getSetting } from "./settings";
 
 export interface LlmEnv {
   OPENAI_API_KEY?: string;
@@ -54,6 +55,10 @@ export interface LlmEnv {
   /** Optional R2 bucket for dumping raw LLM stream output on parse failure
    *  (so the editor can debug / hand-repair without re-running the model). */
   RAW?: R2Bucket;
+  /** Optional D1 binding. When present, system prompts are resolved against
+   *  the admin overrides in app_settings (else the baked-in defaults are used).
+   *  Always bound in the ingest/queue context where these calls actually run. */
+  DB?: D1Database;
 }
 
 /**
@@ -805,6 +810,62 @@ const WEEKLY_SYSTEM_PROMPT = `你是一名有 10 年经验的双语技术编辑�
 输出必须是英文 key 的 JSON 对象，符合给定 schema。`;
 
 /* ============================================================
+ * Editable prompts (admin-overridable — see settings.ts + /admin/settings)
+ *
+ * The constants above are the baked-in DEFAULTS. The admin can store an
+ * override per key in app_settings; each LLM call uses override ?? default,
+ * so a missing/blank/broken override safely falls back to the default and the
+ * pipeline never stalls on a bad edit.
+ * ============================================================ */
+
+export type PromptKey =
+  | "article_analysis"
+  | "article_sections"
+  | "github_analysis"
+  | "github_sections"
+  | "weekly";
+
+/** A runtime-editable system prompt: app_settings row `key`, display `label`,
+ *  and the baked-in `default` shown when no override is stored. */
+export interface PromptEntry {
+  key: PromptKey;
+  label: string;
+  default: string;
+}
+
+export const PROMPT_REGISTRY: PromptEntry[] = [
+  { key: "article_analysis", label: "文章 · 分析（标题 / 摘要 / 标签 / 评分）", default: ANALYSIS_SYSTEM_PROMPT },
+  { key: "article_sections", label: "文章 · 正文分段", default: SECTIONS_SYSTEM_PROMPT },
+  { key: "github_analysis", label: "GitHub · 分析", default: GITHUB_ANALYSIS_SYSTEM_PROMPT },
+  { key: "github_sections", label: "GitHub · 项目讲解文", default: GITHUB_SECTIONS_SYSTEM_PROMPT },
+  { key: "weekly", label: "周刊 · 合辑", default: WEEKLY_SYSTEM_PROMPT },
+];
+
+const PROMPT_DEFAULTS = Object.fromEntries(
+  PROMPT_REGISTRY.map((p) => [p.key, p.default]),
+) as Record<PromptKey, string>;
+
+/** Pick the override when it carries real content, else the baked-in default.
+ *  Empty / whitespace-only / missing override → default. */
+export function resolvePrompt(override: string | null | undefined, fallback: string): string {
+  const trimmed = override?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+/** Resolve a system prompt by key: admin override (app_settings) ?? default.
+ *  Any DB miss / error falls back to the default — prompts must never break
+ *  the pipeline. */
+async function getPrompt(env: LlmEnv, key: PromptKey): Promise<string> {
+  const fallback = PROMPT_DEFAULTS[key];
+  if (!env.DB) return fallback;
+  try {
+    return resolvePrompt(await getSetting(env.DB, key), fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+/* ============================================================
  * Budget
  * ============================================================ */
 
@@ -929,12 +990,14 @@ export async function callLlmAnalysis(
   env: LlmEnv,
   args: CallLlmAnalysisArgs,
 ): Promise<LlmCallResult<LlmAnalysisOutput>> {
+  const systemPrompt = await getPrompt(
+    env,
+    isGithubHost(args.sourceHost) ? "github_analysis" : "article_analysis",
+  );
   return callWithFallback(env, args, {
     phase: "analysis",
     schema: AnalysisResponseSchema,
-    systemPrompt: isGithubHost(args.sourceHost)
-      ? GITHUB_ANALYSIS_SYSTEM_PROMPT
-      : ANALYSIS_SYSTEM_PROMPT,
+    systemPrompt,
     buildMessage: () =>
       buildAnalysisUserMessage({
         title: args.title,
@@ -956,12 +1019,14 @@ export async function callLlmSections(
   env: LlmEnv,
   args: CallLlmSectionsArgs,
 ): Promise<LlmCallResult<LlmSectionsOutput>> {
+  const systemPrompt = await getPrompt(
+    env,
+    isGithubHost(args.sourceHost) ? "github_sections" : "article_sections",
+  );
   const result = await callWithFallback(env, args, {
     phase: "sections",
     schema: SectionsResponseSchema,
-    systemPrompt: isGithubHost(args.sourceHost)
-      ? GITHUB_SECTIONS_SYSTEM_PROMPT
-      : SECTIONS_SYSTEM_PROMPT,
+    systemPrompt,
     buildMessage: () =>
       buildSectionsUserMessage({
         title: args.title,
@@ -989,10 +1054,11 @@ export async function callLlmWeekly(
   env: LlmEnv,
   args: CallLlmWeeklyArgs,
 ): Promise<LlmCallResult<LlmWeeklyOutput>> {
+  const systemPrompt = await getPrompt(env, "weekly");
   return callWithFallback(env, args, {
     phase: "weekly",
     schema: WeeklyResponseSchema,
-    systemPrompt: WEEKLY_SYSTEM_PROMPT,
+    systemPrompt,
     buildMessage: () =>
       buildWeeklyUserMessage({
         picks: args.picks,

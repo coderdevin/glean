@@ -6,8 +6,6 @@ import { db } from "~/db/client";
 import { submissions, type SubmissionStatus } from "~/db/schema";
 import { and, desc, inArray, like, or, sql } from "drizzle-orm";
 import { formatDateISO, formatTimeHM, siteTz, todayInSiteTz } from "~/lib/datetime";
-import { getLlmProviderSetting } from "~/lib/settings";
-import { defaultProviderName } from "~/lib/llm";
 
 const env = Astro.locals.runtime.env;
 const filterParam = Astro.url.searchParams.get("status");
@@ -149,15 +147,7 @@ const pageHref = (overrides: { page?: number; sort?: "newest" | "score" } = {}) 
 };
 const clearSearchHref = filterKey === "active" ? "/admin" : `/admin?status=${filterKey}`;
 
-// Global default-provider toggle. "auto" follows the env default; show which
-// provider that resolves to so the operator knows what new submissions use.
-const providerSetting = await getLlmProviderSetting(env.DB);
-const effectiveProvider = providerSetting === "auto" ? defaultProviderName(env) : providerSetting;
-const PROVIDER_OPTIONS: { value: "auto" | "modelscope" | "deepseek"; label: string }[] = [
-  { value: "modelscope", label: "ModelScope" },
-  { value: "deepseek", label: "DeepSeek" },
-  { value: "auto", label: "Auto" },
-];
+// The default-provider toggle now lives on /admin/settings.
 
 Astro.response.headers.set("Cache-Control", "no-store");
 ---
@@ -189,24 +179,6 @@ Astro.response.headers.set("Cache-Control", "no-store");
           </nav>
         </div>
       </header>
-
-      <div class="q2-provider" role="group" aria-label="默认 AI 引擎">
-        <span class="q2-provider__label">默认引擎</span>
-        {PROVIDER_OPTIONS.map((opt) => (
-          <form action="/api/admin/llm-provider" method="post" style="display: inline">
-            <input type="hidden" name="provider" value={opt.value} />
-            <button
-              type="submit"
-              class={`q2-provider__btn${providerSetting === opt.value ? " is-active" : ""}`}
-              aria-pressed={providerSetting === opt.value}
-            >
-              {opt.label}
-              {opt.value === "auto" && <span class="q2-provider__hint">→ {effectiveProvider}</span>}
-            </button>
-          </form>
-        ))}
-        <span class="q2-provider__note">新投稿自动处理用此引擎；ModelScope 失败时自动回退 DeepSeek。</span>
-      </div>
 
       {isFlatList && (
         <div class="q2-toolbar">
