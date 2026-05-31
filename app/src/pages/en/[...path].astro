@@ -1,0 +1,9 @@
+---
+// Physical catch-all for `/en/*` — see src/pages/en/index.astro for why this
+// exists. The middleware (which runs once a route matches) strips the /en
+// prefix and rewrites to the shared zh-tree template with lang=en, so this
+// body normally never executes; the Astro.rewrite is a defensive fallback.
+export const prerender = false;
+const path = Astro.params.path ?? "";
+return Astro.rewrite("/" + path + Astro.url.search);
+---
