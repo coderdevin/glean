@@ -1,0 +1,10 @@
+---
+// Physical route for `/en`. Its only job is to make Cloudflare Pages invoke
+// the SSR function for this path — on the CF adapter an unmatched route 404s
+// *before* middleware runs, so the middleware can't rewrite `/en` unless a
+// route matches. The middleware intercepts via next()-rewrite and renders the
+// `/` template with lang=en, so this body normally never executes; the
+// Astro.rewrite below is a defensive fallback.
+export const prerender = false;
+return Astro.rewrite("/" + Astro.url.search);
+---
