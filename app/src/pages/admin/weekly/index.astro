@@ -170,10 +170,20 @@ const range = thisWeekToDate(new Date(), siteTz(env));
     flex-direction: column;
     gap: var(--s-sm);
   }
+  /* The card is the row itself; the editor link + export button live inside
+     it (anchors can't nest, so they're siblings sharing one bordered card). */
   .wk-row {
     display: flex;
-    align-items: stretch;
-    gap: var(--s-sm);
+    align-items: center;
+    padding-right: var(--s-md);
+    border: 1px solid var(--c-hairline);
+    border-radius: var(--r-lg);
+    background: var(--c-canvas);
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .wk-row:hover {
+    border-color: var(--c-primary);
+    background: var(--c-surface-soft);
   }
   .wk-row__link {
     flex: 1;
@@ -181,28 +191,21 @@ const range = thisWeekToDate(new Date(), siteTz(env));
     display: flex;
     align-items: center;
     gap: var(--s-md);
-    padding: var(--s-md) var(--s-lg);
-    border: 1px solid var(--c-hairline);
-    border-radius: var(--r-lg);
-    background: var(--c-canvas);
+    padding: var(--s-md) var(--s-sm) var(--s-md) var(--s-lg);
     color: inherit;
     text-decoration: none;
-    transition: border-color 0.15s ease, background 0.15s ease;
-  }
-  .wk-row__link:hover {
-    border-color: var(--c-primary);
-    background: var(--c-surface-soft);
   }
 
-  /* Export action — sibling of the editor link (anchors can't nest) */
+  /* Export action — sits beside the status badge inside the same card. */
   .wk-row__export {
     flex: none;
     display: inline-flex;
     align-items: center;
-    padding: 0 var(--s-md);
+    margin-left: var(--s-sm);
+    padding: 7px 14px;
     border: 1px solid var(--c-hairline);
     border-radius: var(--r-lg);
-    background: var(--c-canvas);
+    background: var(--c-surface-soft);
     color: var(--c-muted);
     font-size: 13px;
     font-weight: 500;
@@ -213,7 +216,7 @@ const range = thisWeekToDate(new Date(), siteTz(env));
   .wk-row__export:hover {
     border-color: var(--c-primary);
     color: var(--c-primary);
-    background: var(--c-surface-soft);
+    background: var(--c-surface-cream-strong, var(--c-canvas));
   }
   .wk-row__no {
     flex: none;
