@@ -44,7 +44,15 @@ const weekNum = (() => {
   const oneJan = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d.getTime() - oneJan.getTime()) / 86400000 + oneJan.getUTCDay() + 1) / 7);
 })();
-let globalIdx = 0;
+
+// Annotate each pick with a running 1-based index so the TOC (rendered first)
+// and the body anchors (#p-N) reference the same numbers.
+let _n = 0;
+const toc = groups.map((g) => ({
+  zh: g.zh,
+  en: g.en,
+  items: g.list.map((p) => ({ pick: p, n: ++_n })),
+}));
 ---
 <Site
   title={`#${String(issue.number).padStart(3, "0")} — ${issue.titleEn} · Glean · 拾遗`}
@@ -85,25 +93,49 @@ let globalIdx = 0;
     </div>
   </section>
 
-  {groups.length > 0 && (
-    <div class="cat-toc">
-      <div class="container">
-        <div class="cat-toc__inner">
-          <span class="cat-toc__label"><span class="lang-zh">本期目录</span><span class="lang-en">Sections</span></span>
-          {groups.map((g, i) => (
-            <a class="cat-toc__chip" href={`#sec-${i}`}>
-              <span class="lang-zh">{g.zh}</span>
-              <span class="lang-en">{g.en}</span>
-              <span class="cat-toc__chip-count">{g.list.length}</span>
-            </a>
-          ))}
-        </div>
-      </div>
-    </div>
-  )}
+  <div class:list={["container", "issue-layout", groups.length > 0 && "issue-layout--sidebar"]}>
+    {groups.length > 0 && (
+      <aside class="issue-toc" aria-label="本期目录 · Contents">
+        <details class="issue-toc__panel" open>
+          <summary class="issue-toc__summary">
+            <span><span class="lang-zh">本期目录</span><span class="lang-en">Contents</span></span>
+            <span class="issue-toc__summary-meta">{picks.length}<span class="issue-toc__chev" aria-hidden="true">▾</span></span>
+          </summary>
+          <nav class="issue-toc__sticky">
+            <ol class="issue-toc__list">
+              {toc.map((g, i) => (
+                <li class="issue-toc__group">
+                  <a class="issue-toc__link" href={`#sec-${i}`} data-toc={`sec-${i}`}>
+                    <span class="issue-toc__num">{String(i + 1).padStart(2, "0")}</span>
+                    <span class="issue-toc__text">
+                      <span class="lang-zh">{g.zh}</span>
+                      <span class="lang-en">{g.en}</span>
+                    </span>
+                    <span class="issue-toc__count">{g.items.length}</span>
+                  </a>
+                  <ul class="issue-toc__sublist">
+                    {g.items.map((it) => (
+                      <li>
+                        <a class="issue-toc__sublink" href={`#p-${it.n}`} title={it.pick.title_zh}>
+                          <span class="issue-toc__subnum">{String(it.n).padStart(2, "0")}</span>
+                          <span class="issue-toc__subtext">
+                            <span class="lang-zh">{it.pick.title_zh}</span>
+                            <span class="lang-en">{it.pick.title_en}</span>
+                          </span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          </nav>
+        </details>
+      </aside>
+    )}
 
-  <main class="container">
-    {groups.map((g, catIdx) => (
+    <main class="issue-content">
+    {toc.map((g, catIdx) => (
       <section id={`sec-${catIdx}`} class="issue-section">
         <div class="issue-section__head">
           <div>
@@ -116,15 +148,15 @@ let globalIdx = 0;
               <span class="lang-en">{g.en}</span>
             </h2>
           </div>
-          <span class="issue-section__count">{g.list.length} / {picks.length}</span>
+          <span class="issue-section__count">{g.items.length} / {picks.length}</span>
         </div>
 
         <div class="pick-list">
-          {g.list.map((pick) => {
-            globalIdx += 1;
-            const idx = String(globalIdx).padStart(2, "0");
+          {g.items.map((it) => {
+            const pick = it.pick;
+            const idx = String(it.n).padStart(2, "0");
             return (
-              <article class="pick-item">
+              <article class="pick-item" id={`p-${it.n}`}>
                 <span class="pick-item__index">{idx}</span>
                 <div class="pick-item__main">
                   <div class="pick-item__meta">
@@ -174,5 +206,45 @@ let globalIdx = 0;
         </p>
       </div>
     )}
-  </main>
+    </main>
+  </div>
+
+  <script is:inline>
+    // Scroll-spy: highlight the sidebar TOC link for the section currently in
+    // the upper viewport band. Pure IntersectionObserver, no deps.
+    (function () {
+      const links = [...document.querySelectorAll(".issue-toc__link")];
+      if (links.length === 0) return;
+      const byId = new Map(links.map((a) => [a.getAttribute("data-toc"), a]));
+      const sections = [...document.querySelectorAll(".issue-section[id]")];
+      if (sections.length === 0) return;
+      let current = null;
+      const activate = (id) => {
+        if (id === current) return;
+        current = id;
+        links.forEach((a) => a.classList.toggle("is-active", a.getAttribute("data-toc") === id));
+      };
+      const obs = new IntersectionObserver(
+        (entries) => {
+          const inView = entries
+            .filter((e) => e.isIntersecting)
+            .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+          if (inView[0]) activate(inView[0].target.id);
+        },
+        { rootMargin: "-20% 0px -65% 0px", threshold: 0 },
+      );
+      sections.forEach((s) => obs.observe(s));
+
+      // Mobile: the <details> TOC is `open` by default (so desktop shows it) —
+      // collapse it on small screens, and close it again after a jump.
+      const panel = document.querySelector(".issue-toc__panel");
+      const isMobile = () => window.matchMedia("(max-width: 979px)").matches;
+      if (panel && isMobile()) panel.removeAttribute("open");
+      document.querySelectorAll(".issue-toc__link, .issue-toc__sublink").forEach((a) => {
+        a.addEventListener("click", () => {
+          if (panel && isMobile()) panel.removeAttribute("open");
+        });
+      });
+    })();
+  </script>
 </Site>

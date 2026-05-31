@@ -1654,89 +1654,65 @@ body[data-lang="zh"] .lang-en {
 .issue-list {
   display: flex;
   flex-direction: column;
-  gap: var(--s-xl);
 }
+/* Editorial issue index: a ghost serial number anchors each entry, the theme
+   carries the row. Whole card is the <a> (no nested links) so it's fully
+   clickable. Robust grid — no absolute-positioned cover to overlap. */
 .issue-list-card {
+  position: relative;
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: var(--s-xl);
-  align-items: stretch;
+  grid-template-columns: minmax(0, auto) 1fr;
+  gap: clamp(20px, 4vw, 60px);
+  align-items: start;
   text-decoration: none;
   color: inherit;
   border-top: 1px solid var(--c-hairline);
-  padding-top: var(--s-xl);
+  padding: var(--s-xxl) 0;
 }
 .issue-list-card:first-child {
   border-top: 0;
-  padding-top: 0;
+  padding-top: var(--s-lg);
 }
-.issue-list-card:hover {
-  text-decoration: none;
-}
-.issue-list-card:hover .issue-list-card__title {
-  color: var(--c-primary);
-}
-.issue-list-card__cover {
-  position: relative;
-  aspect-ratio: 4 / 3;
-  background: var(--c-surface-dark);
-  color: var(--c-on-dark);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 20px;
-}
-.issue-list-card__cover--cream {
-  background: var(--c-surface-cream-strong);
-  color: var(--c-ink);
-}
-.issue-list-card__cover--coral {
-  background: var(--c-primary);
-  color: var(--c-on-primary);
-}
-.issue-list-card__cover::after {
-  content: attr(data-bigno);
-  position: absolute;
-  right: -10px;
-  bottom: -40px;
+.issue-list-card:hover { text-decoration: none; }
+.issue-list-card:hover .issue-list-card__title { color: var(--c-primary); }
+.issue-list-card__no {
   font-family: var(--f-display);
   font-weight: 500;
-  font-size: 200px;
-  line-height: 0.85;
-  letter-spacing: -8px;
-  color: var(--scrim-light-6);
-  pointer-events: none;
+  font-size: clamp(54px, 7vw, 104px);
+  line-height: 0.82;
+  letter-spacing: -3px;
+  color: var(--c-surface-cream-strong);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  transition: color 0.25s ease;
 }
-.issue-list-card__cover--cream::after {
-  color: var(--shadow-ink-6);
+.issue-list-card:hover .issue-list-card__no { color: var(--coral-300); }
+.issue-list-card__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 62ch;
 }
-.issue-list-card__cover--coral::after {
-  color: var(--scrim-light-13);
-}
-.issue-list-card__cover-no {
+.issue-list-card__eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
   font-family: var(--f-mono);
   font-size: 12px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  position: relative;
-  z-index: 1;
+  color: var(--c-muted);
 }
-.issue-list-card__cover-theme {
-  position: relative;
-  z-index: 1;
-  font-family: var(--f-display);
-  font-weight: 500;
-  font-size: 22px;
-  line-height: 1.15;
-  letter-spacing: -0.3px;
-}
-.issue-list-card__body {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 10px;
+.issue-list-card__latest {
+  color: var(--c-primary);
+  background: var(--coral-tint);
+  border: 1px solid var(--coral-tint-strong);
+  border-radius: var(--r-pill);
+  padding: 2px 9px;
+  font-size: 11px;
+  letter-spacing: 1px;
 }
 .issue-list-card__date {
   font-family: var(--f-mono);
@@ -1748,26 +1724,27 @@ body[data-lang="zh"] .lang-en {
 .issue-list-card__title {
   font-family: var(--f-display);
   font-weight: 500;
-  font-size: 32px;
-  line-height: 1.15;
-  letter-spacing: -0.5px;
+  font-size: clamp(28px, 3.4vw, 38px);
+  line-height: 1.12;
+  letter-spacing: -0.6px;
   color: var(--c-ink);
   margin: 0;
 }
 .issue-list-card__lead {
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--c-body);
-  max-width: 56ch;
   margin: 0;
 }
 .issue-list-card__meta {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--s-md);
   font-size: 13px;
   color: var(--c-muted);
   align-items: center;
-  margin-top: 4px;
+  font-family: var(--f-mono);
+  margin-top: 2px;
 }
 .issue-list-card__meta .dot-sep {
   width: 3px;
@@ -1775,64 +1752,133 @@ body[data-lang="zh"] .lang-en {
   border-radius: 50%;
   background: var(--c-hairline);
 }
-@media (max-width: 760px) {
-  .issue-list-card {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 680px) {
+  .issue-list-card { grid-template-columns: 1fr; gap: 8px; }
+  .issue-list-card__no { font-size: 44px; }
 }
 
 /* =========================================================================
-   Category TOC (sticky chips on weekly issue)
+   Issue body layout: sticky sidebar TOC + content (weekly issue)
    ========================================================================= */
-.cat-toc {
-  position: sticky;
-  top: 64px;
-  z-index: 30;
-  background: var(--c-canvas);
-  border-bottom: 1px solid var(--c-hairline);
-  margin: var(--s-xl) 0;
-  padding: var(--s-sm) 0;
+.issue-layout {
+  margin-top: var(--s-xl);
 }
-.cat-toc__inner {
+/* Two-column (sidebar + content) only when a TOC is present; otherwise the
+   content stays full-width so a single-section issue doesn't get squished. */
+@media (min-width: 980px) {
+  .issue-layout--sidebar {
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: clamp(40px, 5vw, 72px);
+    align-items: start;
+  }
+}
+
+/* The TOC is a <details> so it can collapse on mobile; on desktop it stays
+   open (summary hidden) and the nav becomes a scrollable sticky sidebar that
+   holds the full section → article-title outline. */
+.issue-toc__panel { border: 0; }
+.issue-toc__summary { display: none; }
+
+@media (min-width: 980px) {
+  .issue-toc__sticky {
+    position: sticky;
+    top: 84px;
+    max-height: calc(100vh - 104px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: 4px;
+  }
+  .issue-toc__sticky::-webkit-scrollbar { width: 5px; }
+  .issue-toc__sticky::-webkit-scrollbar-thumb { background: var(--c-hairline); border-radius: 4px; }
+}
+
+.issue-toc__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.issue-toc__group + .issue-toc__group { margin-top: 4px; }
+
+/* Section row */
+.issue-toc__link {
   display: flex;
-  gap: var(--s-xs);
-  overflow-x: auto;
-  align-items: center;
-  scrollbar-width: thin;
-}
-.cat-toc__inner::-webkit-scrollbar { height: 4px; }
-.cat-toc__inner::-webkit-scrollbar-thumb { background: var(--c-hairline); border-radius: 4px; }
-.cat-toc__label {
-  font-family: var(--f-mono);
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--c-muted);
-  padding-right: var(--s-sm);
-  white-space: nowrap;
-}
-.cat-toc__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--r-pill);
-  font-size: 13px;
-  font-weight: 500;
+  align-items: baseline;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--r-md);
+  text-decoration: none;
   color: var(--c-body-strong);
-  background: transparent;
-  border: 1px solid var(--c-hairline);
-  white-space: nowrap;
-  text-decoration: none;
+  border-left: 2px solid transparent;
+  line-height: 1.3;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
-.cat-toc__chip:hover {
-  background: var(--c-surface-card);
+.issue-toc__link:hover { background: var(--c-surface-soft); color: var(--c-ink); text-decoration: none; }
+.issue-toc__link.is-active { color: var(--c-ink); background: var(--c-surface-soft); border-left-color: var(--c-primary); }
+.issue-toc__num { flex: 0 0 auto; font-family: var(--f-mono); font-size: 11px; color: var(--c-muted-soft); }
+.issue-toc__link.is-active .issue-toc__num { color: var(--c-primary); }
+.issue-toc__text { min-width: 0; font-size: 13px; font-weight: 600; }
+.issue-toc__count { flex: 0 0 auto; margin-left: auto; font-family: var(--f-mono); font-size: 11px; color: var(--c-muted-soft); }
+
+/* Article titles nested under each section */
+.issue-toc__sublist { list-style: none; margin: 1px 0 2px; padding: 0; }
+.issue-toc__sublink {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 10px 4px 30px;
   text-decoration: none;
-}
-.cat-toc__chip-count {
-  font-family: var(--f-mono);
-  font-size: 11px;
   color: var(--c-muted);
+  line-height: 1.4;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.issue-toc__sublink:hover { color: var(--c-ink); background: var(--c-surface-soft); text-decoration: none; }
+.issue-toc__subnum { flex: 0 0 auto; font-family: var(--f-mono); font-size: 10px; color: var(--c-muted-soft); }
+.issue-toc__subtext {
+  min-width: 0;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mobile: collapsible dropdown holding the full vertical outline. */
+@media (max-width: 979px) {
+  .issue-toc {
+    position: sticky;
+    top: 56px;
+    z-index: 30;
+    background: var(--c-canvas);
+    margin: var(--s-md) 0 var(--s-lg);
+  }
+  .issue-toc__panel {
+    border: 1px solid var(--c-hairline);
+    border-radius: var(--r-lg);
+    background: var(--c-canvas);
+    overflow: hidden;
+  }
+  .issue-toc__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--f-mono);
+    font-size: 12px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--c-ink);
+  }
+  .issue-toc__summary::-webkit-details-marker { display: none; }
+  .issue-toc__summary-meta { display: inline-flex; align-items: center; gap: 8px; color: var(--c-muted); }
+  .issue-toc__chev { transition: transform 0.2s ease; }
+  .issue-toc__panel[open] .issue-toc__chev { transform: rotate(180deg); }
+  .issue-toc__sticky {
+    max-height: 60vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 4px 8px 10px;
+    border-top: 1px solid var(--c-hairline);
+  }
 }
 
 /* =========================================================================
@@ -1841,9 +1887,12 @@ body[data-lang="zh"] .lang-en {
 .issue-section {
   padding: var(--s-xxl) 0;
   border-top: 1px solid var(--c-hairline-soft);
+  /* Offset anchor jumps below the sticky nav + sidebar top. */
+  scroll-margin-top: 88px;
 }
 .issue-section:first-of-type {
   border-top: 0;
+  padding-top: 0;
 }
 .issue-section__head {
   display: flex;
@@ -1881,11 +1930,14 @@ body[data-lang="zh"] .lang-en {
   flex-direction: column;
 }
 .pick-item {
+  position: relative;
   display: grid;
   grid-template-columns: 72px 1fr;
   gap: var(--s-lg);
   padding: var(--s-xl) 0;
   border-top: 1px solid var(--c-hairline-soft);
+  /* TOC article-title links jump here; clear the sticky nav. */
+  scroll-margin-top: 88px;
 }
 .pick-item:first-child { border-top: 0; padding-top: 0; }
 .pick-item__index {
@@ -1926,6 +1978,8 @@ body[data-lang="zh"] .lang-en {
   color: var(--c-primary);
   text-decoration: none;
 }
+/* Whole pick clickable: stretch the title link over the row; tags opt above. */
+.pick-item__title a::after { content: ""; position: absolute; inset: 0; }
 .pick-item__title .alt {
   display: block;
   font-family: var(--f-display);
@@ -1998,6 +2052,8 @@ body[data-lang="zh"] .lang-en {
 .pick-item__tag {
   color: var(--c-muted);
   text-decoration: none;
+  position: relative;
+  z-index: 1;
 }
 .pick-item__tag::before { content: "#"; opacity: 0.5; }
 .pick-item__tag:hover { color: var(--c-primary); text-decoration: none; }
@@ -3070,7 +3126,7 @@ body[data-lang="zh"] .lang-en {
 .nav-link:focus-visible,
 .lang-toggle button:focus-visible,
 .feed-tag:focus-visible,
-.cat-toc__chip:focus-visible,
+.issue-toc__link:focus-visible,
 .brand:focus-visible,
 .pick-item__tag:focus-visible {
   outline: 2px solid var(--c-primary);
@@ -3746,19 +3802,6 @@ body[data-lang="zh"] .lang-en {
   text-transform: uppercase;
 }
 
-/* ---- Sticky cat-toc fix (fixed-height + horizontal scroll inside) ---- */
-.cat-toc__inner {
-  overflow-x: auto;
-  scrollbar-width: thin;
-  flex-wrap: nowrap !important;
-  white-space: nowrap;
-}
-.cat-toc__chip {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-
 /* =========================================================================
    CJK line-break hygiene (added 2026-05-25)
    Prevents two-character compounds (闭环, 业余, 周一 etc.) from being broken
@@ -3933,7 +3976,7 @@ body[data-lang="zh"] .lang-en {
 .kbd,
 .queue-table,
 .verdict-pill,
-.cat-toc,
+.issue-toc,
 .day-picker__sub,
 .progress-steps,
 .section-head__eyebrow {

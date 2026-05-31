@@ -64,23 +64,25 @@ const fmtPubEn = (d: Date | null) => {
       <div class="issue-list">
         {issues.map((iss, i) => (
           <a class="issue-list-card" href={`/weekly/${iss.number}`}>
-            <div class={`issue-list-card__cover${i % 3 === 1 ? " issue-list-card__cover--cream" : ""}`} data-bigno={String(iss.number).padStart(3, "0")}>
-              <div class="issue-list-card__cover-no">Issue · {String(iss.number).padStart(3, "0")}{i === 0 ? " · CURRENT" : ""}</div>
-              <div class="issue-list-card__cover-theme">
-                <span class="lang-zh">{iss.titleZh}</span>
-                <span class="lang-en">{iss.titleEn}</span>
-              </div>
-            </div>
+            <div class="issue-list-card__no" aria-hidden="true">{String(iss.number).padStart(3, "0")}</div>
             <div class="issue-list-card__body">
-              <div class="issue-list-card__date">
-                {fmt(iss.dateStart, iss.dateEnd)}
-                {iss.publishedAt && (
-                  <>
-                    {" · "}
-                    <span class="lang-zh">{fmtPubZh(iss.publishedAt)}发布</span>
-                    <span class="lang-en">published {fmtPubEn(iss.publishedAt)}</span>
-                  </>
+              <div class="issue-list-card__eyebrow">
+                <span>Issue · {String(iss.number).padStart(3, "0")}</span>
+                {i === 0 && (
+                  <span class="issue-list-card__latest">
+                    <span class="lang-zh">最新</span><span class="lang-en">Latest</span>
+                  </span>
                 )}
+                <span class="issue-list-card__date">
+                  {fmt(iss.dateStart, iss.dateEnd)}
+                  {iss.publishedAt && (
+                    <>
+                      {" · "}
+                      <span class="lang-zh">{fmtPubZh(iss.publishedAt)}发布</span>
+                      <span class="lang-en">pub {fmtPubEn(iss.publishedAt)}</span>
+                    </>
+                  )}
+                </span>
               </div>
               <h2 class="issue-list-card__title">
                 <span class="lang-zh">{iss.titleZh}</span>
@@ -95,21 +97,21 @@ const fmtPubEn = (d: Date | null) => {
                   <span class="lang-zh">{iss.pick_count} 篇</span>
                   <span class="lang-en">{iss.pick_count} picks</span>
                 </span>
+                {iss.section_count > 0 && (
+                  <>
+                    <span class="dot-sep"></span>
+                    <span>
+                      <span class="lang-zh">{iss.section_count} 章</span>
+                      <span class="lang-en">{iss.section_count} sections</span>
+                    </span>
+                  </>
+                )}
                 {iss.read_minutes > 0 && (
                   <>
                     <span class="dot-sep"></span>
                     <span>
                       <span class="lang-zh">约 {iss.read_minutes} 分钟</span>
-                      <span class="lang-en">~{iss.read_minutes} min read</span>
-                    </span>
-                  </>
-                )}
-                {iss.section_count > 0 && (
-                  <>
-                    <span class="dot-sep"></span>
-                    <span>
-                      <span class="lang-zh">{iss.section_count} 个章节</span>
-                      <span class="lang-en">{iss.section_count} sections</span>
+                      <span class="lang-en">~{iss.read_minutes} min</span>
                     </span>
                   </>
                 )}
