@@ -223,6 +223,9 @@ export default {
   // worker wall-time ceiling. A platform eviction bypasses the in-worker
   // try/catch, so without this a stuck row would show "running…" forever.
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    // Log the exact cron string Cloudflare passes so we can confirm scheduled()
+    // fires and that the daily gate below matches (wrangler tail / dashboard).
+    console.log(`scheduled tick: cron="${controller.cron}"`);
     // Reapers run on every cron tick (cheap + idempotent).
     const queued = await reapStaleLlmQueueWait(env);
     if (queued > 0) console.log(`reaper: marked ${queued} stale LLM queue wait submission(s) failed`);
