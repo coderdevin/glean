@@ -149,8 +149,13 @@ ${noteHtml}
 </div>`;
         })
         .join("");
-      return `<tr><td class="sec" style="padding:26px 32px 0 32px;">
-<div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${ACCENT};font-weight:700;margin-bottom:6px;"><span style="display:inline-block;min-width:22px;padding:2px 7px;margin-right:8px;border-radius:6px;background:${PAPER};color:${ACCENT};border:1px solid ${RULE};letter-spacing:0;">${secNo(gi)}</span>${esc(heading)}</div>
+      // Number + heading share ONE tinted block (a section banner with a left
+      // accent rule). A single bg cell — number and title sit on the same color
+      // block, and there's no inline-block for Outlook to break onto two lines.
+      return `<tr><td class="sec" style="padding:28px 32px 0 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;"><tr>
+<td style="background:${PAPER};border-left:4px solid ${ACCENT};padding:10px 16px;line-height:1.35;"><span style="font-size:14px;font-weight:700;color:${ACCENT};">${secNo(gi)}</span><span style="color:${MUTED};">&nbsp;·&nbsp;</span><span style="font-size:18px;font-weight:700;color:${ACCENT};">${esc(heading)}</span></td>
+</tr></table>
 ${items}
 </td></tr>`;
     })
@@ -174,7 +179,7 @@ ${items}
   /* Phones: trim the 32px side padding so narrow screens aren't cramped.
      Honored by Apple Mail / iOS Mail / Gmail app; desktop clients ignore it. */
   @media only screen and (max-width: 480px) {
-    .sheet td { padding-left: 18px !important; padding-right: 18px !important; }
+    .sheet > tbody > tr > td { padding-left: 18px !important; padding-right: 18px !important; }
   }
   @media print {
     html, body { background: #ffffff !important; }
