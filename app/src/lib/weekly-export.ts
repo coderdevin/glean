@@ -21,7 +21,8 @@ export type Lang = "zh" | "en";
 
 const ACCENT = "#b1543a";
 const INK = "#2b2722";
-const MUTED = "#6b6357";
+const BODY = "#46403a"; // body copy — darker than MUTED for readable contrast
+const MUTED = "#6b6357"; // meta / labels only
 const PAPER = "#faf8f4";
 const CARD = "#ffffff";
 const RULE = "#e7e1d8";
@@ -105,7 +106,7 @@ export function renderWeeklyExportHtml(args: {
   // Contents — a scannable index of section names + numbered article titles,
   // shown BEFORE the full details so a reader (or a printed page-one) sees the
   // shape of the issue at a glance. Boxed in its own table so Outlook keeps bg.
-  const contentsHtml = `<tr><td style="padding:22px 32px 0 32px;">
+  const contentsHtml = `<tr><td style="padding:22px 24px 0 24px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${RULE};border-radius:10px;background:${PAPER};">
 <tr><td style="padding:16px 18px;">
 <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};font-weight:700;margin-bottom:6px;">${zh ? "目录 · Contents" : "Contents · 目录"}</div>
@@ -144,7 +145,7 @@ ${g.picks
           return `<div class="pick" style="padding:16px 0;border-bottom:1px solid ${RULE};">
 <div style="font-size:12px;color:${MUTED};margin-bottom:4px;">${meta}</div>
 <a href="${base}/a/${esc(p.slug)}" style="font-size:17px;font-weight:600;color:${INK};text-decoration:none;line-height:1.4;"><span style="color:${MUTED};font-weight:500;">${n}.</span> ${esc(pickTitle(p))}</a>
-<p style="margin:6px 0 0 0;font-size:14px;line-height:1.65;color:${MUTED};">${esc(pSummary)}</p>
+<p style="margin:6px 0 0 0;font-size:14.5px;line-height:1.7;color:${BODY};">${esc(pSummary)}</p>
 ${noteHtml}
 </div>`;
         })
@@ -152,7 +153,7 @@ ${noteHtml}
       // Number + heading share ONE tinted block (a section banner with a left
       // accent rule). A single bg cell — number and title sit on the same color
       // block, and there's no inline-block for Outlook to break onto two lines.
-      return `<tr><td class="sec" style="padding:28px 32px 0 32px;">
+      return `<tr><td class="sec" style="padding:28px 24px 0 24px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;"><tr>
 <td style="background:${PAPER};border-left:4px solid ${ACCENT};padding:10px 16px;line-height:1.35;"><span style="font-size:14px;font-weight:700;color:${ACCENT};">${secNo(gi)}</span><span style="color:${MUTED};">&nbsp;·&nbsp;</span><span style="font-size:18px;font-weight:700;color:${ACCENT};">${esc(heading)}</span></td>
 </tr></table>
@@ -178,8 +179,8 @@ ${items}
   a { text-decoration: none; }
   /* Phones: trim the 32px side padding so narrow screens aren't cramped.
      Honored by Apple Mail / iOS Mail / Gmail app; desktop clients ignore it. */
-  @media only screen and (max-width: 480px) {
-    .sheet > tbody > tr > td { padding-left: 18px !important; padding-right: 18px !important; }
+  @media only screen and (max-width: 600px) {
+    .sheet > tbody > tr > td { padding-left: 14px !important; padding-right: 14px !important; }
   }
   @media print {
     html, body { background: #ffffff !important; }
@@ -208,15 +209,15 @@ ${styleBlock}
 <tr><td align="center" style="padding:16px;">
 <!--[if mso]><table role="presentation" width="760" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
 <table role="presentation" class="sheet" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:760px;background:${CARD};border:1px solid ${RULE};border-radius:12px;overflow:hidden;">
-<tr><td style="padding:32px 32px 0 32px;">
+<tr><td style="padding:30px 24px 0 24px;">
 <div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;font-size:0;line-height:3px;">&nbsp;</div>
 <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${eyebrow}</div>
 <h1 style="margin:8px 0 12px 0;font-size:26px;line-height:1.25;color:${INK};">${esc(title)}</h1>
-<p style="margin:0;font-size:15px;line-height:1.75;color:${MUTED};">${esc(intro)}</p>
+<p style="margin:0;font-size:15px;line-height:1.75;color:${BODY};">${esc(intro)}</p>
 </td></tr>
 ${contentsHtml}
 ${sectionsHtml}
-<tr><td class="web-cta" style="padding:26px 32px 34px 32px;">
+<tr><td class="web-cta" style="padding:26px 24px 34px 24px;">
 <a href="${zh ? zhUrl : enUrl}" style="display:inline-block;padding:11px 24px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${readOnWeb}</a>
 </td></tr>
 </table>

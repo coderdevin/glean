@@ -88,8 +88,8 @@ assert.ok(
   "apple mail meta present",
 );
 assert.ok(zh.includes("[if mso]"), "MSO conditional (Outlook font fallback) present");
-// Full-width layout: no fixed 600px cap that would waste space when pasted.
-assert.ok(!/max-width:\s*600px/.test(zh), "no fixed 600px width cap");
+// Body column capped at a comfortable reading width (not the old narrow 600).
+assert.ok(/max-width:\s*760px/.test(zh), "body capped at 760px reading width");
 
 // Print support for browser PDF.
 assert.ok(zh.includes("@media print"), "print stylesheet present");
