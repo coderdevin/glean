@@ -22,10 +22,19 @@ assert.equal(normalizeSlug(""), ""); // empty stays empty
   assert.deepEqual(dropped, []);
 }
 
-// invalid family → falls back to the analysis category
+// family is now free-form (a category slug): an arbitrary slug is kept (normalized)
 {
   const { valid } = sanitizeProposedTags(
-    [{ slug: "cli", name_zh: "命令行", name_en: "CLI", family: "bogus" }],
+    [{ slug: "cli", name_zh: "命令行", name_en: "CLI", family: "Dev Tools" }],
+    "code",
+  );
+  assert.equal(valid[0]!.family, "dev-tools");
+}
+
+// missing / empty family → falls back to the analysis category
+{
+  const { valid } = sanitizeProposedTags(
+    [{ slug: "cli", name_zh: "命令行", name_en: "CLI", family: "" }],
     "code",
   );
   assert.equal(valid[0]!.family, "code");

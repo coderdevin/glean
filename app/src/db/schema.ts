@@ -43,7 +43,9 @@ export const picks = sqliteTable(
     sourceHost: text("source_host").notNull(),
     readMinutes: integer("read_minutes").notNull().default(5),
 
-    category: text("category", { enum: CATEGORIES }).notNull(),
+    // Free-form category slug — references the self-growing `categories` table
+    // (formerly the infra/data/code enum). Plain text; sanitizeCategory validates.
+    category: text("category").notNull(),
 
     dailyDate: text("daily_date").notNull(),
     weeklyIssueId: text("weekly_issue_id"),
@@ -105,12 +107,23 @@ export const weeklyIssues = sqliteTable("weekly_issues", {
     .$defaultFn(() => new Date()),
 });
 
-/** Taxonomy — small finite list. */
+/** Self-growing tag taxonomy. `family` is a category slug (see `categories`). */
 export const tags = sqliteTable("tags", {
   slug: text("slug").primaryKey(),
   nameZh: text("name_zh").notNull(),
   nameEn: text("name_en").notNull(),
-  family: text("family", { enum: CATEGORIES }).notNull(),
+  family: text("family").notNull(),
+});
+
+/** Self-growing category taxonomy — also used as `tags.family` and
+ *  `picks.category`. The 3 seeded rows (infra/data/code) keep hand-tuned brand
+ *  colors; any new category's badge color is derived from its slug at render
+ *  (color = null). Grows via upsert at ingest, like tags. */
+export const categories = sqliteTable("categories", {
+  slug: text("slug").primaryKey(),
+  nameZh: text("name_zh").notNull(),
+  nameEn: text("name_en").notNull(),
+  color: text("color"),
 });
 
 export const pickTags = sqliteTable(
@@ -149,7 +162,7 @@ export const submissions = sqliteTable(
     aiSummaryEn: text("ai_summary_en"),
     aiBulletsJson: text("ai_bullets_json"),
     aiTagsJson: text("ai_tags_json"),
-    aiCategory: text("ai_category", { enum: CATEGORIES }),
+    aiCategory: text("ai_category"),
     aiScore: real("ai_score"),
     aiSubscoresJson: text("ai_subscores_json"),
     aiGlossaryJson: text("ai_glossary_json"),
@@ -284,6 +297,7 @@ export type Pick = typeof picks.$inferSelect;
 export type NewPick = typeof picks.$inferInsert;
 export type WeeklyIssue = typeof weeklyIssues.$inferSelect;
 export type Tag = typeof tags.$inferSelect;
+export type CategoryRow = typeof categories.$inferSelect;
 export type Submission = typeof submissions.$inferSelect;
 export type NewSubmission = typeof submissions.$inferInsert;
 export type Subscriber = typeof subscribers.$inferSelect;

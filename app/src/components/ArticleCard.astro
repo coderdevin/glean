@@ -16,10 +16,10 @@ export interface ArticleCardPick {
   source_url: string;
   source_host: string;
   read_minutes: number;
-  category: "infra" | "data" | "code";
+  category: string;
   submitter_name: string | null;
   published_at: Date | null;
-  tags: { slug: string; name_zh: string; name_en: string; family: "infra" | "data" | "code" }[];
+  tags: { slug: string; name_zh: string; name_en: string; family: string }[];
 }
 
 interface Props {

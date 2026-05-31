@@ -27,6 +27,7 @@ import {
   picks,
   pickTags,
   tags as tagsTable,
+  categories as categoriesTable,
   weeklyIssues,
   type EventStage,
   type EventStatus,
@@ -42,6 +43,7 @@ import {
 } from "./llm";
 import { extractFromUrl } from "./extract";
 import { sanitizeProposedTags } from "./tags";
+import { sanitizeCategory } from "./category";
 import { bustForPick, bustForWeekly } from "./cache";
 import { repairWeeklyDraft } from "./weekly";
 import { ulid } from "./ulid";
@@ -334,6 +336,14 @@ export async function processLlm(
     .orderBy(sql`(select count(*) from pick_tags pt where pt.tag_slug = ${tagsTable.slug}) desc`)
     .limit(60);
 
+  // Existing categories shown to the model as reuse hints (same soft-reuse as
+  // tags; categories are few so no count ordering needed).
+  const categoriesHint = await db
+    .select({ slug: categoriesTable.slug, nameZh: categoriesTable.nameZh, nameEn: categoriesTable.nameEn })
+    .from(categoriesTable)
+    .orderBy(categoriesTable.slug)
+    .limit(60);
+
   const sourceHost = (() => {
     try { return new URL(row.url).host; } catch { return undefined; }
   })();
@@ -348,6 +358,7 @@ export async function processLlm(
     title: titleSeed,
     body,
     taxonomy,
+    categories: categoriesHint,
     modelOverride: opts.modelOverride,
     submissionId: id,
     sourceHost,
@@ -356,20 +367,39 @@ export async function processLlm(
   });
 
   console.log(`processLlm ${id}: phase 1 done latency=${analysis.latencyMs}ms tokens=${analysis.totalTokens ?? "?"}`);
+  // Free-form category: validate/normalize the model's proposal and upsert into
+  // the self-growing categories table. Existing rows (incl. the seeded
+  // infra/data/code with hand-tuned colors) are preserved by onConflictDoNothing.
+  const category = sanitizeCategory(analysis.output.category, "code");
+  await db
+    .insert(categoriesTable)
+    .values({ slug: category.slug, nameZh: category.nameZh, nameEn: category.nameEn, color: null })
+    .onConflictDoNothing();
+
   // Free-form tags: validate/normalize the model's proposals, upsert any new
   // slugs into the self-growing tags table (with their LLM-written bilingual
   // names + family), and keep aiTagsJson as a plain slug[] so the downstream
   // publish / cache / admin paths stay unchanged. Existing slugs are preserved
-  // by onConflictDoNothing — the LLM never overwrites a curated name.
+  // by onConflictDoNothing — the LLM never overwrites a curated name. A tag's
+  // family is a category slug; ensure each one exists as a category row too.
   const { valid: proposedTags, dropped: tagsDropped } = sanitizeProposedTags(
     analysis.output.tags,
-    analysis.output.category,
+    category.slug,
   );
+  const familiesSeen = new Set<string>([category.slug]);
   for (const t of proposedTags) {
     await db
       .insert(tagsTable)
       .values({ slug: t.slug, nameZh: t.nameZh, nameEn: t.nameEn, family: t.family })
       .onConflictDoNothing();
+    if (!familiesSeen.has(t.family)) {
+      familiesSeen.add(t.family);
+      const fam = sanitizeCategory(t.family, t.family);
+      await db
+        .insert(categoriesTable)
+        .values({ slug: fam.slug, nameZh: fam.nameZh, nameEn: fam.nameEn, color: null })
+        .onConflictDoNothing();
+    }
   }
   const tagsKept = proposedTags.map((t) => t.slug);
 
@@ -388,7 +418,7 @@ export async function processLlm(
       // still can't publish, but the old sections aren't destroyed.
       aiSectionsError: null,
       aiTagsJson: JSON.stringify(tagsKept),
-      aiCategory: analysis.output.category,
+      aiCategory: category.slug,
       aiScore: analysis.output.score,
       aiSubscoresJson: analysis.output.subscores ? JSON.stringify(analysis.output.subscores) : null,
       aiGlossaryJson: analysis.output.glossary.length ? JSON.stringify(analysis.output.glossary) : null,

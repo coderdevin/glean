@@ -4,34 +4,40 @@ import Site from "~/layouts/Site.astro";
 import Lang from "~/components/Lang.astro";
 import { localizedPath } from "~/lib/i18n";
 import { db } from "~/db/client";
-import { allTagsWithCounts } from "~/lib/queries";
-import { CATEGORIES } from "~/db/schema";
+import { allTagsWithCounts, allCategories } from "~/lib/queries";
+import { categoryBadge } from "~/lib/category";
 
 const lang = Astro.locals.lang ?? "zh";
 const L = (p: string): string => localizedPath(p, lang);
 
 const env = Astro.locals.runtime.env;
 const allTags = await allTagsWithCounts(db(env.DB));
+const cats = await allCategories(db(env.DB));
 
 Astro.response.headers.set(
   "Cache-Control",
   "public, max-age=60, s-maxage=600, stale-while-revalidate=1800",
 );
 
-const FAMILY_LABELS: Record<(typeof CATEGORIES)[number], { zh: string; en: string }> = {
-  infra: { zh: "基础设施", en: "Infrastructure" },
-  data: { zh: "数据 / AI", en: "Data / AI" },
-  code: { zh: "工程 / 代码", en: "Engineering / Code" },
-};
-
-const grouped = CATEGORIES.map((key) => ({
-  key,
-  zh: FAMILY_LABELS[key].zh,
-  en: FAMILY_LABELS[key].en,
-  tags: allTags
-    .filter((t) => t.family === key)
-    .sort((a, b) => b.count - a.count || a.slug.localeCompare(b.slug)),
-}));
+// Group tags by their (self-growing) category family. Labels come from the
+// categories table; a family with no category row falls back to its slug.
+// Families are ordered by total pick count desc so the busiest territory leads.
+const catName = new Map(cats.map((c) => [c.slug, { zh: c.nameZh, en: c.nameEn }]));
+const families = [...new Set(allTags.map((t) => t.family))];
+const grouped = families
+  .map((key) => ({
+    key,
+    zh: catName.get(key)?.zh ?? key,
+    en: catName.get(key)?.en ?? key,
+    tags: allTags
+      .filter((t) => t.family === key)
+      .sort((a, b) => b.count - a.count || a.slug.localeCompare(b.slug)),
+  }))
+  .sort(
+    (a, b) =>
+      b.tags.reduce((s, t) => s + t.count, 0) - a.tags.reduce((s, t) => s + t.count, 0) ||
+      a.key.localeCompare(b.key),
+  );
 const totalPicks = allTags.reduce((s, t) => s + t.count, 0);
 ---
 <Site
@@ -72,16 +78,18 @@ const totalPicks = allTags.reduce((s, t) => s + t.count, 0);
               <Lang zh={group.zh} en={group.en} />
             </div>
             <div class="tag-grid">
-              {group.tags.map((t) => (
+              {group.tags.map((t) => {
+                const b = categoryBadge(t.family);
+                return (
                 <a
                   href={L(`/tag/${t.slug}`)}
-                  class={`badge badge--cat-${t.family} tag-grid__item${t.count === 0 ? " is-empty" : ""}`}
-                  style="text-decoration: none"
+                  class={`badge ${b.className} tag-grid__item${t.count === 0 ? " is-empty" : ""}`}
+                  style={`text-decoration: none;${b.style}`}
                 >
                   <Lang zh={t.name_zh ?? undefined} en={t.name_en ?? undefined} />
                   <span class="tag-grid__count">· {t.count}</span>
                 </a>
-              ))}
+              )})}
             </div>
           </div>
         )

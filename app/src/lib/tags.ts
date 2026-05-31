@@ -9,9 +9,6 @@
  * are validated, missing names are derived, duplicates collapse, and the list
  * is capped. ingest.ts then upserts the survivors into the `tags` table.
  */
-import { CATEGORIES, type Category } from "../db/schema";
-
-const FAMILIES = new Set<string>(CATEGORIES);
 const MAX_TAGS = 6;
 const MAX_SLUG_LEN = 40;
 
@@ -19,7 +16,9 @@ export interface NormalizedTag {
   slug: string;
   nameZh: string;
   nameEn: string;
-  family: Category;
+  /** A category slug (free-form; see categories table). Falls back to the
+   *  pick's category when the model omits it. */
+  family: string;
 }
 
 /** Coerce an arbitrary string to a safe slug: lowercase ascii kebab-case.
@@ -36,7 +35,7 @@ export function normalizeSlug(raw: string): string {
 }
 
 /** Title-case a slug for an English display-name fallback ("vector-db" → "Vector Db"). */
-function titleCaseSlug(slug: string): string {
+export function titleCaseSlug(slug: string): string {
   return slug
     .split("-")
     .filter(Boolean)
@@ -57,7 +56,7 @@ function titleCaseSlug(slug: string): string {
  */
 export function sanitizeProposedTags(
   raw: unknown,
-  fallbackFamily: Category,
+  fallbackFamily: string,
 ): { valid: NormalizedTag[]; dropped: string[] } {
   if (!Array.isArray(raw)) return { valid: [], dropped: [] };
 
@@ -83,9 +82,9 @@ export function sanitizeProposedTags(
     if (seen.has(slug)) continue;
     seen.add(slug);
 
-    const family = (typeof t.family === "string" && FAMILIES.has(t.family)
-      ? t.family
-      : fallbackFamily) as Category;
+    // family is a free-form category slug; normalize it, fall back to the
+    // pick's category when missing/blank.
+    const family = normalizeSlug(typeof t.family === "string" ? t.family : "") || fallbackFamily;
     const nameZh = typeof t.name_zh === "string" && t.name_zh.trim() ? t.name_zh.trim() : slug;
     const nameEn =
       typeof t.name_en === "string" && t.name_en.trim() ? t.name_en.trim() : titleCaseSlug(slug);

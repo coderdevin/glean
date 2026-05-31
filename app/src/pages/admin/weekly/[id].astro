@@ -7,6 +7,7 @@ import { weeklyById, confirmedSubscriberCount } from "~/lib/queries";
 import { eq } from "drizzle-orm";
 import type { LayoutSection } from "~/lib/weekly";
 import { siteTz, formatDateISO } from "~/lib/datetime";
+import { categoryBadge } from "~/lib/category";
 
 const env = Astro.locals.runtime.env;
 const id = Astro.params.id!;
@@ -129,11 +130,13 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
                         <span class="wk-pick__zh">{p?.titleZh ?? pid}</span>
                         {p?.titleEn && <span class="wk-pick__en">{p.titleEn}</span>}
                       </span>
-                      {p && (
-                        <span class={`badge badge--cat-${p.category} wk-pick__cat`}>
+                      {p && (() => {
+                        const b = categoryBadge(p.category);
+                        return (
+                        <span class={`badge ${b.className} wk-pick__cat`} style={b.style}>
                           {catLabel[p.category] ?? p.category}
                         </span>
-                      )}
+                      )})()}
                     </label>
                   </li>
                 );

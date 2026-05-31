@@ -1,23 +1,25 @@
 ---
+import { categoryBadge } from "~/lib/category";
 interface Props {
   slug: string;
   nameZh: string;
   nameEn: string;
-  family?: "infra" | "data" | "code";
+  family?: string;
   href?: string;
 }
 const { nameZh, nameEn, family, href } = Astro.props;
-const badgeClass = ["badge", family ? `badge--cat-${family}` : ""].filter(Boolean).join(" ");
+const b = family ? categoryBadge(family) : { className: "", style: "" };
+const badgeClass = ["badge", b.className].filter(Boolean).join(" ");
 import Lang from "./Lang.astro";
 ---
 {href ? (
   <a href={href} class="tag-link">
-    <span class={badgeClass}>
+    <span class={badgeClass} style={b.style}>
       <Lang zh={nameZh} en={nameEn} />
     </span>
   </a>
 ) : (
-  <span class={badgeClass}>
+  <span class={badgeClass} style={b.style}>
     <Lang zh={nameZh} en={nameEn} />
   </span>
 )}

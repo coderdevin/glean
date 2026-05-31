@@ -9,10 +9,12 @@ import {
   pickTags,
   picks,
   tags as tagsTable,
+  categories as categoriesTable,
   weeklyIssues,
   weeklyDeliveries,
   subscribers,
   articleAnnotations,
+  type CategoryRow,
 } from "~/db/schema";
 import type { ArticleCardPick } from "~/components/ArticleCard.astro";
 import type { WeeklyCoverIssue } from "~/components/WeeklyCover.astro";
@@ -39,7 +41,7 @@ interface PickRow {
   source_url: string;
   source_host: string;
   read_minutes: number;
-  category: "infra" | "data" | "code";
+  category: string;
   daily_date: string;
   weekly_issue_id: string | null;
   position_in_day: number;
@@ -49,7 +51,7 @@ interface PickRow {
 
 function rowsToCardPicks(
   rows: PickRow[],
-  tagMap: Map<string, { slug: string; name_zh: string; name_en: string; family: "infra" | "data" | "code" }[]>,
+  tagMap: Map<string, { slug: string; name_zh: string; name_en: string; family: string }[]>,
 ): ArticleCardPick[] {
   return rows.map((r) => ({
     id: r.id,
@@ -79,7 +81,7 @@ function safeJson<T>(s: string | null | undefined): T {
 async function attachTags(
   db: DB,
   pickIds: string[],
-): Promise<Map<string, { slug: string; name_zh: string; name_en: string; family: "infra" | "data" | "code" }[]>> {
+): Promise<Map<string, { slug: string; name_zh: string; name_en: string; family: string }[]>> {
   if (pickIds.length === 0) return new Map();
   const rows = await db
     .select({
@@ -93,7 +95,7 @@ async function attachTags(
     .innerJoin(tagsTable, eq(pickTags.tagSlug, tagsTable.slug))
     .where(inArray(pickTags.pickId, pickIds));
 
-  const map = new Map<string, { slug: string; name_zh: string; name_en: string; family: "infra" | "data" | "code" }[]>();
+  const map = new Map<string, { slug: string; name_zh: string; name_en: string; family: string }[]>();
   for (const r of rows) {
     const list = map.get(r.pick_id) ?? [];
     list.push({ slug: r.slug, name_zh: r.name_zh, name_en: r.name_en, family: r.family });
@@ -396,7 +398,7 @@ export async function adjacentPicks(
 }
 
 /** All distinct tags with current pick counts (for the tag-edge page sidebar). */
-export async function allTagsWithCounts(db: DB): Promise<{ slug: string; name_zh: string; name_en: string; family: "infra" | "data" | "code"; count: number }[]> {
+export async function allTagsWithCounts(db: DB): Promise<{ slug: string; name_zh: string; name_en: string; family: string; count: number }[]> {
   const result = await db
     .select({
       slug: tagsTable.slug,
@@ -408,6 +410,11 @@ export async function allTagsWithCounts(db: DB): Promise<{ slug: string; name_zh
     .from(tagsTable)
     .orderBy(tagsTable.slug);
   return result as any;
+}
+
+/** All categories (for tag-index grouping labels + admin category input). */
+export async function allCategories(db: DB): Promise<CategoryRow[]> {
+  return db.select().from(categoriesTable).orderBy(categoriesTable.slug);
 }
 
 /** Admin: all issues incl. drafts, newest first. */

@@ -5,6 +5,7 @@ import Lang from "~/components/Lang.astro";
 import { localizedPath } from "~/lib/i18n";
 import { db } from "~/db/client";
 import { pickBySlug, adjacentPicks } from "~/lib/queries";
+import { categoryBadge } from "~/lib/category";
 import { formatDateISO, formatTimeHM, siteTz } from "~/lib/datetime";
 import MarkdownIt from "markdown-it";
 
@@ -288,11 +289,13 @@ const breadcrumbLd = {
                   <Lang zh="标签" en="Tags" />
                 </div>
                 <div class="aside-tags">
-                  {pick.tags.map((t) => (
-                    <a href={L(`/tag/${t.slug}`)} class={`badge badge--cat-${t.family}`}>
+                  {pick.tags.map((t) => {
+                    const b = categoryBadge(t.family);
+                    return (
+                    <a href={L(`/tag/${t.slug}`)} class={`badge ${b.className}`} style={b.style}>
                       <Lang zh={t.name_zh} en={t.name_en} />
                     </a>
-                  ))}
+                  )})}
                 </div>
               </div>
 

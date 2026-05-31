@@ -7,6 +7,7 @@ import { submissions, submissionEvents } from "~/db/schema";
 import { getAdminProcessingStatus } from "~/lib/adminProcessingStatus";
 import { formatTimeHM, formatTimeHMS, siteTz } from "~/lib/datetime";
 import { isInFlight } from "~/lib/submissionStatus";
+import { allCategories } from "~/lib/queries";
 import { asc, eq } from "drizzle-orm";
 
 const id = Astro.params.id;
@@ -17,6 +18,10 @@ const drizzle = db(env.DB);
 const rows = await drizzle.select().from(submissions).where(eq(submissions.id, id)).limit(1);
 const row = rows[0];
 if (!row) return new Response("Not found", { status: 404 });
+
+// Existing categories for the editor's category combobox (free-form: the editor
+// can pick an existing slug or type a new one).
+const cats = await allCategories(drizzle);
 
 // Position inside the "ready" queue, so J/K (prev/next) can wire up.
 // Only computed when the current row is itself ready — for other statuses
@@ -526,11 +531,17 @@ const sectionsTotalChars = aiSections.reduce(
 
           <div class="r2-meta">
             <span><span class="r2-meta__label">cat</span>
-              <select class="r2-meta__edit" name="category">
-                <option value="code" selected={row.aiCategory === "code"}>code</option>
-                <option value="infra" selected={row.aiCategory === "infra"}>infra</option>
-                <option value="data" selected={row.aiCategory === "data"}>data</option>
-              </select>
+              <input
+                class="r2-meta__edit"
+                name="category"
+                list="category-options"
+                value={row.aiCategory ?? "code"}
+                autocomplete="off"
+                size="12"
+              />
+              <datalist id="category-options">
+                {cats.map((c) => <option value={c.slug}>{c.nameZh}</option>)}
+              </datalist>
             </span>
             <span class="r2-meta__sep">·</span>
             <span><span class="r2-meta__label">score</span>

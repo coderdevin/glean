@@ -11,8 +11,9 @@
 import { asc, eq, sql } from "drizzle-orm";
 import { ulid } from "./ulid";
 import { db } from "~/db/client";
-import { pickTags, picks, submissions, tags, type Submission } from "~/db/schema";
+import { pickTags, picks, submissions, tags, categories, type Submission } from "~/db/schema";
 import { slugify } from "./adminForm";
+import { sanitizeCategory } from "./category";
 import { bustForPick } from "./cache";
 import { siteTz, todayInSiteTz } from "./datetime";
 import { logEvent } from "./ingest";
@@ -136,6 +137,16 @@ export async function publishSubmission(
         publishedAt: now,
       },
     });
+
+  // Ensure the (possibly hand-typed) category exists as a category row so tag
+  // grouping + badge naming work. Existing rows keep their names/colors.
+  {
+    const c = sanitizeCategory(fields.category, "code");
+    await drizzleDb
+      .insert(categories)
+      .values({ slug: c.slug, nameZh: c.nameZh, nameEn: c.nameEn, color: null })
+      .onConflictDoNothing();
+  }
 
   await drizzleDb.delete(pickTags).where(eq(pickTags.pickId, pickId));
   if (fields.tagSlugs.length > 0) {
