@@ -87,7 +87,9 @@ assert.ok(
   zh.includes("x-apple-disable-message-reformatting"),
   "apple mail meta present",
 );
-assert.ok(zh.includes("[if mso]"), "MSO ghost-table conditional present");
+assert.ok(zh.includes("[if mso]"), "MSO conditional (Outlook font fallback) present");
+// Full-width layout: no fixed 600px cap that would waste space when pasted.
+assert.ok(!/max-width:\s*600px/.test(zh), "no fixed 600px width cap");
 
 // Print support for browser PDF.
 assert.ok(zh.includes("@media print"), "print stylesheet present");

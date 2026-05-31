@@ -194,10 +194,9 @@ ${styleBlock}
 </head>
 <body style="margin:0;padding:0;background:${PAPER};color:${INK};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${PAPER};opacity:0;">${esc(intro.slice(0, 110))}</div>
-<table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAPER};padding:24px 12px;">
+<table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAPER};padding:16px 16px;">
 <tr><td align="center">
-<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-<table role="presentation" class="sheet" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:${CARD};border:1px solid ${RULE};border-radius:12px;overflow:hidden;">
+<table role="presentation" class="sheet" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${CARD};border:1px solid ${RULE};border-radius:12px;overflow:hidden;">
 <tr><td style="padding:32px 32px 0 32px;">
 <div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;font-size:0;line-height:3px;">&nbsp;</div>
 <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${eyebrow}</div>
@@ -210,7 +209,6 @@ ${sectionsHtml}
 <a href="${zh ? zhUrl : enUrl}" style="display:inline-block;padding:11px 24px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${readOnWeb}</a>
 </td></tr>
 </table>
-<!--[if mso]></td></tr></table><![endif]-->
 </td></tr>
 </table>
 </body>
