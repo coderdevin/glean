@@ -41,6 +41,7 @@ import {
   type LlmEnv,
 } from "./llm";
 import { extractFromUrl } from "./extract";
+import { sanitizeProposedTags } from "./tags";
 import { bustForPick, bustForWeekly } from "./cache";
 import { repairWeeklyDraft } from "./weekly";
 import { ulid } from "./ulid";
@@ -323,8 +324,15 @@ export async function processLlm(
     meta: { model: processingModel, body_chars: body.length },
   });
 
-  const taxonomyRows = await db.select({ slug: tagsTable.slug }).from(tagsTable);
-  const taxonomy = taxonomyRows.map((t) => t.slug);
+  // Existing tags shown to the model as reuse hints (most-used first, capped so
+  // a large taxonomy doesn't blow the prompt budget). NOT a whitelist — the
+  // model proposes tags freely; sanitizeProposedTags + the upsert below grow
+  // the table with any new slugs it mints.
+  const taxonomy = await db
+    .select({ slug: tagsTable.slug, nameZh: tagsTable.nameZh, nameEn: tagsTable.nameEn })
+    .from(tagsTable)
+    .orderBy(sql`(select count(*) from pick_tags pt where pt.tag_slug = ${tagsTable.slug}) desc`)
+    .limit(60);
 
   const sourceHost = (() => {
     try { return new URL(row.url).host; } catch { return undefined; }
@@ -348,9 +356,22 @@ export async function processLlm(
   });
 
   console.log(`processLlm ${id}: phase 1 done latency=${analysis.latencyMs}ms tokens=${analysis.totalTokens ?? "?"}`);
-  const taxonomySet = new Set(taxonomy);
-  const tagsKept = analysis.output.tags.filter((t) => taxonomySet.has(t)).slice(0, 3);
-  const tagsDropped = analysis.output.tags.filter((t) => !taxonomySet.has(t));
+  // Free-form tags: validate/normalize the model's proposals, upsert any new
+  // slugs into the self-growing tags table (with their LLM-written bilingual
+  // names + family), and keep aiTagsJson as a plain slug[] so the downstream
+  // publish / cache / admin paths stay unchanged. Existing slugs are preserved
+  // by onConflictDoNothing — the LLM never overwrites a curated name.
+  const { valid: proposedTags, dropped: tagsDropped } = sanitizeProposedTags(
+    analysis.output.tags,
+    analysis.output.category,
+  );
+  for (const t of proposedTags) {
+    await db
+      .insert(tagsTable)
+      .values({ slug: t.slug, nameZh: t.nameZh, nameEn: t.nameEn, family: t.family })
+      .onConflictDoNothing();
+  }
+  const tagsKept = proposedTags.map((t) => t.slug);
 
   await db
     .update(submissions)
