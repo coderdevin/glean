@@ -1593,14 +1593,17 @@ body[data-lang="zh"] .lang-en {
 .issue-masthead::before {
   content: attr(data-no);
   position: absolute;
-  right: -40px;
-  top: -60px;
+  right: clamp(-16px, 1vw, 28px);
+  top: 50%;
+  transform: translateY(-50%);
   font-family: var(--f-display);
   font-weight: 500;
-  font-size: clamp(180px, 26vw, 320px);
-  line-height: 0.9;
-  letter-spacing: -10px;
-  color: var(--scrim-light-4);
+  font-size: clamp(220px, 30vw, 460px);
+  line-height: 0.78;
+  letter-spacing: -12px;
+  /* Brighter than the old 4% scrim so the right side reads as a deliberate
+     oversized issue number filling the space rather than an empty gutter. */
+  color: color-mix(in oklch, var(--white) 7%, transparent);
   pointer-events: none;
 }
 .issue-masthead__eyebrow {
@@ -1666,13 +1669,22 @@ body[data-lang="zh"] .lang-en {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, max-content) 1fr;
-  gap: clamp(18px, 3vw, 40px);
+  /* Eyebrow on row 1 (text column); the big serial shares row 2 with the
+     title so it aligns to the title, not the small eyebrow above it. */
+  grid-template-areas:
+    ".  eyebrow"
+    "no body";
+  column-gap: clamp(18px, 3vw, 40px);
+  row-gap: 10px;
   align-items: start;
   text-decoration: none;
   color: inherit;
   border-top: 1px solid var(--c-hairline);
   padding: var(--s-xl) 0;
 }
+.issue-list-card__eyebrow { grid-area: eyebrow; }
+.issue-list-card__no { grid-area: no; }
+.issue-list-card__body { grid-area: body; }
 .issue-list-card:first-child {
   border-top: 0;
   padding-top: var(--s-lg);
@@ -1689,9 +1701,6 @@ body[data-lang="zh"] .lang-en {
   font-variant-numeric: tabular-nums;
   user-select: none;
   transition: color 0.25s ease;
-  /* Drop the big serial to the vertical centre of the entry so it reads as a
-     unit with the title/lead instead of floating up by the eyebrow. */
-  align-self: center;
 }
 .issue-list-card:hover .issue-list-card__no { color: var(--coral-300); }
 .issue-list-card__body {
@@ -1762,7 +1771,11 @@ body[data-lang="zh"] .lang-en {
   background: var(--c-hairline);
 }
 @media (max-width: 680px) {
-  .issue-list-card { grid-template-columns: 1fr; gap: 8px; }
+  .issue-list-card {
+    grid-template-columns: 1fr;
+    grid-template-areas: "eyebrow" "no" "body";
+    row-gap: 6px;
+  }
   .issue-list-card__no { font-size: 44px; }
 }
 
@@ -1954,12 +1967,21 @@ body[data-lang="zh"] .lang-en {
   position: relative;
   display: grid;
   grid-template-columns: 72px 1fr;
-  gap: var(--s-lg);
+  /* source·time on row 1; the big index shares row 2 with the title so it
+     aligns to the title rather than the small meta line above it. */
+  grid-template-areas:
+    ".   meta"
+    "idx body";
+  column-gap: var(--s-lg);
+  row-gap: 6px;
   padding: var(--s-xl) 0;
   border-top: 1px solid var(--c-hairline-soft);
   /* TOC article-title links jump here; clear the sticky nav. */
   scroll-margin-top: 88px;
 }
+.pick-item__meta { grid-area: meta; }
+.pick-item__index { grid-area: idx; }
+.pick-item__main { grid-area: body; }
 .pick-item:first-child { border-top: 0; padding-top: 0; }
 .pick-item__index {
   font-family: var(--f-display);
@@ -2081,7 +2103,7 @@ body[data-lang="zh"] .lang-en {
 .pick-item__submitter { margin-left: auto; }
 
 @media (max-width: 640px) {
-  .pick-item { grid-template-columns: 48px 1fr; gap: var(--s-md); }
+  .pick-item { grid-template-columns: 48px 1fr; column-gap: var(--s-md); }
   .pick-item__index { font-size: 32px; }
   .pick-item__title { font-size: 22px; }
 }

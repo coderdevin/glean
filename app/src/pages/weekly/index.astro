@@ -65,26 +65,26 @@ const fmtPubEn = (d: Date | null) => {
       <div class="issue-list">
         {issues.map((iss, i) => (
           <a class="issue-list-card" href={`/weekly/${iss.number}`}>
+            <div class="issue-list-card__eyebrow">
+              <span>{issueNo(iss.number)}</span>
+              {i === 0 && (
+                <span class="issue-list-card__latest">
+                  <span class="lang-zh">最新</span><span class="lang-en">Latest</span>
+                </span>
+              )}
+              <span class="issue-list-card__date">
+                {weeklyDateRange(iss.dateStart, iss.dateEnd)}
+                {iss.publishedAt && (
+                  <>
+                    {" · "}
+                    <span class="lang-zh">{fmtPubZh(iss.publishedAt)}发布</span>
+                    <span class="lang-en">pub {fmtPubEn(iss.publishedAt)}</span>
+                  </>
+                )}
+              </span>
+            </div>
             <div class="issue-list-card__no" aria-hidden="true">{String(iss.number).padStart(3, "0")}</div>
             <div class="issue-list-card__body">
-              <div class="issue-list-card__eyebrow">
-                <span>{issueNo(iss.number)}</span>
-                {i === 0 && (
-                  <span class="issue-list-card__latest">
-                    <span class="lang-zh">最新</span><span class="lang-en">Latest</span>
-                  </span>
-                )}
-                <span class="issue-list-card__date">
-                  {weeklyDateRange(iss.dateStart, iss.dateEnd)}
-                  {iss.publishedAt && (
-                    <>
-                      {" · "}
-                      <span class="lang-zh">{fmtPubZh(iss.publishedAt)}发布</span>
-                      <span class="lang-en">pub {fmtPubEn(iss.publishedAt)}</span>
-                    </>
-                  )}
-                </span>
-              </div>
               <h2 class="issue-list-card__title">
                 <span class="lang-zh">{iss.titleZh}</span>
                 <span class="lang-en">{iss.titleEn}</span>
