@@ -1936,22 +1936,16 @@ body[data-lang="zh"] .lang-en {
 }
 
 /* The TOC is a <details> so it can collapse on mobile; on desktop it stays
-   open (summary hidden) and the nav becomes a scrollable sticky sidebar that
-   holds the full section → article-title outline. */
+   open (summary hidden) and the nav lays the full section → article-title
+   outline straight down the sidebar — NOT a scroll box. No max-height / no
+   overflow, so there is no internal scroll and nothing to scroll: the whole
+   outline is visible and the page itself scrolls. (A sticky scroll box was
+   what put a scrollbar there and kept it scrollable after the bar was hidden.) */
 .issue-toc__panel { border: 0; }
 .issue-toc__summary { display: none; }
 
-@media (min-width: 980px) {
-  .issue-toc__sticky {
-    position: sticky;
-    top: 84px;
-    max-height: calc(100vh - 104px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-}
-/* No visible scrollbar on the TOC (desktop sidebar or mobile dropdown) — it
-   still scrolls by wheel/trackpad/keyboard, just without the bar. */
+/* Mobile dropdown still caps its height (see the max-width block below); hide
+   that scrollbar but keep the bar off everywhere. */
 .issue-toc__sticky { scrollbar-width: none; }
 .issue-toc__sticky::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
