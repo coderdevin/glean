@@ -1,0 +1,23 @@
+---
+/**
+ * Single-language render primitive. Emits ONLY the active language into the
+ * DOM — unlike the legacy `<span class="lang-zh">…</span><span class="lang-en">
+ * …</span>` pair, which ships both and hides one via CSS (and so leaks both
+ * languages to crawlers at every URL).
+ *
+ * Two forms:
+ *   plain text  →  <Lang zh="首页" en="Home" />
+ *   rich markup →  <Lang><Fragment slot="zh">…</Fragment><Fragment slot="en">…</Fragment></Lang>
+ *
+ * Active language comes from `Astro.locals.lang`, which the middleware sets
+ * from the URL (`/en/*` ⇒ en, otherwise zh).
+ */
+interface Props {
+  zh?: string;
+  en?: string;
+}
+const { zh, en } = Astro.props;
+const lang = Astro.locals.lang ?? "zh";
+const text = lang === "en" ? en : zh;
+---
+{text != null ? text : lang === "en" ? <slot name="en" /> : <slot name="zh" />}
