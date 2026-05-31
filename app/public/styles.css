@@ -916,6 +916,10 @@ button {
   color: var(--c-primary);
   text-decoration: none;
 }
+/* Whole-card click target: stretch the title link over the card so clicking
+   the summary / bullets / empty space opens the article. Tag links in the
+   footer opt back above this overlay (see .article-card__meta a). */
+.article-card__title a::after { content: ""; position: absolute; inset: 0; }
 .article-card__summary {
   font-size: 15px;
   line-height: 1.6;
@@ -981,6 +985,8 @@ button {
   color: var(--c-muted);
   align-items: center;
 }
+/* Tag links stay clickable above the stretched title-link overlay. */
+.article-card__meta a { position: relative; z-index: 1; }
 
 .article-card--featured {
   background: var(--c-surface-dark);
@@ -2017,6 +2023,8 @@ body[data-lang="zh"] .lang-en {
   padding: var(--s-lg) 0;
   border-top: 1px solid var(--c-hairline-soft);
   align-items: start;
+  /* Anchor for the stretched title link below (whole-row click target). */
+  position: relative;
 }
 .feed-row:first-child { border-top: 0; }
 /* Solid background on hover (no decorative gradient) and matching feedback
@@ -2051,6 +2059,10 @@ body[data-lang="zh"] .lang-en {
   text-decoration: none;
 }
 .feed-row__title a:hover { color: var(--c-primary); }
+/* Stretch the title link over the whole row so clicking anywhere (summary,
+   metadata, empty space) opens the article. Hovering anywhere triggers the
+   title + row hover. Inner links (tags, below) opt back above this overlay. */
+.feed-row__title a::after { content: ""; position: absolute; inset: 0; }
 .feed-row__alt {
   font-family: var(--f-display);
   font-style: italic;
@@ -2088,6 +2100,9 @@ body[data-lang="zh"] .lang-en {
   color: var(--c-muted);
   text-decoration: none;
   font-family: var(--f-body);
+  /* Stay clickable above the stretched title-link overlay. */
+  position: relative;
+  z-index: 1;
 }
 .feed-row__bar .feed-tag::before { content: "#"; opacity: 0.5; }
 .feed-row__aside {
