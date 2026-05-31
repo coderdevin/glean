@@ -1,8 +1,10 @@
 ---
 export const prerender = false;
 import Site from "~/layouts/Site.astro";
+import SubscribeCard from "~/components/SubscribeCard.astro";
 import { db } from "~/db/client";
 import { allWeeklies } from "~/lib/queries";
+import { issueNo, weeklyDateRange, weeklyReadDuration } from "~/lib/weeklyFormat";
 
 const env = Astro.locals.runtime.env;
 const issues = await allWeeklies(db(env.DB));
@@ -10,7 +12,6 @@ Astro.response.headers.set(
   "Cache-Control",
   "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
 );
-const fmt = (s: string, e: string) => `${s} → ${e}`;
 const fmtPubZh = (d: Date | null) => {
   if (!d) return "";
   const dt = new Date(d);
@@ -67,14 +68,14 @@ const fmtPubEn = (d: Date | null) => {
             <div class="issue-list-card__no" aria-hidden="true">{String(iss.number).padStart(3, "0")}</div>
             <div class="issue-list-card__body">
               <div class="issue-list-card__eyebrow">
-                <span>Issue · {String(iss.number).padStart(3, "0")}</span>
+                <span>{issueNo(iss.number)}</span>
                 {i === 0 && (
                   <span class="issue-list-card__latest">
                     <span class="lang-zh">最新</span><span class="lang-en">Latest</span>
                   </span>
                 )}
                 <span class="issue-list-card__date">
-                  {fmt(iss.dateStart, iss.dateEnd)}
+                  {weeklyDateRange(iss.dateStart, iss.dateEnd)}
                   {iss.publishedAt && (
                     <>
                       {" · "}
@@ -110,8 +111,8 @@ const fmtPubEn = (d: Date | null) => {
                   <>
                     <span class="dot-sep"></span>
                     <span>
-                      <span class="lang-zh">约 {iss.read_minutes} 分钟</span>
-                      <span class="lang-en">~{iss.read_minutes} min</span>
+                      <span class="lang-zh">{weeklyReadDuration(iss.read_minutes).zh}</span>
+                      <span class="lang-en">{weeklyReadDuration(iss.read_minutes).en}</span>
                     </span>
                   </>
                 )}
@@ -122,4 +123,6 @@ const fmtPubEn = (d: Date | null) => {
       </div>
     </div>
   </section>
+
+  <SubscribeCard source="weekly-archive" />
 </Site>

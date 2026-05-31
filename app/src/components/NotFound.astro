@@ -1,0 +1,31 @@
+---
+/** Styled, in-shell 404 body. Used by /404 and by routes that 404 on bad
+ *  params (e.g. a weekly issue number that doesn't exist). */
+interface Props {
+  kind?: "weekly" | "site";
+}
+const { kind = "site" } = Astro.props;
+---
+<section class="container notfound">
+  <div class="notfound__inner">
+    <div class="notfound__code" aria-hidden="true">404</div>
+    <h1 class="notfound__title">
+      <span class="lang-zh">{kind === "weekly" ? "没有这一期" : "页面走丢了"}</span>
+      <span class="lang-en">{kind === "weekly" ? "No such issue" : "Page not found"}</span>
+    </h1>
+    <p class="notfound__msg">
+      <span class="lang-zh">{kind === "weekly" ? "这一期可能还没发布，或期号不对。" : "链接可能失效，或地址拼错了。"}</span>
+      <span class="lang-en">{kind === "weekly"
+        ? "That issue isn’t published yet, or the number is wrong."
+        : "The link may be broken, or the address mistyped."}</span>
+    </p>
+    <div class="notfound__actions">
+      <a class="btn btn-primary" href="/weekly">
+        <span class="lang-zh">所有周刊</span><span class="lang-en">All weeklies</span>
+      </a>
+      <a class="btn btn-secondary" href="/">
+        <span class="lang-zh">回首页</span><span class="lang-en">Home</span>
+      </a>
+    </div>
+  </div>
+</section>

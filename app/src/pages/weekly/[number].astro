@@ -1,70 +1,102 @@
 ---
 export const prerender = false;
 import Site from "~/layouts/Site.astro";
+import NotFound from "~/components/NotFound.astro";
+import SubscribeCard from "~/components/SubscribeCard.astro";
 import { db } from "~/db/client";
-import { picksForWeekly, weeklyByNumber } from "~/lib/queries";
+import { allWeeklies, picksForWeekly, weeklyByNumber } from "~/lib/queries";
+import { issueNo, weeklyDateRange, weeklyReadDuration } from "~/lib/weeklyFormat";
 import type { LayoutSection } from "~/lib/weekly";
 
 const numberStr = Astro.params.number;
 const number = numberStr ? Number(numberStr) : NaN;
-if (!Number.isInteger(number) || number <= 0) {
-  return new Response("Not found", { status: 404 });
-}
+const valid = Number.isInteger(number) && number > 0;
 
 const env = Astro.locals.runtime.env;
 const drizzleDb = db(env.DB);
-const issue = await weeklyByNumber(drizzleDb, number);
-if (!issue) return new Response("Not found", { status: 404 });
+const issue = valid ? await weeklyByNumber(drizzleDb, number) : null;
 
-const picks = await picksForWeekly(drizzleDb, issue.id);
-Astro.response.headers.set(
-  "Cache-Control",
-  "public, max-age=60, s-maxage=86400, stale-while-revalidate=86400",
-);
+// Everything below is computed only when the issue exists; the template guards
+// on `issue` and renders <NotFound> (with a 404 status) otherwise.
+let picks: Awaited<ReturnType<typeof picksForWeekly>> = [];
+let toc: { zh: string; en: string; items: { pick: (typeof picks)[number]; n: number }[] }[] = [];
+let readMinutes = 0;
+let weekNum: number | null = null;
+type Neighbor = { number: number; titleZh: string; titleEn: string };
+let older: Neighbor | null = null; // 上一期 (smaller number)
+let newer: Neighbor | null = null; // 下一期 (larger number)
 
-const layout: LayoutSection[] = issue.layoutJson ? JSON.parse(issue.layoutJson) : [];
-const pickById = new Map(picks.map((p) => [p.id, p]));
-const readMinutes = picks.reduce((a, p) => a + p.read_minutes, 0);
+if (issue) {
+  picks = await picksForWeekly(drizzleDb, issue.id);
+  readMinutes = picks.reduce((a, p) => a + p.read_minutes, 0);
 
-// Build [heading, picks[]] groups in layout order; collect leftovers.
-type Group = { zh: string; en: string; list: typeof picks };
-const groups: Group[] = [];
-const seen = new Set<string>();
-for (const sec of layout) {
-  const list = sec.pick_ids.map((id) => pickById.get(id)).filter(Boolean) as typeof picks;
-  list.forEach((p) => seen.add(p.id));
-  if (list.length > 0) groups.push({ zh: sec.heading_zh, en: sec.heading_en, list });
+  // Build [heading, picks[]] groups in layout order; collect leftovers.
+  const layout: LayoutSection[] = issue.layoutJson ? JSON.parse(issue.layoutJson) : [];
+  const pickById = new Map(picks.map((p) => [p.id, p]));
+  type Group = { zh: string; en: string; list: typeof picks };
+  const groups: Group[] = [];
+  const seen = new Set<string>();
+  for (const sec of layout) {
+    const list = sec.pick_ids.map((id) => pickById.get(id)).filter(Boolean) as typeof picks;
+    list.forEach((p) => seen.add(p.id));
+    if (list.length > 0) groups.push({ zh: sec.heading_zh, en: sec.heading_en, list });
+  }
+  const leftover = picks.filter((p) => !seen.has(p.id));
+  if (leftover.length > 0) groups.push({ zh: "其他", en: "More", list: leftover });
+
+  // 1-based running index so the TOC (rendered first) and body anchors (#p-N) match.
+  let _n = 0;
+  toc = groups.map((g) => ({
+    zh: g.zh,
+    en: g.en,
+    items: g.list.map((p) => ({ pick: p, n: ++_n })),
+  }));
+
+  weekNum = (() => {
+    if (!issue.dateStart) return null;
+    const d = new Date(issue.dateStart + "T00:00:00Z");
+    const oneJan = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d.getTime() - oneJan.getTime()) / 86400000 + oneJan.getUTCDay() + 1) / 7);
+  })();
+
+  // Prev/next neighbors. allWeeklies is published-only, desc by number, so the
+  // older issue sits at idx+1 and the newer at idx-1.
+  const all = await allWeeklies(drizzleDb);
+  const idx = all.findIndex((w) => w.number === issue.number);
+  if (idx >= 0) {
+    const o = all[idx + 1];
+    const n = all[idx - 1];
+    if (o) older = { number: o.number, titleZh: o.titleZh, titleEn: o.titleEn };
+    if (n) newer = { number: n.number, titleZh: n.titleZh, titleEn: n.titleEn };
+  }
 }
-const leftover = picks.filter((p) => !seen.has(p.id));
-if (leftover.length > 0) groups.push({ zh: "其他", en: "More", list: leftover });
 
-const weekNum = (() => {
-  if (!issue.dateStart) return null;
-  const d = new Date(issue.dateStart + "T00:00:00Z");
-  const oneJan = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil(((d.getTime() - oneJan.getTime()) / 86400000 + oneJan.getUTCDay() + 1) / 7);
-})();
-
-// Annotate each pick with a running 1-based index so the TOC (rendered first)
-// and the body anchors (#p-N) reference the same numbers.
-let _n = 0;
-const toc = groups.map((g) => ({
-  zh: g.zh,
-  en: g.en,
-  items: g.list.map((p) => ({ pick: p, n: ++_n })),
-}));
+if (!issue) {
+  Astro.response.status = 404;
+} else {
+  Astro.response.headers.set(
+    "Cache-Control",
+    "public, max-age=60, s-maxage=86400, stale-while-revalidate=86400",
+  );
+}
+const readDur = weeklyReadDuration(readMinutes);
 ---
 <Site
-  title={`#${String(issue.number).padStart(3, "0")} — ${issue.titleEn} · Glean · 拾遗`}
-  description={issue.introEn}
+  title={issue ? `${issueNo(issue.number)} — ${issue.titleEn} · Glean · 拾遗` : "未找到 · Not found — Glean · 拾遗"}
+  description={issue?.introEn ?? ""}
+  noindex={!issue}
 >
+  {!issue ? (
+    <NotFound kind="weekly" />
+  ) : (
+  <Fragment>
   <section class="container" style="padding-top: 32px">
     <a href="/weekly" class="btn btn-text" style="margin-bottom: 16px; display: inline-block">
       <span class="lang-zh">← 所有期号</span><span class="lang-en">← All issues</span>
     </a>
     <div class="issue-masthead" data-no={String(issue.number).padStart(3, "0")}>
       <span class="issue-masthead__eyebrow">
-        <span>Issue · {String(issue.number).padStart(3, "0")}</span>
+        <span>{issueNo(issue.number)}</span>
         {weekNum && (
           <>
             <span style="opacity: 0.5">/</span>
@@ -84,17 +116,17 @@ const toc = groups.map((g) => ({
         <span class="lang-en">{issue.introEn}</span>
       </p>
       <div class="issue-masthead__meta">
-        <span class="badge"><span class="lang-zh">{issue.dateStart} → {issue.dateEnd}</span><span class="lang-en">{issue.dateStart} – {issue.dateEnd}</span></span>
+        <span class="badge">{weeklyDateRange(issue.dateStart, issue.dateEnd)}</span>
         <span class="badge"><span class="lang-zh">{picks.length} 篇</span><span class="lang-en">{picks.length} picks</span></span>
         {readMinutes > 0 && (
-          <span class="badge"><span class="lang-zh">约 {readMinutes} 分钟</span><span class="lang-en">~{readMinutes} min</span></span>
+          <span class="badge"><span class="lang-zh">{readDur.zh}</span><span class="lang-en">{readDur.en}</span></span>
         )}
       </div>
     </div>
   </section>
 
-  <div class:list={["container", "issue-layout", groups.length > 0 && "issue-layout--sidebar"]}>
-    {groups.length > 0 && (
+  <div class:list={["container", "issue-layout", toc.length > 0 && "issue-layout--sidebar"]}>
+    {toc.length > 0 && (
       <aside class="issue-toc" aria-label="本期目录 · Contents">
         <details class="issue-toc__panel" open>
           <summary class="issue-toc__summary">
@@ -209,6 +241,40 @@ const toc = groups.map((g) => ({
     </main>
   </div>
 
+  {(older || newer) && (
+    <nav class="container issue-pager" aria-label="期号导航 · Issues">
+      {older ? (
+        <a class="issue-pager__link issue-pager__link--prev" href={`/weekly/${older.number}`}>
+          <span class="issue-pager__dir">
+            <span class="lang-zh">← 上一期 · {issueNo(older.number)}</span>
+            <span class="lang-en">← Prev · {issueNo(older.number)}</span>
+          </span>
+          <span class="issue-pager__title">
+            <span class="lang-zh">{older.titleZh}</span>
+            <span class="lang-en">{older.titleEn}</span>
+          </span>
+        </a>
+      ) : <span class="issue-pager__slot"></span>}
+      <a class="issue-pager__all" href="/weekly">
+        <span class="lang-zh">所有期号</span><span class="lang-en">All issues</span>
+      </a>
+      {newer ? (
+        <a class="issue-pager__link issue-pager__link--next" href={`/weekly/${newer.number}`}>
+          <span class="issue-pager__dir">
+            <span class="lang-zh">下一期 · {issueNo(newer.number)} →</span>
+            <span class="lang-en">Next · {issueNo(newer.number)} →</span>
+          </span>
+          <span class="issue-pager__title">
+            <span class="lang-zh">{newer.titleZh}</span>
+            <span class="lang-en">{newer.titleEn}</span>
+          </span>
+        </a>
+      ) : <span class="issue-pager__slot"></span>}
+    </nav>
+  )}
+
+  <SubscribeCard source="weekly-issue" />
+
   <script is:inline>
     // Scroll-spy: highlight the sidebar TOC link for the section currently in
     // the upper viewport band. Pure IntersectionObserver, no deps.
@@ -238,4 +304,6 @@ const toc = groups.map((g) => ({
       // on mobile the summary still lets the reader collapse it manually.
     })();
   </script>
+  </Fragment>
+  )}
 </Site>

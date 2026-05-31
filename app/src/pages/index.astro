@@ -5,6 +5,7 @@ import ArticleCard from "~/components/ArticleCard.astro";
 import { db } from "~/db/client";
 import { homeFeed } from "~/lib/queries";
 import { siteTz, todayInSiteTz } from "~/lib/datetime";
+import { issueNo, weeklyDateRange } from "~/lib/weeklyFormat";
 
 const env = Astro.locals.runtime.env;
 const today = todayInSiteTz(siteTz(env));
@@ -159,7 +160,7 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
 
         <div class="grid grid--cols-2">
           <a class="issue-cover" href={`/weekly/${feed.weekly.number}`} style="text-decoration: none">
-            <span class="issue-cover__no">ISSUE · {String(feed.weekly.number).padStart(3, "0")} · CURRENT</span>
+            <span class="issue-cover__no">{issueNo(feed.weekly.number)} · CURRENT</span>
             <h3 class="issue-cover__title">
               <span class="lang-zh">{feed.weekly.title_zh}</span>
               <span class="lang-en">{feed.weekly.title_en}</span>
@@ -169,8 +170,8 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
               <span class="lang-en">{feed.weekly.intro_en}</span>
             </p>
             <div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap">
-              <span class="badge badge--on-dark">{feed.weekly.pick_count} articles</span>
-              <span class="badge badge--on-dark">{feed.weekly.date_start} – {feed.weekly.date_end}</span>
+              <span class="badge badge--on-dark"><span class="lang-zh">{feed.weekly.pick_count} 篇</span><span class="lang-en">{feed.weekly.pick_count} picks</span></span>
+              <span class="badge badge--on-dark">{weeklyDateRange(feed.weekly.date_start, feed.weekly.date_end)}</span>
             </div>
           </a>
 
@@ -181,7 +182,7 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
             </div>
             <p class="t-body-sm text-muted">
               <a href={`/weekly/${feed.weekly.number}`}>
-                <span class="lang-zh">读完整一期 → {feed.weekly.pick_count} 条精选</span>
+                <span class="lang-zh">读完整一期 → {feed.weekly.pick_count} 篇</span>
                 <span class="lang-en">Read the full issue → {feed.weekly.pick_count} picks</span>
               </a>
             </p>
