@@ -1642,6 +1642,15 @@ body[data-lang="zh"] .lang-en {
   font-size: 12px;
   letter-spacing: 1px;
 }
+/* Keep a dot glued to the segment it precedes so it never orphans at the end of
+   a wrapped eyebrow / meta line. gap:inherit matches the parent flex spacing
+   (eyebrow 10px, meta 12px) so the rhythm stays uniform. */
+.issue-masthead__seg {
+  display: inline-flex;
+  align-items: center;
+  gap: inherit;
+  white-space: nowrap;
+}
 .issue-masthead__dot {
   flex: 0 0 auto;
   width: 3px;
@@ -1704,6 +1713,10 @@ body[data-lang="zh"] .lang-en {
     margin-bottom: 6px;
   }
   .issue-masthead__title { font-size: clamp(30px, 8vw, 40px); margin: 12px 0 16px; }
+  /* Tighten the eyebrow so #001 · 最新 · range · pub-date fits one line on a
+     phone; the __seg grouping still wraps cleanly if a longer (EN) string
+     overflows. */
+  .issue-masthead__eyebrow { font-size: 12px; letter-spacing: 0.4px; gap: 8px; }
 }
 
 /* =========================================================================

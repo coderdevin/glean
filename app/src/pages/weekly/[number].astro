@@ -94,16 +94,18 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
         {!newer && (
           <span class="issue-masthead__latest"><span class="lang-zh">最新</span><span class="lang-en">Latest</span></span>
         )}
-        <span class="issue-masthead__dot" aria-hidden="true"></span>
-        <span>{weeklyDateRange(issue.dateStart, issue.dateEnd)}</span>
+        <span class="issue-masthead__seg">
+          <span class="issue-masthead__dot" aria-hidden="true"></span>
+          <span>{weeklyDateRange(issue.dateStart, issue.dateEnd)}</span>
+        </span>
         {issue.publishedAt && (
-          <>
+          <span class="issue-masthead__seg">
             <span class="issue-masthead__dot" aria-hidden="true"></span>
             <span>
               <span class="lang-zh">{pubDate.zh}发布</span>
               <span class="lang-en">Published {pubDate.en}</span>
             </span>
-          </>
+          </span>
         )}
       </span>
       <h1 class="issue-masthead__title">
@@ -117,16 +119,16 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
       <div class="issue-masthead__meta">
         <span><span class="lang-zh">{picks.length} 篇</span><span class="lang-en">{picks.length} picks</span></span>
         {toc.length > 0 && (
-          <>
+          <span class="issue-masthead__seg">
             <span class="issue-masthead__dot" aria-hidden="true"></span>
             <span><span class="lang-zh">{toc.length} 章</span><span class="lang-en">{toc.length} sections</span></span>
-          </>
+          </span>
         )}
         {readMinutes > 0 && (
-          <>
+          <span class="issue-masthead__seg">
             <span class="issue-masthead__dot" aria-hidden="true"></span>
             <span><span class="lang-zh">{readDur.zh}</span><span class="lang-en">{readDur.en}</span></span>
-          </>
+          </span>
         )}
       </div>
     </div>
