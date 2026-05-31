@@ -3,7 +3,11 @@ import cloudflare from "@astrojs/cloudflare";
 
 // https://astro.build/config
 export default defineConfig({
-  site: process.env.SITE_URL ?? "https://your-domain.example",
+  // `site` is resolved at BUILD time (powers canonical URLs + the sitemap).
+  // The runtime SITE_URL var (wrangler.toml [vars]) can't reach config here,
+  // so the real production domain is the default — keep in sync with
+  // wrangler.toml's SITE_URL.
+  site: process.env.SITE_URL ?? "https://glean.smartcoder.ai",
   output: "hybrid",
   adapter: cloudflare({
     platformProxy: { enabled: true },

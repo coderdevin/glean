@@ -82,10 +82,54 @@ function renderBody(text: string | null | undefined): string {
   if (!text) return "";
   return md.render(text);
 }
+
+// --- Structured data -------------------------------------------------------
+// A pick is a human-reviewed, bilingual write-up of a source article, so
+// TechArticle is the right type. `isBasedOn` credits the source; AI/answer
+// engines read this graph to attribute and cite. BreadcrumbList gives Google
+// the Home › Tag › Article trail for rich-result breadcrumbs.
+const canonicalUrl = new URL(`/a/${pick.slug}`, Astro.site).toString();
+const siteOrigin = new URL(Astro.site ?? "https://glean.smartcoder.ai").origin;
+const publishedIso = pick.published_at ? pick.published_at.toISOString() : undefined;
+const primaryTag = pick.tags[0];
+
+const articleLd: Record<string, unknown> = {
+  "@type": "TechArticle",
+  headline: pick.title_en,
+  alternativeHeadline: pick.title_zh,
+  description: pick.summary_en,
+  inLanguage: ["zh-CN", "en"],
+  url: canonicalUrl,
+  mainEntityOfPage: canonicalUrl,
+  ...(publishedIso ? { datePublished: publishedIso, dateModified: publishedIso } : {}),
+  articleSection: pick.category,
+  keywords: pick.tags.map((t) => t.name_en).join(", "),
+  isBasedOn: pick.source_url,
+  publisher: { "@id": `${siteOrigin}/#org` },
+};
+
+const breadcrumbLd = {
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: `${siteOrigin}/` },
+    ...(primaryTag
+      ? [{
+          "@type": "ListItem",
+          position: 2,
+          name: primaryTag.name_en,
+          item: `${siteOrigin}/tag/${primaryTag.slug}`,
+        }]
+      : []),
+    { "@type": "ListItem", position: primaryTag ? 3 : 2, name: pick.title_en, item: canonicalUrl },
+  ],
+};
 ---
 <Site
   title={`${pick.title_en} — Glean · 拾遗`}
   description={pick.summary_en}
+  ogType="article"
+  publishedTime={publishedIso}
+  jsonLd={[articleLd, breadcrumbLd]}
 >
   <link rel="stylesheet" href="/article.css?v=art3" slot="head" />
   <link rel="stylesheet" href="/article.css?v=art3" />

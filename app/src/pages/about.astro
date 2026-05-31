@@ -1,6 +1,12 @@
 ---
 import Site from "~/layouts/Site.astro";
-export const prerender = true;
+// SSR (not prerendered) so the /en/about variant resolves via the middleware
+// language rewrite and renders with lang=en. Heavily cached at the edge.
+export const prerender = false;
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, max-age=300, s-maxage=86400, stale-while-revalidate=86400",
+);
 ---
 <Site
   title="关于 · About — Glean · 拾遗"
