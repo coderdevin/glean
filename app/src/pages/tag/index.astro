@@ -1,9 +1,14 @@
 ---
 export const prerender = false;
 import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
+import { localizedPath } from "~/lib/i18n";
 import { db } from "~/db/client";
 import { allTagsWithCounts } from "~/lib/queries";
 import { CATEGORIES } from "~/db/schema";
+
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
 
 const env = Astro.locals.runtime.env;
 const allTags = await allTagsWithCounts(db(env.DB));
@@ -35,17 +40,18 @@ const totalPicks = allTags.reduce((s, t) => s + t.count, 0);
 >
   <section class="page-banner">
     <div class="container">
-      <span class="eyebrow"><span class="lang-zh">标签</span><span class="lang-en">Tags</span></span>
+      <span class="eyebrow"><Lang zh="标签" en="Tags" /></span>
       <h1 style="margin-top: 8px">
-        <span class="lang-zh">所有标签</span>
-        <span class="lang-en">All tags</span>
+        <Lang zh="所有标签" en="All tags" />
       </h1>
       <p style="max-width: 60ch; margin-top: 12px" class="text-body">
-        <span class="lang-zh">按主题浏览每一条收录。共 {allTags.length} 个标签 · {totalPicks} 条精选。</span>
-        <span class="lang-en">
-          Browse every pick by topic. {allTags.length} {allTags.length === 1 ? "tag" : "tags"}
-          {" · "}{totalPicks} {totalPicks === 1 ? "pick" : "picks"}.
-        </span>
+        <Lang>
+          <Fragment slot="zh">按主题浏览每一条收录。共 {allTags.length} 个标签 · {totalPicks} 条精选。</Fragment>
+          <Fragment slot="en">
+            Browse every pick by topic. {allTags.length} {allTags.length === 1 ? "tag" : "tags"}
+            {" · "}{totalPicks} {totalPicks === 1 ? "pick" : "picks"}.
+          </Fragment>
+        </Lang>
       </p>
     </div>
   </section>
@@ -55,8 +61,7 @@ const totalPicks = allTags.reduce((s, t) => s + t.count, 0);
       {allTags.length === 0 && (
         <div class="prose-block" style="text-align: center; padding: 48px 0">
           <p>
-            <span class="lang-zh">还没有标签。第一条精选上线时会自动建立标签。</span>
-            <span class="lang-en">No tags yet. Tags appear automatically when the first pick lands.</span>
+            <Lang zh="还没有标签。第一条精选上线时会自动建立标签。" en="No tags yet. Tags appear automatically when the first pick lands." />
           </p>
         </div>
       )}
@@ -64,18 +69,16 @@ const totalPicks = allTags.reduce((s, t) => s + t.count, 0);
         group.tags.length > 0 && (
           <div style="margin-top: 32px">
             <div class="t-caption-up text-muted" style="margin-bottom: 12px">
-              <span class="lang-zh">{group.zh}</span>
-              <span class="lang-en">{group.en}</span>
+              <Lang zh={group.zh} en={group.en} />
             </div>
             <div class="tag-grid">
               {group.tags.map((t) => (
                 <a
-                  href={`/tag/${t.slug}`}
+                  href={L(`/tag/${t.slug}`)}
                   class={`badge badge--cat-${t.family} tag-grid__item${t.count === 0 ? " is-empty" : ""}`}
                   style="text-decoration: none"
                 >
-                  <span class="lang-zh">{t.name_zh}</span>
-                  <span class="lang-en">{t.name_en}</span>
+                  <Lang zh={t.name_zh ?? undefined} en={t.name_en ?? undefined} />
                   <span class="tag-grid__count">· {t.count}</span>
                 </a>
               ))}

@@ -3,27 +3,26 @@
  * Reusable weekly-subscribe card. The submit behavior is wired globally in
  * Site.astro (the `[data-subscribe-form]` handler), so this works on any page.
  */
+import Lang from "./Lang.astro";
 interface Props {
   /** Analytics source tag written into the hidden field. */
   source?: string;
 }
 const { source = "weekly" } = Astro.props;
+const lang = Astro.locals.lang ?? "zh";
 ---
 <section class="section--tight">
   <div class="container">
     <div class="subscribe-card">
       <div class="subscribe-card__lead">
         <span class="eyebrow">
-          <span class="lang-zh">周刊 · 邮件订阅</span>
-          <span class="lang-en">Weekly · by email</span>
+          <Lang zh="周刊 · 邮件订阅" en="Weekly · by email" />
         </span>
         <h2 class="balance">
-          <span class="lang-zh">每周一早上 · 一封邮件</span>
-          <span class="lang-en">Mondays · one email</span>
+          <Lang zh="每周一早上 · 一封邮件" en="Mondays · one email" />
         </h2>
         <p>
-          <span class="lang-zh">每周把值得读的拣成一期，直接寄到你邮箱。留个邮箱即可，没有广告。</span>
-          <span class="lang-en">Each week’s picks, gathered into one issue and sent to your inbox. Just your email — no ads.</span>
+          <Lang zh="每周把值得读的拣成一期，直接寄到你邮箱。留个邮箱即可，没有广告。" en="Each week’s picks, gathered into one issue and sent to your inbox. Just your email — no ads." />
         </p>
       </div>
       <form class="subscribe-card__form" data-subscribe-form>
@@ -39,19 +38,17 @@ const { source = "weekly" } = Astro.props;
           />
           <button type="submit" class="btn btn-primary">
             <span class="subscribe-card__cta-default">
-              <span class="lang-zh">订阅</span>
-              <span class="lang-en">Subscribe</span>
+              <Lang zh="订阅" en="Subscribe" />
             </span>
             <span class="subscribe-card__cta-done" aria-hidden="true">
-              <span class="lang-zh">✓ 已订阅</span>
-              <span class="lang-en">✓ Subscribed</span>
+              <Lang zh="✓ 已订阅" en="✓ Subscribed" />
             </span>
           </button>
         </div>
         <p class="subscribe-card__status" role="status" aria-live="polite"></p>
         <div class="subscribe-card__channels">
-          <a href="/rss/daily.xml">RSS · Daily</a>
-          <a href="/rss/weekly.xml">RSS · Weekly</a>
+          <a href={`/rss/daily.xml${lang === "en" ? "?lang=en" : ""}`}>RSS · Daily</a>
+          <a href={`/rss/weekly.xml${lang === "en" ? "?lang=en" : ""}`}>RSS · Weekly</a>
         </div>
       </form>
     </div>

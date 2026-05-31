@@ -2,6 +2,10 @@
 export const prerender = false;
 import Site from "~/layouts/Site.astro";
 import Turnstile from "~/components/Turnstile.astro";
+import Lang from "~/components/Lang.astro";
+import { localizedPath } from "~/lib/i18n";
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
 
 Astro.response.headers.set("Cache-Control", "no-store");
 const submitError = Astro.url.searchParams.get("error");
@@ -29,16 +33,13 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
   <section class="page-banner">
     <div class="container">
       <span class="eyebrow">
-        <span class="lang-zh">投一条链接</span>
-        <span class="lang-en">Submit a link</span>
+        <Lang zh="投一条链接" en="Submit a link" />
       </span>
       <h1 style="margin-top: 12px">
-        <span class="lang-zh">提交链接</span>
-        <span class="lang-en">Submit a link</span>
+        <Lang zh="提交链接" en="Submit a link" />
       </h1>
       <p>
-        <span class="lang-zh">贴一条 URL · AI 起草 · 我审完发。</span>
-        <span class="lang-en">Paste a URL · AI drafts · I approve and ship.</span>
+        <Lang zh="贴一条 URL · AI 起草 · 我审完发。" en="Paste a URL · AI drafts · I approve and ship." />
       </p>
     </div>
   </section>
@@ -50,15 +51,16 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
           <div class="stack stack--lg">
             {errorCopy && (
               <div role="alert" class="card" style="padding: 12px 16px; background: color-mix(in oklch, var(--c-error) 12%, var(--c-canvas)); border-left: 4px solid var(--c-error);">
-                <span class="lang-zh">{errorCopy.zh}</span>
-                <span class="lang-en">{errorCopy.en}</span>
+                <Lang zh={errorCopy.zh} en={errorCopy.en} />
               </div>
             )}
 
             <div class="field">
               <label for="url">
-                <span class="lang-zh">文章链接 URL <span style="color: var(--c-primary)">*</span></span>
-                <span class="lang-en">Article URL <span style="color: var(--c-primary)">*</span></span>
+                <Lang>
+                  <Fragment slot="zh">文章链接 URL <span style="color: var(--c-primary)">*</span></Fragment>
+                  <Fragment slot="en">Article URL <span style="color: var(--c-primary)">*</span></Fragment>
+                </Lang>
               </label>
               <input
                 id="url"
@@ -70,15 +72,13 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
                 required
               />
               <span class="hint">
-                <span class="lang-zh">中英皆可 · 自动翻译。</span>
-                <span class="lang-en">CN or EN · auto-translated.</span>
+                <Lang zh="中英皆可 · 自动翻译。" en="CN or EN · auto-translated." />
               </span>
             </div>
 
             <div class="field">
               <label for="note">
-                <span class="lang-zh">为什么推荐？(可选)</span>
-                <span class="lang-en">Why do you recommend it? (optional)</span>
+                <Lang zh="为什么推荐？(可选)" en="Why do you recommend it? (optional)" />
               </label>
               <textarea
                 id="note"
@@ -88,8 +88,7 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
                 maxlength="500"
               >{prefillNote}</textarea>
               <span class="hint">
-                <span class="lang-zh">只给编辑 · 不公开。</span>
-                <span class="lang-en">Editor only · not public.</span>
+                <Lang zh="只给编辑 · 不公开。" en="Editor only · not public." />
               </span>
             </div>
 
@@ -99,12 +98,10 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
 
             <div class="row" style="gap: 12px; align-items: center">
               <button type="submit" class="btn btn-primary">
-                <span class="lang-zh">提交 →</span>
-                <span class="lang-en">Submit →</span>
+                <Lang zh="提交 →" en="Submit →" />
               </button>
               <span class="t-body-sm text-muted-soft">
-                <span class="lang-zh">无需登录 · 每 IP 每小时 10 条</span>
-                <span class="lang-en">No login · 10 per IP per hour</span>
+                <Lang zh="无需登录 · 每 IP 每小时 10 条" en="No login · 10 per IP per hour" />
               </span>
             </div>
           </div>
@@ -113,12 +110,10 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
         <aside class="stack stack--xl">
           <div>
             <span class="eyebrow">
-              <span class="lang-zh">之后发生什么</span>
-              <span class="lang-en">What happens next</span>
+              <Lang zh="之后发生什么" en="What happens next" />
             </span>
             <h2 class="t-display-sm" style="margin-top: 12px">
-              <span class="lang-zh">从粘贴到上刊 · 4 步</span>
-              <span class="lang-en">Paste to publish · 4 steps</span>
+              <Lang zh="从粘贴到上刊 · 4 步" en="Paste to publish · 4 steps" />
             </h2>
           </div>
 
@@ -127,12 +122,10 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
               <span class="badge badge--coral" style="height: 24px; justify-content: center; min-width: 28px">1</span>
               <div>
                 <div class="t-title-md">
-                  <span class="lang-zh">入队</span>
-                  <span class="lang-en">Queued</span>
+                  <Lang zh="入队" en="Queued" />
                 </div>
                 <p class="t-body-sm text-body" style="margin: 4px 0 0">
-                  <span class="lang-zh">URL 落库 · 给你一个查询 ID。</span>
-                  <span class="lang-en">URL stored · you get a lookup ID.</span>
+                  <Lang zh="URL 落库 · 给你一个查询 ID。" en="URL stored · you get a lookup ID." />
                 </p>
               </div>
             </li>
@@ -140,12 +133,10 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
               <span class="badge badge--coral" style="height: 24px; justify-content: center; min-width: 28px">2</span>
               <div>
                 <div class="t-title-md">
-                  <span class="lang-zh">AI 加工</span>
-                  <span class="lang-en">AI pass</span>
+                  <Lang zh="AI 加工" en="AI pass" />
                 </div>
                 <p class="t-body-sm text-body" style="margin: 4px 0 0">
-                  <span class="lang-zh">抓正文 · 双语 · 要点 · 标签 · 一句点评。~30 秒。</span>
-                  <span class="lang-en">Extract · translate · bullets · tags · note. ~30s.</span>
+                  <Lang zh="抓正文 · 双语 · 要点 · 标签 · 一句点评。~30 秒。" en="Extract · translate · bullets · tags · note. ~30s." />
                 </p>
               </div>
             </li>
@@ -153,12 +144,10 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
               <span class="badge badge--coral" style="height: 24px; justify-content: center; min-width: 28px">3</span>
               <div>
                 <div class="t-title-md">
-                  <span class="lang-zh">人工审核</span>
-                  <span class="lang-en">Human review</span>
+                  <Lang zh="人工审核" en="Human review" />
                 </div>
                 <p class="t-body-sm text-body" style="margin: 4px 0 0">
-                  <span class="lang-zh">我读一眼 · 可改可拒 · 通常 1 小时内。</span>
-                  <span class="lang-en">I read, edit, or reject · usually within an hour.</span>
+                  <Lang zh="我读一眼 · 可改可拒 · 通常 1 小时内。" en="I read, edit, or reject · usually within an hour." />
                 </p>
               </div>
             </li>
@@ -166,12 +155,10 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
               <span class="badge badge--coral" style="height: 24px; justify-content: center; min-width: 28px">4</span>
               <div>
                 <div class="t-title-md">
-                  <span class="lang-zh">进当日日刊</span>
-                  <span class="lang-en">Lands in today’s daily</span>
+                  <Lang zh="进当日日刊" en="Lands in today’s daily" />
                 </div>
                 <p class="t-body-sm text-body" style="margin: 4px 0 0">
-                  <span class="lang-zh">通过即公开 · 高分会进下周一的周刊。</span>
-                  <span class="lang-en">Public on approval · top picks land in Monday’s weekly.</span>
+                  <Lang zh="通过即公开 · 高分会进下周一的周刊。" en="Public on approval · top picks land in Monday’s weekly." />
                 </p>
               </div>
             </li>
@@ -179,15 +166,13 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
 
           <div class="card card--dark" style="padding: 24px; margin-bottom: 0">
             <div class="t-caption-up" style="color: var(--c-accent-amber); margin-bottom: 8px">
-              <span class="lang-zh">命令行用户</span>
-              <span class="lang-en">Terminal-first?</span>
+              <Lang zh="命令行用户" en="Terminal-first?" />
             </div>
             <pre class="t-code" style="margin: 0; color: var(--c-on-dark); line-height: 1.65; white-space: pre-wrap; word-break: break-all"><span style="color: var(--c-accent-amber)">$</span> curl -X POST {apiHost}/api/submit <span style="color: var(--c-muted-soft)">\</span>
     -H <span style="color: var(--c-accent-teal)">"Content-Type: application/json"</span> <span style="color: var(--c-muted-soft)">\</span>
     -d <span style="color: var(--c-accent-teal)">'&#123;"url":"https://example.com/article"&#125;'</span></pre>
             <p class="t-body-sm" style="margin: 10px 0 0; color: var(--c-on-dark-soft)">
-              <span class="lang-zh">无需登录 · 每 IP 每小时 10 条</span>
-              <span class="lang-en">No auth · 10 per IP per hour</span>
+              <Lang zh="无需登录 · 每 IP 每小时 10 条" en="No auth · 10 per IP per hour" />
             </p>
           </div>
         </aside>

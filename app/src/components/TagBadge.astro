@@ -8,15 +8,16 @@ interface Props {
 }
 const { nameZh, nameEn, family, href } = Astro.props;
 const badgeClass = ["badge", family ? `badge--cat-${family}` : ""].filter(Boolean).join(" ");
+import Lang from "./Lang.astro";
 ---
 {href ? (
   <a href={href} class="tag-link">
     <span class={badgeClass}>
-      <span class="lang-zh">{nameZh}</span><span class="lang-en">{nameEn}</span>
+      <Lang zh={nameZh} en={nameEn} />
     </span>
   </a>
 ) : (
   <span class={badgeClass}>
-    <span class="lang-zh">{nameZh}</span><span class="lang-en">{nameEn}</span>
+    <Lang zh={nameZh} en={nameEn} />
   </span>
 )}

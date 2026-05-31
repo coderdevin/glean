@@ -1,12 +1,17 @@
 ---
 export const prerender = false;
 import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
 import NotFound from "~/components/NotFound.astro";
 import SubscribeCard from "~/components/SubscribeCard.astro";
 import { db } from "~/db/client";
 import { allWeeklies, picksForWeekly, weeklyByNumber } from "~/lib/queries";
 import { issueNo, weeklyDateRange, weeklyPubDate, weeklyReadDuration } from "~/lib/weeklyFormat";
 import type { LayoutSection } from "~/lib/weekly";
+import { localizedPath } from "~/lib/i18n";
+
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
 
 const numberStr = Astro.params.number;
 const number = numberStr ? Number(numberStr) : NaN;
@@ -85,14 +90,14 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
   <Fragment>
   <div class="reading-progress" aria-hidden="true"><span class="reading-progress__bar" id="reading-progress-bar"></span></div>
   <section class="container" style="padding-top: 32px">
-    <a href="/weekly" class="btn btn-text" style="margin-bottom: 16px; display: inline-block">
-      <span class="lang-zh">← 所有期号</span><span class="lang-en">← All issues</span>
+    <a href={L("/weekly")} class="btn btn-text" style="margin-bottom: 16px; display: inline-block">
+      <Lang zh="← 所有期号" en="← All issues" />
     </a>
     <div class="issue-masthead" data-no={String(issue.number).padStart(3, "0")}>
       <span class="issue-masthead__eyebrow">
         <span class="issue-masthead__no-label">{issueNo(issue.number)}</span>
         {!newer && (
-          <span class="issue-masthead__latest"><span class="lang-zh">最新</span><span class="lang-en">Latest</span></span>
+          <span class="issue-masthead__latest"><Lang zh="最新" en="Latest" /></span>
         )}
         <span class="issue-masthead__seg">
           <span class="issue-masthead__dot" aria-hidden="true"></span>
@@ -102,32 +107,29 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
           <span class="issue-masthead__seg">
             <span class="issue-masthead__dot" aria-hidden="true"></span>
             <span>
-              <span class="lang-zh">{pubDate.zh}发布</span>
-              <span class="lang-en">Published {pubDate.en}</span>
+              <Lang><Fragment slot="zh">{pubDate.zh}发布</Fragment><Fragment slot="en">Published {pubDate.en}</Fragment></Lang>
             </span>
           </span>
         )}
       </span>
       <h1 class="issue-masthead__title">
-        <span class="lang-zh">{issue.titleZh}</span>
-        <span class="lang-en">{issue.titleEn}</span>
+        <Lang zh={issue.titleZh} en={issue.titleEn} />
       </h1>
       <p class="issue-masthead__lead">
-        <span class="lang-zh">{issue.introZh}</span>
-        <span class="lang-en">{issue.introEn}</span>
+        <Lang zh={issue.introZh} en={issue.introEn} />
       </p>
       <div class="issue-masthead__meta">
-        <span><span class="lang-zh">{picks.length} 篇</span><span class="lang-en">{picks.length} picks</span></span>
+        <span><Lang><Fragment slot="zh">{picks.length} 篇</Fragment><Fragment slot="en">{picks.length} picks</Fragment></Lang></span>
         {toc.length > 0 && (
           <span class="issue-masthead__seg">
             <span class="issue-masthead__dot" aria-hidden="true"></span>
-            <span><span class="lang-zh">{toc.length} 章</span><span class="lang-en">{toc.length} sections</span></span>
+            <span><Lang><Fragment slot="zh">{toc.length} 章</Fragment><Fragment slot="en">{toc.length} sections</Fragment></Lang></span>
           </span>
         )}
         {readMinutes > 0 && (
           <span class="issue-masthead__seg">
             <span class="issue-masthead__dot" aria-hidden="true"></span>
-            <span><span class="lang-zh">{readDur.zh}</span><span class="lang-en">{readDur.en}</span></span>
+            <span><Lang zh={readDur.zh} en={readDur.en} /></span>
           </span>
         )}
       </div>
@@ -139,7 +141,7 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
       <aside class="issue-toc" aria-label="本期目录 · Contents">
         <details class="issue-toc__panel" open>
           <summary class="issue-toc__summary">
-            <span><span class="lang-zh">本期目录</span><span class="lang-en">Contents</span></span>
+            <span><Lang zh="本期目录" en="Contents" /></span>
             <span class="issue-toc__now" data-toc-now></span>
             <span class="issue-toc__summary-meta">{picks.length}<span class="issue-toc__chev" aria-hidden="true">▾</span></span>
           </summary>
@@ -150,8 +152,7 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
                   <a class="issue-toc__link" href={`#sec-${i}`} data-toc={`sec-${i}`}>
                     <span class="issue-toc__num">{String(i + 1).padStart(2, "0")}</span>
                     <span class="issue-toc__text">
-                      <span class="lang-zh">{g.zh}</span>
-                      <span class="lang-en">{g.en}</span>
+                      <Lang zh={g.zh} en={g.en} />
                     </span>
                     <span class="issue-toc__count">{g.items.length}</span>
                   </a>
@@ -161,8 +162,7 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
                         <a class="issue-toc__sublink" href={`#p-${it.n}`} title={it.pick.title_zh}>
                           <span class="issue-toc__subnum">{String(it.n).padStart(2, "0")}</span>
                           <span class="issue-toc__subtext">
-                            <span class="lang-zh">{it.pick.title_zh}</span>
-                            <span class="lang-en">{it.pick.title_en}</span>
+                            <Lang zh={it.pick.title_zh} en={it.pick.title_en} />
                           </span>
                         </a>
                       </li>
@@ -182,12 +182,10 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
         <div class="issue-section__head">
           <div>
             <div class="issue-section__eyebrow">
-              <span class="lang-zh">章节 {String(catIdx + 1).padStart(2, "0")}</span>
-              <span class="lang-en">Section {String(catIdx + 1).padStart(2, "0")}</span>
+              <Lang><Fragment slot="zh">章节 {String(catIdx + 1).padStart(2, "0")}</Fragment><Fragment slot="en">Section {String(catIdx + 1).padStart(2, "0")}</Fragment></Lang>
             </div>
             <h2 class="issue-section__title">
-              <span class="lang-zh">{g.zh}</span>
-              <span class="lang-en">{g.en}</span>
+              <Lang zh={g.zh} en={g.en} />
             </h2>
           </div>
           <span class="issue-section__count">{g.items.length} / {picks.length}</span>
@@ -207,28 +205,28 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
                 <span class="pick-item__index">{idx}</span>
                 <div class="pick-item__main">
                   <h3 class="pick-item__title">
-                    <a href={`/a/${pick.slug}`}>
-                      <span class="lang-zh">{pick.title_zh}<span class="alt">{pick.title_en}</span></span>
-                      <span class="lang-en">{pick.title_en}<span class="alt">{pick.title_zh}</span></span>
+                    <a href={L(`/a/${pick.slug}`)}>
+                      <Lang>
+                        <Fragment slot="zh">{pick.title_zh}<span class="alt">{pick.title_en}</span></Fragment>
+                        <Fragment slot="en">{pick.title_en}<span class="alt">{pick.title_zh}</span></Fragment>
+                      </Lang>
                     </a>
                   </h3>
                   <p class="pick-item__note">
-                    <span class="lang-zh">{pick.summary_zh}</span>
-                    <span class="lang-en">{pick.summary_en}</span>
+                    <Lang zh={pick.summary_zh} en={pick.summary_en} />
                   </p>
                   {(pick.editor_note_zh || pick.editor_note_en) && (
                     <div class="pick-item__editor">
                       <span class="pick-item__editor-label">Editor</span>
                       <span class="pick-item__editor-text">
-                        <span class="lang-zh">{pick.editor_note_zh}</span>
-                        <span class="lang-en">{pick.editor_note_en}</span>
+                        <Lang zh={pick.editor_note_zh ?? undefined} en={pick.editor_note_en ?? undefined} />
                       </span>
                     </div>
                   )}
                   <div class="pick-item__footer">
                     <div class="pick-item__tags">
                       {pick.tags.map((t) => (
-                        <a class="pick-item__tag" href={`/tag/${t.slug}`}>{t.name_en}</a>
+                        <a class="pick-item__tag" href={L(`/tag/${t.slug}`)}>{t.name_en}</a>
                       ))}
                     </div>
                   </div>
@@ -243,8 +241,7 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
     {picks.length === 0 && (
       <div class="prose-block" style="text-align: center; padding: 48px 0">
         <p>
-          <span class="lang-zh">这期周刊尚未编入内容。</span>
-          <span class="lang-en">This issue has no picks yet.</span>
+          <Lang zh="这期周刊尚未编入内容。" en="This issue has no picks yet." />
         </p>
       </div>
     )}
@@ -254,29 +251,25 @@ const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
   {(older || newer) && (
     <nav class="container issue-pager" aria-label="期号导航 · Issues">
       {older ? (
-        <a class="issue-pager__link issue-pager__link--prev" href={`/weekly/${older.number}`}>
+        <a class="issue-pager__link issue-pager__link--prev" href={L(`/weekly/${older.number}`)}>
           <span class="issue-pager__dir">
-            <span class="lang-zh">← 上一期 · {issueNo(older.number)}</span>
-            <span class="lang-en">← Prev · {issueNo(older.number)}</span>
+            <Lang><Fragment slot="zh">← 上一期 · {issueNo(older.number)}</Fragment><Fragment slot="en">← Prev · {issueNo(older.number)}</Fragment></Lang>
           </span>
           <span class="issue-pager__title">
-            <span class="lang-zh">{older.titleZh}</span>
-            <span class="lang-en">{older.titleEn}</span>
+            <Lang zh={older.titleZh} en={older.titleEn} />
           </span>
         </a>
       ) : <span class="issue-pager__slot"></span>}
-      <a class="issue-pager__all" href="/weekly">
-        <span class="lang-zh">所有期号</span><span class="lang-en">All issues</span>
+      <a class="issue-pager__all" href={L("/weekly")}>
+        <Lang zh="所有期号" en="All issues" />
       </a>
       {newer ? (
-        <a class="issue-pager__link issue-pager__link--next" href={`/weekly/${newer.number}`}>
+        <a class="issue-pager__link issue-pager__link--next" href={L(`/weekly/${newer.number}`)}>
           <span class="issue-pager__dir">
-            <span class="lang-zh">下一期 · {issueNo(newer.number)} →</span>
-            <span class="lang-en">Next · {issueNo(newer.number)} →</span>
+            <Lang><Fragment slot="zh">下一期 · {issueNo(newer.number)} →</Fragment><Fragment slot="en">Next · {issueNo(newer.number)} →</Fragment></Lang>
           </span>
           <span class="issue-pager__title">
-            <span class="lang-zh">{newer.titleZh}</span>
-            <span class="lang-en">{newer.titleEn}</span>
+            <Lang zh={newer.titleZh} en={newer.titleEn} />
           </span>
         </a>
       ) : <span class="issue-pager__slot"></span>}

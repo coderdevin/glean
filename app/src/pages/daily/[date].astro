@@ -1,9 +1,14 @@
 ---
 export const prerender = false;
 import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
+import { localizedPath } from "~/lib/i18n";
 import { db } from "~/db/client";
 import { dailyPicksForDate, recentDailyDates } from "~/lib/queries";
 import { formatTimeHM, siteTz, todayInSiteTz } from "~/lib/datetime";
+
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
 
 const { date } = Astro.params;
 if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -55,12 +60,10 @@ const zhDate = `${date} · ${zhWeekdays[new Date(date + "T00:00:00Z").getUTCDay(
   <section class="page-banner">
     <div class="container">
       <span class="eyebrow">
-        <span class="lang-zh">日刊 · 时间线</span>
-        <span class="lang-en">Daily · timeline</span>
+        <Lang zh="日刊 · 时间线" en="Daily · timeline" />
       </span>
       <h1 style="margin-top: 12px">
-        <span class="lang-zh">每天拾几条。</span>
-        <span class="lang-en">A few picks a day.</span>
+        <Lang zh="每天拾几条。" en="A few picks a day." />
       </h1>
     </div>
   </section>
@@ -69,25 +72,28 @@ const zhDate = `${date} · ${zhWeekdays[new Date(date + "T00:00:00Z").getUTCDay(
     <div class="container">
       <div class="day-picker">
         <span class="day-picker__date">
-          <span class="lang-zh">{zhDate}</span>
-          <span class="lang-en">{longDate}</span>
+          <Lang zh={zhDate} en={longDate} />
         </span>
         <span class="day-picker__sub">
-          <span class="lang-zh">{picks.length} 条</span>
-          <span class="lang-en">{picks.length} {picks.length === 1 ? "pick" : "picks"}</span>
+          <Lang>
+            <Fragment slot="zh">{picks.length} 条</Fragment>
+            <Fragment slot="en">{picks.length} {picks.length === 1 ? "pick" : "picks"}</Fragment>
+          </Lang>
         </span>
         <div class="day-picker__nav">
           {prevDate ? (
-            <a href={`/daily/${prevDate}`} class="btn btn-secondary">
-              <span class="lang-zh">← {prevDate.slice(5)}</span>
-              <span class="lang-en">← {prevDate.slice(5)}</span>
+            <a href={L(`/daily/${prevDate}`)} class="btn btn-secondary">
+              <Lang>
+                <Fragment slot="zh">← {prevDate.slice(5)}</Fragment>
+                <Fragment slot="en">← {prevDate.slice(5)}</Fragment>
+              </Lang>
             </a>
           ) : (
             <button type="button" class="btn btn-secondary" disabled aria-label="前一天 · Previous day" style="opacity: 0.5">←</button>
           )}
           <details style="position: relative">
             <summary class="btn btn-secondary" style="list-style: none; cursor: pointer">
-              <span class="lang-zh">日历 ▾</span><span class="lang-en">Calendar ▾</span>
+              <Lang zh="日历 ▾" en="Calendar ▾" />
             </summary>
             <div class="calendar-popover">
               <div class="calendar-popover__heading">{cur.getUTCFullYear()} · {String(cur.getUTCMonth() + 1).padStart(2, "0")}</div>
@@ -97,22 +103,24 @@ const zhDate = `${date} · ${zhWeekdays[new Date(date + "T00:00:00Z").getUTCDay(
                   dd.iso === null ? (
                     <span class="cal-widget__day is-empty">·</span>
                   ) : dd.hasPicks ? (
-                    <a href={`/daily/${dd.iso}`} class={`cal-widget__day has-issues${dd.isToday ? " is-today" : ""}${dd.isCurrent ? " is-current" : ""}`}>{dd.d}</a>
+                    <a href={L(`/daily/${dd.iso}`)} class={`cal-widget__day has-issues${dd.isToday ? " is-today" : ""}${dd.isCurrent ? " is-current" : ""}`}>{dd.d}</a>
                   ) : (
                     <span class={`cal-widget__day${dd.isToday ? " is-today" : ""}`}>{dd.d}</span>
                   ),
                 )}
               </div>
               <div style="display: flex; gap: 10px; margin-top: 10px; font-size: 11px; color: var(--c-muted)">
-                <span style="display: inline-flex; align-items: center; gap: 4px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--c-surface-cream-strong); display: inline-block"></span><span class="lang-zh">有日刊</span><span class="lang-en">has picks</span></span>
-                <span style="display: inline-flex; align-items: center; gap: 4px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--c-primary); display: inline-block"></span><span class="lang-zh">今天</span><span class="lang-en">today</span></span>
+                <span style="display: inline-flex; align-items: center; gap: 4px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--c-surface-cream-strong); display: inline-block"></span><Lang zh="有日刊" en="has picks" /></span>
+                <span style="display: inline-flex; align-items: center; gap: 4px"><span style="width: 8px; height: 8px; border-radius: 2px; background: var(--c-primary); display: inline-block"></span><Lang zh="今天" en="today" /></span>
               </div>
             </div>
           </details>
           {nextDate ? (
-            <a href={`/daily/${nextDate}`} class="btn btn-secondary">
-              <span class="lang-zh">{nextDate.slice(5)} →</span>
-              <span class="lang-en">{nextDate.slice(5)} →</span>
+            <a href={L(`/daily/${nextDate}`)} class="btn btn-secondary">
+              <Lang>
+                <Fragment slot="zh">{nextDate.slice(5)} →</Fragment>
+                <Fragment slot="en">{nextDate.slice(5)} →</Fragment>
+              </Lang>
             </a>
           ) : (
             <button type="button" class="btn btn-secondary" disabled aria-label="后一天 · Next day" style="opacity: 0.5">→</button>
@@ -127,8 +135,7 @@ const zhDate = `${date} · ${zhWeekdays[new Date(date + "T00:00:00Z").getUTCDay(
       {picks.length === 0 && (
         <div class="prose-block" style="text-align: center; padding: 48px 0">
           <p>
-            <span class="lang-zh">这一天没有日刊。试试日历找有内容的日期。</span>
-            <span class="lang-en">Nothing for this day. Try the calendar for dates that have picks.</span>
+            <Lang zh="这一天没有日刊。试试日历找有内容的日期。" en="Nothing for this day. Try the calendar for dates that have picks." />
           </p>
         </div>
       )}
@@ -140,18 +147,15 @@ const zhDate = `${date} · ${zhWeekdays[new Date(date + "T00:00:00Z").getUTCDay(
             </div>
             <div class="feed-row__main">
               <h2 class="feed-row__title">
-                <a href={`/a/${pick.slug}`}>
-                  <span class="lang-zh">{pick.title_zh}</span>
-                  <span class="lang-en">{pick.title_en}</span>
+                <a href={L(`/a/${pick.slug}`)}>
+                  <Lang zh={pick.title_zh} en={pick.title_en} />
                 </a>
               </h2>
               <div class="feed-row__alt">
-                <span class="lang-zh">{pick.title_en}</span>
-                <span class="lang-en">{pick.title_zh}</span>
+                <Lang zh={pick.title_en} en={pick.title_zh} />
               </div>
               <p class="feed-row__summary">
-                <span class="lang-zh">{pick.summary_zh}</span>
-                <span class="lang-en">{pick.summary_en}</span>
+                <Lang zh={pick.summary_zh} en={pick.summary_en} />
               </p>
               <div class="feed-row__bar">
                 <span class="feed-domain">{pick.source_host}</span>
@@ -160,7 +164,7 @@ const zhDate = `${date} · ${zhWeekdays[new Date(date + "T00:00:00Z").getUTCDay(
                 {pick.tags.map((t) => (
                   <>
                     <span>·</span>
-                    <a class="feed-tag" href={`/tag/${t.slug}`}>{t.name_en}</a>
+                    <a class="feed-tag" href={L(`/tag/${t.slug}`)}>{t.name_en}</a>
                   </>
                 ))}
               </div>
