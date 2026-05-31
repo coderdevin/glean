@@ -175,19 +175,43 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
             </div>
           </a>
 
-          <div class="card card--canvas" style="padding: 28px">
-            <div class="t-caption-up text-muted" style="margin-bottom: 16px">
-              <span class="lang-zh">本期亮点</span>
-              <span class="lang-en">Inside this issue</span>
+          <div class="card card--canvas issue-contents">
+            <div class="t-caption-up text-muted issue-contents__head">
+              <span class="lang-zh">本期目录</span>
+              <span class="lang-en">Contents</span>
             </div>
-            <p class="t-body-sm text-muted">
-              <a href={`/weekly/${feed.weekly.number}`}>
-                <span class="lang-zh">读完整一期 → {feed.weekly.pick_count} 篇</span>
-                <span class="lang-en">Read the full issue → {feed.weekly.pick_count} picks</span>
-              </a>
-            </p>
-            <hr class="hairline" />
-            <a href={`/weekly/${feed.weekly.number}`} class="btn btn-secondary" style="width: 100%">
+            {feed.weeklyToc.length > 0 ? (
+              <ol class="issue-contents__list">
+                {feed.weeklyToc.map((g, i) => (
+                  <li class="issue-contents__group">
+                    <div class="issue-contents__sec">
+                      <span class="issue-contents__sec-no">{String(i + 1).padStart(2, "0")}</span>
+                      <span class="issue-contents__sec-title">
+                        <span class="lang-zh">{g.zh}</span>
+                        <span class="lang-en">{g.en}</span>
+                      </span>
+                      <span class="issue-contents__sec-count">{g.items.length}</span>
+                    </div>
+                    <ul class="issue-contents__items">
+                      {g.items.map((it) => (
+                        <li>
+                          <a class="issue-contents__item" href={`/a/${it.slug}`}>
+                            <span class="lang-zh">{it.title_zh}</span>
+                            <span class="lang-en">{it.title_en}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p class="t-body-sm text-muted">
+                <span class="lang-zh">本期内容整理中。</span>
+                <span class="lang-en">Contents coming together.</span>
+              </p>
+            )}
+            <a href={`/weekly/${feed.weekly.number}`} class="btn btn-secondary issue-contents__cta">
               <span class="lang-zh">读完整一期 →</span>
               <span class="lang-en">Read the full issue →</span>
             </a>

@@ -5,7 +5,7 @@ import NotFound from "~/components/NotFound.astro";
 import SubscribeCard from "~/components/SubscribeCard.astro";
 import { db } from "~/db/client";
 import { allWeeklies, picksForWeekly, weeklyByNumber } from "~/lib/queries";
-import { issueNo, weeklyDateRange, weeklyReadDuration } from "~/lib/weeklyFormat";
+import { issueNo, weeklyDateRange, weeklyPubDate, weeklyReadDuration } from "~/lib/weeklyFormat";
 import type { LayoutSection } from "~/lib/weekly";
 
 const numberStr = Astro.params.number;
@@ -21,7 +21,6 @@ const issue = valid ? await weeklyByNumber(drizzleDb, number) : null;
 let picks: Awaited<ReturnType<typeof picksForWeekly>> = [];
 let toc: { zh: string; en: string; items: { pick: (typeof picks)[number]; n: number }[] }[] = [];
 let readMinutes = 0;
-let weekNum: number | null = null;
 type Neighbor = { number: number; titleZh: string; titleEn: string };
 let older: Neighbor | null = null; // 上一期 (smaller number)
 let newer: Neighbor | null = null; // 下一期 (larger number)
@@ -52,13 +51,6 @@ if (issue) {
     items: g.list.map((p) => ({ pick: p, n: ++_n })),
   }));
 
-  weekNum = (() => {
-    if (!issue.dateStart) return null;
-    const d = new Date(issue.dateStart + "T00:00:00Z");
-    const oneJan = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil(((d.getTime() - oneJan.getTime()) / 86400000 + oneJan.getUTCDay() + 1) / 7);
-  })();
-
   // Prev/next neighbors. allWeeklies is published-only, desc by number, so the
   // older issue sits at idx+1 and the newer at idx-1.
   const all = await allWeeklies(drizzleDb);
@@ -80,6 +72,7 @@ if (!issue) {
   );
 }
 const readDur = weeklyReadDuration(readMinutes);
+const pubDate = weeklyPubDate(issue?.publishedAt ?? null);
 ---
 <Site
   title={issue ? `${issueNo(issue.number)} — ${issue.titleEn} · Glean · 拾遗` : "未找到 · Not found — Glean · 拾遗"}
@@ -97,13 +90,18 @@ const readDur = weeklyReadDuration(readMinutes);
     </a>
     <div class="issue-masthead" data-no={String(issue.number).padStart(3, "0")}>
       <span class="issue-masthead__eyebrow">
-        <span>{issueNo(issue.number)}</span>
-        {weekNum && (
+        <span class="issue-masthead__no-label">{issueNo(issue.number)}</span>
+        {!newer && (
+          <span class="issue-masthead__latest"><span class="lang-zh">最新</span><span class="lang-en">Latest</span></span>
+        )}
+        <span class="issue-masthead__dot" aria-hidden="true"></span>
+        <span>{weeklyDateRange(issue.dateStart, issue.dateEnd)}</span>
+        {issue.publishedAt && (
           <>
-            <span style="opacity: 0.5">/</span>
+            <span class="issue-masthead__dot" aria-hidden="true"></span>
             <span>
-              <span class="lang-zh">{issue.dateStart.slice(0,4)} 第 {weekNum} 周</span>
-              <span class="lang-en">Week {weekNum}, {issue.dateStart.slice(0,4)}</span>
+              <span class="lang-zh">{pubDate.zh}发布</span>
+              <span class="lang-en">Published {pubDate.en}</span>
             </span>
           </>
         )}
@@ -117,10 +115,18 @@ const readDur = weeklyReadDuration(readMinutes);
         <span class="lang-en">{issue.introEn}</span>
       </p>
       <div class="issue-masthead__meta">
-        <span class="badge">{weeklyDateRange(issue.dateStart, issue.dateEnd)}</span>
-        <span class="badge"><span class="lang-zh">{picks.length} 篇</span><span class="lang-en">{picks.length} picks</span></span>
+        <span><span class="lang-zh">{picks.length} 篇</span><span class="lang-en">{picks.length} picks</span></span>
+        {toc.length > 0 && (
+          <>
+            <span class="issue-masthead__dot" aria-hidden="true"></span>
+            <span><span class="lang-zh">{toc.length} 章</span><span class="lang-en">{toc.length} sections</span></span>
+          </>
+        )}
         {readMinutes > 0 && (
-          <span class="badge"><span class="lang-zh">{readDur.zh}</span><span class="lang-en">{readDur.en}</span></span>
+          <>
+            <span class="issue-masthead__dot" aria-hidden="true"></span>
+            <span><span class="lang-zh">{readDur.zh}</span><span class="lang-en">{readDur.en}</span></span>
+          </>
         )}
       </div>
     </div>

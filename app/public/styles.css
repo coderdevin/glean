@@ -371,20 +371,20 @@ label {
   touch-action: manipulation;
 }
 
-/* When the "dark surface" component family (.issue-cover, .issue-masthead,
+/* When the "dark surface" component family (.issue-cover,
    .article-card--featured) flips to a cream surface in dark mode, the
    amber accent eyebrow goes from light-amber-on-dark to light-amber-on-cream
    (1.8:1 — invisible). Re-bind --c-accent-amber to a darker amber within
-   these component scopes so the eyebrow stays readable in both themes. */
+   these component scopes so the eyebrow stays readable in both themes.
+   (.issue-masthead is no longer a dark surface — it's a theme-aware cream
+   issue card, so it's excluded here.) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .issue-cover,
-  :root:not([data-theme="light"]) .issue-masthead,
   :root:not([data-theme="light"]) .article-card--featured {
     --c-accent-amber: oklch(48% 0.110 65);
   }
 }
 :root[data-theme="dark"] .issue-cover,
-:root[data-theme="dark"] .issue-masthead,
 :root[data-theme="dark"] .article-card--featured {
   --c-accent-amber: oklch(48% 0.110 65);
 }
@@ -1581,84 +1581,190 @@ body[data-lang="zh"] .lang-en {
 /* =========================================================================
    Issue masthead (top of weekly issue detail)
    ========================================================================= */
+/* One bound issue of a periodical: a cream card carrying an oversized ghost
+   serial in the left column, with the eyebrow → title → lead → meta stacked in
+   the right column. Theme-aware tokens so it's a cream card in light mode and a
+   raised dark card in dark mode (no longer the old full-dark surface). */
 .issue-masthead {
   position: relative;
   overflow: hidden;
-  background: var(--c-surface-dark);
-  color: var(--c-on-dark);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  /* Explicit areas so the ghost serial reliably spans the full content height
+     (grid-row:1/-1 collapses to one row when rows are only implicit). */
+  grid-template-areas:
+    "no eyebrow"
+    "no title"
+    "no lead"
+    "no meta";
+  column-gap: clamp(24px, 4vw, 60px);
+  align-items: center;
+  background: var(--c-surface-soft);
+  border: 1px solid var(--c-hairline);
   border-radius: var(--r-xl);
-  padding: 72px 64px 64px;
+  box-shadow: 0 1px 0 var(--shadow-ink-6), 0 24px 48px -32px var(--shadow-ink-13);
+  padding: clamp(36px, 5vw, 64px);
   margin-top: var(--s-lg);
 }
 .issue-masthead::before {
   content: attr(data-no);
-  position: absolute;
-  right: clamp(-16px, 1vw, 28px);
-  top: 50%;
-  transform: translateY(-50%);
+  grid-area: no;
+  align-self: center;
   font-family: var(--f-display);
   font-weight: 500;
-  font-size: clamp(220px, 30vw, 460px);
-  line-height: 0.78;
-  letter-spacing: -12px;
-  /* Brighter than the old 4% scrim so the right side reads as a deliberate
-     oversized issue number filling the space rather than an empty gutter. */
-  color: color-mix(in oklch, var(--white) 7%, transparent);
+  font-size: clamp(108px, 13vw, 208px);
+  line-height: 0.8;
+  letter-spacing: -6px;
+  color: var(--c-surface-cream-strong);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
   pointer-events: none;
 }
 .issue-masthead__eyebrow {
-  display: inline-flex;
+  grid-area: eyebrow;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-family: var(--f-mono);
-  font-size: 12px;
-  letter-spacing: 2px;
-  color: var(--c-accent-amber);
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  color: var(--c-muted);
   text-transform: uppercase;
-  position: relative;
-  z-index: 1;
+}
+.issue-masthead__no-label { color: var(--c-ink); }
+.issue-masthead__latest {
+  color: var(--c-primary);
+  background: var(--coral-tint);
+  border: 1px solid var(--coral-tint-strong);
+  border-radius: var(--r-pill);
+  padding: 3px 11px;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.issue-masthead__dot {
+  flex: 0 0 auto;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--c-hairline);
 }
 .issue-masthead__title {
+  grid-area: title;
   font-family: var(--f-display);
   font-weight: 500;
-  font-size: clamp(40px, 5.4vw, 60px);
-  line-height: 1.05;
+  font-size: clamp(38px, 5.2vw, 58px);
+  line-height: 1.08;
   letter-spacing: -1.2px;
-  color: var(--c-on-dark);
+  color: var(--c-ink);
   margin: 16px 0 20px;
-  /* Fill the masthead width and wrap greedily. word-break:normal (NOT keep-all)
-     so a long CJK title can break between any characters — keep-all forbids
-     breaks inside CJK runs, forcing the only break onto the latin "AI" and
-     producing the awkward "…AI ↵ 工程…" split. */
-  max-width: none;
+  /* Fill the column and wrap greedily. word-break:normal (NOT keep-all) so a
+     long CJK title can break between any characters — keep-all forbids breaks
+     inside CJK runs, forcing the only break onto the latin "AI". */
   text-wrap: normal;
   word-break: normal;
   overflow-wrap: break-word;
-  position: relative;
-  z-index: 1;
 }
 .issue-masthead__lead {
+  grid-area: lead;
   font-size: 17px;
   line-height: 1.7;
-  color: var(--c-on-dark-soft);
-  /* Wider measure so the lead uses the masthead width instead of wrapping
-     early with a big right gutter (it's max-width, not a <br>). */
-  max-width: 74ch;
+  color: var(--c-body);
+  /* No max-width — the lead fills the column width before wrapping, like the
+     title; a ch cap left a large blank right gutter. */
   margin: 0 0 24px;
-  position: relative;
-  z-index: 1;
 }
 .issue-masthead__meta {
+  grid-area: meta;
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
   flex-wrap: wrap;
-  position: relative;
-  z-index: 1;
+  font-family: var(--f-mono);
+  font-size: 13px;
+  color: var(--c-muted);
 }
-.issue-masthead__meta .badge {
-  background: var(--scrim-cream-8);
-  color: var(--c-on-dark-soft);
+@media (max-width: 680px) {
+  .issue-masthead {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "no"
+      "eyebrow"
+      "title"
+      "lead"
+      "meta";
+    align-items: start;
+    padding: 28px 22px;
+  }
+  .issue-masthead::before {
+    align-self: start;
+    font-size: 68px;
+    letter-spacing: -3px;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .issue-masthead__title { font-size: clamp(30px, 8vw, 40px); margin: 12px 0 16px; }
 }
+
+/* =========================================================================
+   Homepage "本期目录 · Contents" — the latest issue's table of contents
+   (section heading → article titles) shown beside the cover.
+   ========================================================================= */
+.issue-contents {
+  display: flex;
+  flex-direction: column;
+  padding: 28px;
+}
+.issue-contents__head { margin-bottom: 18px; }
+.issue-contents__list {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.issue-contents__sec {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--c-hairline);
+}
+.issue-contents__sec-no {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--c-muted-soft);
+}
+.issue-contents__sec-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-ink);
+}
+.issue-contents__sec-count {
+  margin-left: auto;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--c-muted-soft);
+}
+.issue-contents__items {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.issue-contents__item {
+  display: block;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--c-body);
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+.issue-contents__item:hover { color: var(--c-primary); text-decoration: none; }
+.issue-contents__cta { margin-top: auto; width: 100%; }
 
 /* =========================================================================
    Issue list card (weekly-list page)
@@ -1815,10 +1921,18 @@ body[data-lang="zh"] .lang-en {
     overscroll-behavior: contain;
   }
 }
-/* No visible scrollbar on the TOC (desktop sidebar or mobile dropdown) — it
-   still scrolls by wheel/trackpad/keyboard, just without the grey bar. */
-.issue-toc__sticky { scrollbar-width: none; }
-.issue-toc__sticky::-webkit-scrollbar { width: 0; height: 0; display: none; }
+/* Slim, quiet scrollbar on the TOC (desktop sidebar or mobile dropdown). A
+   fully hidden bar removed the only hint that a long outline scrolls, so it
+   read as "cut off" at the last visible row. Keep it faint at rest, firmer on
+   hover — affordance without the chunky default grey bar. */
+.issue-toc__sticky { scrollbar-width: thin; scrollbar-color: var(--c-hairline) transparent; }
+.issue-toc__sticky::-webkit-scrollbar { width: 6px; height: 6px; }
+.issue-toc__sticky::-webkit-scrollbar-track { background: transparent; }
+.issue-toc__sticky::-webkit-scrollbar-thumb {
+  background: var(--c-hairline);
+  border-radius: 4px;
+}
+.issue-toc__sticky:hover::-webkit-scrollbar-thumb { background: var(--c-muted-soft); }
 
 .issue-toc__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .issue-toc__group + .issue-toc__group { margin-top: 4px; }
@@ -4313,7 +4427,6 @@ body[data-lang="zh"] em {
    but lead paragraphs sitting on dark surfaces need light text.
    ========================================================================= */
 .issue-cover__lead,
-.issue-masthead__lead,
 .article-card--featured .article-card__summary,
 .article-card--featured .article-card__bullets,
 .cta-band--coral p,
@@ -4329,10 +4442,9 @@ body[data-lang="zh"] em {
   /* slightly softer than pure cream so it doesn't compete with title */
   color: var(--scrim-cream-88);
 }
-
-.issue-masthead__lead {
-  color: var(--scrim-cream-92);
-}
+/* NOTE: .issue-masthead__lead is intentionally NOT here — the masthead is now a
+   cream issue card, so its lead uses --c-body (set in the editorial-prose rule
+   above). A cream-on-cream override here made the intro invisible. */
 
 /* =========================================================================
    Reduced motion (a11y) — collapse all animation/transition timing to a

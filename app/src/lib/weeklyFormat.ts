@@ -22,6 +22,20 @@ export function weeklyDateRange(start: string, end: string): string {
 }
 
 /**
+ * Publish date for the issue masthead / archive, e.g. "5 月 31 日" (zh) /
+ * "May 31" (en). UTC-parsed so it matches the date range (no TZ drift).
+ */
+export function weeklyPubDate(d: Date | number | string | null): { zh: string; en: string } {
+  if (!d) return { zh: "", en: "" };
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return { zh: "", en: "" };
+  return {
+    zh: `${dt.getUTCMonth() + 1} 月 ${dt.getUTCDate()} 日`,
+    en: dt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
+  };
+}
+
+/**
  * Friendly total read time: minutes under an hour, rounded hours above. A bare
  * "约 520 分钟" reads worse than "约 9 小时" for a full digest issue.
  */

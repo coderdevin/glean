@@ -16,6 +16,15 @@ import {
 } from "~/db/schema";
 import type { ArticleCardPick } from "~/components/ArticleCard.astro";
 import type { WeeklyCoverIssue } from "~/components/WeeklyCover.astro";
+import { buildWeeklyGroups, type LayoutSection } from "~/lib/weekly";
+
+/** Compact table-of-contents for the homepage "本期目录": section heading +
+ *  the article titles under it (no summaries). */
+export interface WeeklyTocGroup {
+  zh: string;
+  en: string;
+  items: { title_zh: string; title_en: string; slug: string }[];
+}
 
 interface PickRow {
   id: string;
@@ -211,11 +220,9 @@ export async function allWeeklies(
   return result as any;
 }
 
-/** Latest published weekly with pick count — for the homepage cover. */
-export async function latestWeeklyCover(db: DB): Promise<WeeklyCoverIssue | null> {
-  const all = await allWeeklies(db);
-  if (all.length === 0) return null;
-  const w = all[0]!;
+type WeeklyRow = Awaited<ReturnType<typeof allWeeklies>>[number];
+
+function weeklyCoverFromRow(w: WeeklyRow): WeeklyCoverIssue {
   return {
     number: w.number,
     slug: w.slug,
@@ -228,6 +235,12 @@ export async function latestWeeklyCover(db: DB): Promise<WeeklyCoverIssue | null
     pick_count: w.pick_count,
     cover_image_url: null,
   };
+}
+
+/** Latest published weekly with pick count — for the homepage cover. */
+export async function latestWeeklyCover(db: DB): Promise<WeeklyCoverIssue | null> {
+  const all = await allWeeklies(db);
+  return all.length === 0 ? null : weeklyCoverFromRow(all[0]!);
 }
 
 /** Picks tagged with a given slug. */
@@ -419,6 +432,7 @@ export async function homeFeed(db: DB, today: string): Promise<{
   date: string;
   picks: ArticleCardPick[];
   weekly: WeeklyCoverIssue | null;
+  weeklyToc: WeeklyTocGroup[];
 }> {
   let date = today;
   let picksList = await dailyPicksForDate(db, date);
@@ -429,8 +443,25 @@ export async function homeFeed(db: DB, today: string): Promise<{
       picksList = await dailyPicksForDate(db, date);
     }
   }
-  const weekly = await latestWeeklyCover(db);
-  return { date, picks: picksList.slice(0, 3), weekly };
+
+  // Latest issue cover + its table of contents (section → article titles) for
+  // the homepage. One allWeeklies call feeds both; the TOC needs the issue's
+  // picks + layout, so it's a second query only when an issue exists.
+  const all = await allWeeklies(db);
+  const latest = all[0] ?? null;
+  const weekly = latest ? weeklyCoverFromRow(latest) : null;
+  let weeklyToc: WeeklyTocGroup[] = [];
+  if (latest) {
+    const issuePicks = await picksForWeekly(db, latest.id);
+    const layout: LayoutSection[] = latest.layoutJson ? JSON.parse(latest.layoutJson) : [];
+    weeklyToc = buildWeeklyGroups(layout, issuePicks).map((g) => ({
+      zh: g.zh,
+      en: g.en,
+      items: g.picks.map((p) => ({ title_zh: p.title_zh, title_en: p.title_en, slug: p.slug })),
+    }));
+  }
+
+  return { date, picks: picksList.slice(0, 3), weekly, weeklyToc };
 }
 
 // --- Newsletter delivery --------------------------------------------------
