@@ -93,21 +93,30 @@ export function renderWeeklyExportHtml(args: {
   const secNo = (i: number) => String(i + 1).padStart(2, "0");
   const pickTitle = (p: ExportPick) => (zh ? p.title_zh : p.title_en);
 
-  // Contents — a scannable index of section names + article titles, shown
-  // BEFORE the full details so a reader (or a printed page-one) sees the shape
-  // of the issue at a glance. Boxed in its own table so Outlook keeps the bg.
+  // Assign each article a running 1..N number once, so the Contents index and
+  // the detail blocks reference the same number (sections keep their own 01/02).
+  let running = 0;
+  const numberedGroups = groups.map((g) => ({
+    zh: g.zh,
+    en: g.en,
+    picks: g.picks.map((p) => ({ pick: p, n: ++running })),
+  }));
+
+  // Contents — a scannable index of section names + numbered article titles,
+  // shown BEFORE the full details so a reader (or a printed page-one) sees the
+  // shape of the issue at a glance. Boxed in its own table so Outlook keeps bg.
   const contentsHtml = `<tr><td style="padding:22px 32px 0 32px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${RULE};border-radius:10px;background:${PAPER};">
 <tr><td style="padding:16px 18px;">
 <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};font-weight:700;margin-bottom:6px;">${zh ? "目录 · Contents" : "Contents · 目录"}</div>
-${groups
+${numberedGroups
     .map(
       (g, gi) => `<div style="margin-top:12px;">
 <div style="font-size:13px;font-weight:700;color:${ACCENT};">${secNo(gi)} · ${esc(zh ? g.zh : g.en)}</div>
 ${g.picks
         .map(
-          (p) =>
-            `<div style="font-size:13.5px;line-height:1.7;color:${INK};padding-left:2px;">· ${esc(pickTitle(p))}</div>`,
+          ({ pick, n }) =>
+            `<div style="font-size:13.5px;line-height:1.7;color:${INK};padding-left:2px;"><span style="color:${MUTED};font-variant-numeric:tabular-nums;">${n}.</span> ${esc(pickTitle(pick))}</div>`,
         )
         .join("")}
 </div>`,
@@ -117,12 +126,13 @@ ${g.picks
 </table>
 </td></tr>`;
 
-  // Full details, section by section. Section numbers mirror the contents.
-  const sectionsHtml = groups
+  // Full details, section by section. Section numbers mirror the contents;
+  // each article carries its running number as a leading badge.
+  const sectionsHtml = numberedGroups
     .map((g, gi) => {
       const heading = zh ? g.zh : g.en;
       const items = g.picks
-        .map((p) => {
+        .map(({ pick: p, n }) => {
           const pSummary = zh ? p.summary_zh : p.summary_en;
           const note = zh ? p.editor_note_zh : p.editor_note_en;
           const meta = `${esc(p.source_host)} · ${p.read_minutes} min`;
@@ -130,8 +140,9 @@ ${g.picks
             ? `<p style="margin:8px 0 0 0;font-size:13px;line-height:1.6;color:${ACCENT};"><span style="font-weight:600;">${zh ? "编辑" : "Editor"}</span> ${esc(note)}</p>`
             : "";
           // Each pick is its own block so print can keep it whole (break-inside).
+          // The number sits on the meta line, then the title on its own line.
           return `<div class="pick" style="padding:16px 0;border-bottom:1px solid ${RULE};">
-<div style="font-size:12px;color:${MUTED};margin-bottom:4px;">${meta}</div>
+<div style="font-size:12px;color:${MUTED};margin-bottom:4px;"><span style="font-weight:700;color:${ACCENT};">${n}.</span> ${meta}</div>
 <a href="${base}/a/${esc(p.slug)}" style="font-size:17px;font-weight:600;color:${INK};text-decoration:none;line-height:1.4;">${esc(pickTitle(p))}</a>
 <p style="margin:6px 0 0 0;font-size:14px;line-height:1.65;color:${MUTED};">${esc(pSummary)}</p>
 ${noteHtml}
@@ -145,7 +156,9 @@ ${items}
     })
     .join("");
 
-  const readOnWeb = zh ? "在网页上阅读本期 →" : "Read this issue on the web →";
+  const readOnWeb = zh
+    ? "在网页上阅读本期每篇内容详情 →"
+    : "Read every article in full on the web →";
   const eyebrow = `${esc(siteName)} · ${zh ? "第" : "Issue"} ${no} ${zh ? "期" : ""} · ${esc(issue.dateStart)} → ${esc(issue.dateEnd)}`;
 
   // Bilingual canonical links, appended at the very end (requested).
@@ -182,12 +195,13 @@ ${items}
 ${styleBlock}
 </head>
 <body style="margin:0;padding:0;background:${PAPER};color:${INK};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${PAPER};opacity:0;">${esc(intro.slice(0, 110))}</div>
 <table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAPER};padding:24px 12px;">
 <tr><td align="center">
 <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
 <table role="presentation" class="sheet" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:${CARD};border:1px solid ${RULE};border-radius:12px;overflow:hidden;">
 <tr><td style="padding:32px 32px 0 32px;">
-<div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;"></div>
+<div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;font-size:0;line-height:3px;">&nbsp;</div>
 <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${eyebrow}</div>
 <h1 style="margin:8px 0 12px 0;font-size:26px;line-height:1.25;color:${INK};">${esc(title)}</h1>
 <p style="margin:0;font-size:15px;line-height:1.75;color:${MUTED};">${esc(intro)}</p>
@@ -200,8 +214,7 @@ ${sectionsHtml}
 <tr><td style="padding:22px 32px 30px 32px;border-top:1px solid ${RULE};color:${MUTED};font-size:12px;line-height:1.8;">
 <div style="font-weight:700;color:${INK};font-size:13px;margin-bottom:6px;">${esc(siteName)}</div>
 ${linkLine(zh ? "中文" : "中文 (Chinese)", zhUrl)}<br>
-${linkLine(zh ? "English (英文)" : "English", enUrl)}<br>
-<span style="color:${MUTED};">${zh ? "本页可直接打印或另存为 PDF。" : "Print this page or save it as a PDF."}</span>
+${linkLine(zh ? "English (英文)" : "English", enUrl)}
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->

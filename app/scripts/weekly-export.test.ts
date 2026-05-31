@@ -105,6 +105,11 @@ assert.ok(zh.split("推理").length - 1 >= 2, "section name appears in contents 
 assert.ok(zh.split("第二篇").length - 1 >= 2, "article title appears in contents and detail");
 // Section numbering.
 assert.ok(zh.includes("01") && zh.includes("02"), "sections are numbered");
+// Running article numbers 1..N (3 picks total here → 1. 2. 3.), in contents + detail.
+assert.ok(zh.includes("1.") && zh.includes("2.") && zh.includes("3."), "articles carry running numbers");
+assert.ok(zh.split("3.").length - 1 >= 2, "article number appears in contents and detail");
+// Print-note line removed.
+assert.ok(!/另存为 PDF|save it as a PDF/.test(zh), "print-note line removed");
 
 // Links point at the site, no per-recipient/unsubscribe token.
 assert.ok(
@@ -131,7 +136,7 @@ assert.ok(
   "en section headings present",
 );
 assert.ok(en.includes("Title &amp; more"), "en title escaped");
-assert.ok(en.includes("Read this issue on the web"), "en read-on-web CTA");
+assert.ok(en.includes("Read every article in full on the web"), "en read-on-web CTA");
 assert.ok(/Contents/.test(en), "en contents heading present");
 assert.ok(en.includes("https://glean.smartcoder.ai/en/weekly/7"), "en canonical link present");
 assert.ok(en.includes("https://glean.smartcoder.ai/weekly/7"), "zh canonical link also present in en doc");
