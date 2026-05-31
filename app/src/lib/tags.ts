@@ -12,7 +12,7 @@
 import { CATEGORIES, type Category } from "../db/schema";
 
 const FAMILIES = new Set<string>(CATEGORIES);
-const MAX_TAGS = 4;
+const MAX_TAGS = 6;
 const MAX_SLUG_LEN = 40;
 
 export interface NormalizedTag {

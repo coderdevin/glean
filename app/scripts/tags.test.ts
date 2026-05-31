@@ -73,19 +73,18 @@ assert.equal(normalizeSlug(""), ""); // empty stays empty
   assert.equal(valid[0]!.nameZh, "检索增强");
 }
 
-// cap at 4 tags
+// cap at 6 tags
 {
   const { valid } = sanitizeProposedTags(
-    [
-      { slug: "a", name_zh: "a", name_en: "A", family: "code" },
-      { slug: "b", name_zh: "b", name_en: "B", family: "code" },
-      { slug: "c", name_zh: "c", name_en: "C", family: "code" },
-      { slug: "d", name_zh: "d", name_en: "D", family: "code" },
-      { slug: "e", name_zh: "e", name_en: "E", family: "code" },
-    ],
+    ["a", "b", "c", "d", "e", "f", "g", "h"].map((s) => ({
+      slug: s,
+      name_zh: s,
+      name_en: s.toUpperCase(),
+      family: "code",
+    })),
     "code",
   );
-  assert.equal(valid.length, 4);
+  assert.equal(valid.length, 6);
 }
 
 // tolerant of garbage input (null / non-array / non-object entries)

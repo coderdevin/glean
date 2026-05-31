@@ -53,7 +53,7 @@ tag 不只是标签，背后有落地页：
 - `slug`：小写 kebab-case，纯 ascii（`vector-db`，非 `Vector DB`）
 - `name_zh / name_en`：落地页双语显示名
 - `family`：必须为 `infra | data | code` 之一（落地页按此分组）
-- 数量：**2–4 个**（原为 1–3）
+- 数量：**3–6 个**（原为 1–3）；准确性优先于数量，贴切的不足 3 个时宁可少给，不凑数
 
 涉及：
 - zod schema（`llm.ts:262`）：`tags` 从 `z.array(z.string())` 改为对象数组 schema
@@ -81,7 +81,7 @@ analysis 调用时把现有 tags 注入 prompt（slug + 中英名），措辞：
 替换 `taxonomySet.has(t)` 过滤，改为（`sanitizeProposedTags` in `src/lib/tags.ts` +
 upsert）：
 1. **校验+合法化**每个 tag（`sanitizeProposedTags`）：slug 小写化、空格/非 ascii 转
-   `-`、去非法字符、去重、上限 4 个；family 不合法时回退到文章 category；缺失的
+   `-`、去非法字符、去重、上限 6 个；family 不合法时回退到文章 category；缺失的
    中英名按 slug 派生。非法 slug 丢弃并记 log（`tagsDropped` 语义从"不在白名单"变为
    "格式非法"）。
 2. **upsert（在 ingest 阶段）**：`INSERT INTO tags ... ON CONFLICT(slug) DO NOTHING`
