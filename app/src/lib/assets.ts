@@ -7,4 +7,4 @@
  * Bump this on ANY change to public/styles.css; every layout that links the
  * sheet imports this one constant so they can't drift out of sync.
  */
-export const CSS_VERSION = "20260531m";
+export const CSS_VERSION = "20260531n";

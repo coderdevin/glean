@@ -2006,13 +2006,12 @@ body[data-lang="zh"] .lang-en {
 .issue-toc__sublink { align-items: flex-start; }
 .issue-toc__subnum { transform: translateY(1px); }
 
-/* Mobile: collapsible dropdown holding the full vertical outline. */
+/* Mobile: the full outline in normal flow — expanded by default, NOT sticky and
+   NOT an internal scroll box. The whole list lays out and the page itself
+   scrolls. A sticky 60vh internal-scroll panel used to sit pinned at the top and
+   trap touch scrolling, which felt broken. (The summary can still collapse it.) */
 @media (max-width: 979px) {
   .issue-toc {
-    position: sticky;
-    top: 56px;
-    z-index: 30;
-    background: var(--c-canvas);
     margin: var(--s-md) 0 var(--s-lg);
   }
   .issue-toc__panel {
@@ -2040,9 +2039,6 @@ body[data-lang="zh"] .lang-en {
   .issue-toc__chev { transition: transform 0.2s ease; }
   .issue-toc__panel[open] .issue-toc__chev { transform: rotate(180deg); }
   .issue-toc__sticky {
-    max-height: 60vh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
     padding: 4px 8px 10px;
     border-top: 1px solid var(--c-hairline);
   }
