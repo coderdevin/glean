@@ -171,6 +171,11 @@ ${items}
   @page { margin: 14mm; }
   body { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
   a { text-decoration: none; }
+  /* Phones: trim the 32px side padding so narrow screens aren't cramped.
+     Honored by Apple Mail / iOS Mail / Gmail app; desktop clients ignore it. */
+  @media only screen and (max-width: 480px) {
+    .sheet td { padding-left: 18px !important; padding-right: 18px !important; }
+  }
   @media print {
     html, body { background: #ffffff !important; }
     .wrap { background: #ffffff !important; padding: 0 !important; }
@@ -194,8 +199,8 @@ ${styleBlock}
 </head>
 <body style="margin:0;padding:0;background:${PAPER};color:${INK};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${PAPER};opacity:0;">${esc(intro.slice(0, 110))}</div>
-<table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAPER};padding:16px 16px;">
-<tr><td align="center">
+<table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAPER};">
+<tr><td align="center" style="padding:16px;">
 <table role="presentation" class="sheet" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${CARD};border:1px solid ${RULE};border-radius:12px;overflow:hidden;">
 <tr><td style="padding:32px 32px 0 32px;">
 <div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;font-size:0;line-height:3px;">&nbsp;</div>
