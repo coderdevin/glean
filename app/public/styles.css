@@ -1623,7 +1623,9 @@ body[data-lang="zh"] .lang-en {
   letter-spacing: -1.2px;
   color: var(--c-on-dark);
   margin: 16px 0 20px;
-  max-width: 22ch;
+  /* Was 22ch — too narrow, forced an early wrap with a large right gutter.
+     Let the title use the masthead width (it still wraps naturally). */
+  max-width: 30ch;
   position: relative;
   z-index: 1;
 }
@@ -1687,6 +1689,9 @@ body[data-lang="zh"] .lang-en {
   font-variant-numeric: tabular-nums;
   user-select: none;
   transition: color 0.25s ease;
+  /* Drop the big serial to the vertical centre of the entry so it reads as a
+     unit with the title/lead instead of floating up by the eyebrow. */
+  align-self: center;
 }
 .issue-list-card:hover .issue-list-card__no { color: var(--coral-300); }
 .issue-list-card__body {
@@ -1694,7 +1699,6 @@ body[data-lang="zh"] .lang-en {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 62ch;
 }
 .issue-list-card__eyebrow {
   display: flex;
@@ -1737,6 +1741,9 @@ body[data-lang="zh"] .lang-en {
   line-height: 1.65;
   color: var(--c-body);
   margin: 0;
+  /* Keep the lead at a readable measure even though the title now fills the
+     full column width. */
+  max-width: 64ch;
 }
 .issue-list-card__meta {
   display: flex;
@@ -1770,7 +1777,7 @@ body[data-lang="zh"] .lang-en {
 @media (min-width: 980px) {
   .issue-layout--sidebar {
     display: grid;
-    grid-template-columns: 248px minmax(0, 1fr);
+    grid-template-columns: 300px minmax(0, 1fr);
     gap: clamp(40px, 5vw, 72px);
     align-items: start;
   }
@@ -1842,10 +1849,16 @@ body[data-lang="zh"] .lang-en {
 .issue-toc__subtext {
   min-width: 0;
   font-size: 12.5px;
-  white-space: nowrap;
+  /* Show up to two lines instead of truncating at one, so long titles are
+     readable in the (now wider) sidebar. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
+.issue-toc__sublink { align-items: flex-start; }
+.issue-toc__subnum { transform: translateY(1px); }
 
 /* Mobile: collapsible dropdown holding the full vertical outline. */
 @media (max-width: 979px) {
@@ -2166,6 +2179,71 @@ body[data-lang="zh"] .lang-en {
   justify-content: center;
   flex-wrap: wrap;
 }
+
+/* =========================================================================
+   Long-issue reading aids: top progress bar, back-to-top, mobile "now" label
+   ========================================================================= */
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 60;
+  pointer-events: none;
+}
+.reading-progress__bar {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: var(--c-primary);
+  will-change: transform;
+}
+
+.to-top {
+  position: fixed;
+  right: clamp(16px, 3vw, 32px);
+  bottom: clamp(16px, 3vw, 32px);
+  z-index: 55;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--c-hairline);
+  background: var(--c-canvas);
+  color: var(--c-ink);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.15s ease;
+}
+.to-top.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.to-top:hover { background: var(--c-surface-soft); color: var(--c-primary); }
+
+/* Current-section label inside the mobile TOC summary (desktop summary hidden). */
+.issue-toc__now {
+  font-family: var(--f-display);
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--c-muted);
+  margin-left: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+@media (min-width: 980px) { .issue-toc__now { display: none; } }
 
 /* =========================================================================
    Daily feed row (timeline)
@@ -3933,11 +4011,16 @@ body[data-lang="zh"] .lang-en {
 .standards-prose h2,
 .page-banner h1,
 .balance {
-  text-wrap: balance;
+  /* `pretty` fills each line before wrapping (and only tidies the last line),
+     so titles use the available width instead of `balance`'s even-halves split
+     that read as "wrapping early". CJK compounds stay intact via keep-all. */
+  text-wrap: pretty;
   word-break: keep-all;
   overflow-wrap: break-word;
   line-break: strict;
 }
+/* Opt specific elements back into balanced wrapping where it's wanted. */
+.balance { text-wrap: balance; }
 
 /* Mid-tier titles get text-wrap: pretty (Chrome 117+, Safari 17.4+):
    keeps last lines from being orphans without strict CJK locking. */

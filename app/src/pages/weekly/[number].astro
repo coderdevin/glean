@@ -90,6 +90,7 @@ const readDur = weeklyReadDuration(readMinutes);
     <NotFound kind="weekly" />
   ) : (
   <Fragment>
+  <div class="reading-progress" aria-hidden="true"><span class="reading-progress__bar" id="reading-progress-bar"></span></div>
   <section class="container" style="padding-top: 32px">
     <a href="/weekly" class="btn btn-text" style="margin-bottom: 16px; display: inline-block">
       <span class="lang-zh">← 所有期号</span><span class="lang-en">← All issues</span>
@@ -131,6 +132,7 @@ const readDur = weeklyReadDuration(readMinutes);
         <details class="issue-toc__panel" open>
           <summary class="issue-toc__summary">
             <span><span class="lang-zh">本期目录</span><span class="lang-en">Contents</span></span>
+            <span class="issue-toc__now" data-toc-now></span>
             <span class="issue-toc__summary-meta">{picks.length}<span class="issue-toc__chev" aria-hidden="true">▾</span></span>
           </summary>
           <nav class="issue-toc__sticky">
@@ -275,33 +277,64 @@ const readDur = weeklyReadDuration(readMinutes);
 
   <SubscribeCard source="weekly-issue" />
 
+  <button class="to-top" id="to-top" type="button" aria-label="回到顶部 · Back to top">↑</button>
+
   <script is:inline>
-    // Scroll-spy: highlight the sidebar TOC link for the section currently in
-    // the upper viewport band. Pure IntersectionObserver, no deps.
     (function () {
       const links = [...document.querySelectorAll(".issue-toc__link")];
-      if (links.length === 0) return;
-      const byId = new Map(links.map((a) => [a.getAttribute("data-toc"), a]));
       const sections = [...document.querySelectorAll(".issue-section[id]")];
-      if (sections.length === 0) return;
-      let current = null;
-      const activate = (id) => {
-        if (id === current) return;
-        current = id;
-        links.forEach((a) => a.classList.toggle("is-active", a.getAttribute("data-toc") === id));
+      const nowLabel = document.querySelector("[data-toc-now]");
+
+      // --- Scroll-spy: highlight the current section in the sidebar TOC, and
+      //     surface its name in the (mobile) collapsed-TOC summary. ---
+      if (links.length && sections.length) {
+        const byId = new Map(links.map((a) => [a.getAttribute("data-toc"), a]));
+        let current = null;
+        const activate = (id) => {
+          if (id === current) return;
+          current = id;
+          links.forEach((a) => a.classList.toggle("is-active", a.getAttribute("data-toc") === id));
+          const a = byId.get(id);
+          if (nowLabel && a) {
+            const t = a.querySelector(".issue-toc__text");
+            nowLabel.textContent = t ? t.textContent.trim() : "";
+          }
+        };
+        const obs = new IntersectionObserver(
+          (entries) => {
+            const inView = entries
+              .filter((e) => e.isIntersecting)
+              .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+            if (inView[0]) activate(inView[0].target.id);
+          },
+          { rootMargin: "-20% 0px -65% 0px", threshold: 0 },
+        );
+        sections.forEach((s) => obs.observe(s));
+        // TOC stays expanded by default; the mobile summary toggles it.
+      }
+
+      // --- Reading progress bar + back-to-top, throttled via rAF. ---
+      const bar = document.getElementById("reading-progress-bar");
+      const toTop = document.getElementById("to-top");
+      let ticking = false;
+      const onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+          const max = document.documentElement.scrollHeight - window.innerHeight;
+          const p = max > 0 ? Math.min(1, window.scrollY / max) : 0;
+          if (bar) bar.style.transform = `scaleX(${p})`;
+          if (toTop) toTop.classList.toggle("is-visible", window.scrollY > window.innerHeight);
+          ticking = false;
+        });
       };
-      const obs = new IntersectionObserver(
-        (entries) => {
-          const inView = entries
-            .filter((e) => e.isIntersecting)
-            .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-          if (inView[0]) activate(inView[0].target.id);
-        },
-        { rootMargin: "-20% 0px -65% 0px", threshold: 0 },
-      );
-      sections.forEach((s) => obs.observe(s));
-      // The TOC is expanded by default everywhere (the <details> stays `open`);
-      // on mobile the summary still lets the reader collapse it manually.
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+      if (toTop) {
+        toTop.addEventListener("click", () =>
+          window.scrollTo({ top: 0, behavior: "smooth" }),
+        );
+      }
     })();
   </script>
   </Fragment>
