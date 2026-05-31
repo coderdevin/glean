@@ -1719,11 +1719,23 @@ body[data-lang="zh"] .lang-en {
 .issue-contents__list {
   list-style: none;
   margin: 0 0 20px;
-  padding: 0;
+  padding: 0 6px 0 0;
   display: flex;
   flex-direction: column;
   gap: 18px;
+  /* Cap the overall height so a long issue (e.g. 38 picks) doesn't tower over
+     the cover card — the list scrolls within this bound. Slim quiet scrollbar
+     (matching the issue-page TOC) so it doesn't read as clipped. */
+  max-height: clamp(340px, 46vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-hairline) transparent;
 }
+.issue-contents__list::-webkit-scrollbar { width: 6px; }
+.issue-contents__list::-webkit-scrollbar-track { background: transparent; }
+.issue-contents__list::-webkit-scrollbar-thumb { background: var(--c-hairline); border-radius: 4px; }
+.issue-contents__list:hover::-webkit-scrollbar-thumb { background: var(--c-muted-soft); }
 .issue-contents__sec {
   display: flex;
   align-items: baseline;
