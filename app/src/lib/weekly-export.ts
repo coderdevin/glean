@@ -161,11 +161,9 @@ ${items}
     : "Read every article in full on the web →";
   const eyebrow = `${esc(siteName)} · ${zh ? "第" : "Issue"} ${no} ${zh ? "期" : ""} · ${esc(issue.dateStart)} → ${esc(issue.dateEnd)}`;
 
-  // Bilingual canonical links, appended at the very end (requested).
+  // Canonical web URLs (used by the read-on-web CTA).
   const zhUrl = `${base}/weekly/${issue.number}`;
   const enUrl = `${base}/en/weekly/${issue.number}`;
-  const linkLine = (label: string, url: string) =>
-    `${label} · <a href="${url}" style="color:${ACCENT};text-decoration:none;">${esc(url.replace(/^https?:\/\//, ""))}</a>`;
 
   // <style> is for browser screen + print only; mail clients drop it, so it can
   // never override the inline styles that email rendering relies on.
@@ -208,13 +206,8 @@ ${styleBlock}
 </td></tr>
 ${contentsHtml}
 ${sectionsHtml}
-<tr><td class="web-cta" style="padding:26px 32px 8px 32px;">
+<tr><td class="web-cta" style="padding:26px 32px 34px 32px;">
 <a href="${zh ? zhUrl : enUrl}" style="display:inline-block;padding:11px 24px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${readOnWeb}</a>
-</td></tr>
-<tr><td style="padding:22px 32px 30px 32px;border-top:1px solid ${RULE};color:${MUTED};font-size:12px;line-height:1.8;">
-<div style="font-weight:700;color:${INK};font-size:13px;margin-bottom:6px;">${esc(siteName)}</div>
-${linkLine(zh ? "中文" : "中文 (Chinese)", zhUrl)}<br>
-${linkLine(zh ? "English (英文)" : "English", enUrl)}
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->

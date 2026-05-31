@@ -116,14 +116,10 @@ assert.ok(
   zh.includes("https://glean.smartcoder.ai/a/my-article"),
   "article link uses site base",
 );
-// Bilingual canonical links appended at the end.
+// zh doc's read-on-web CTA points at the zh canonical URL.
 assert.ok(
   zh.includes("https://glean.smartcoder.ai/weekly/7"),
   "zh canonical link present",
-);
-assert.ok(
-  zh.includes("https://glean.smartcoder.ai/en/weekly/7"),
-  "en canonical link present",
 );
 assert.ok(!/unsubscribe/i.test(zh), "no unsubscribe link in a generic export");
 
@@ -139,7 +135,6 @@ assert.ok(en.includes("Title &amp; more"), "en title escaped");
 assert.ok(en.includes("Read every article in full on the web"), "en read-on-web CTA");
 assert.ok(/Contents/.test(en), "en contents heading present");
 assert.ok(en.includes("https://glean.smartcoder.ai/en/weekly/7"), "en canonical link present");
-assert.ok(en.includes("https://glean.smartcoder.ai/weekly/7"), "zh canonical link also present in en doc");
 // zh-only editor note must NOT appear in the en render (note_en was null).
 assert.ok(!en.includes("编辑点评"), "zh editor note absent from en render");
 
