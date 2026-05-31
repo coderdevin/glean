@@ -90,12 +90,39 @@ export function renderWeeklyExportHtml(args: {
   const docTitle = `${siteName} ${zh ? "周刊" : "Weekly"} #${no} · ${title}`;
   const langAttr = zh ? "zh-CN" : "en";
 
+  const secNo = (i: number) => String(i + 1).padStart(2, "0");
+  const pickTitle = (p: ExportPick) => (zh ? p.title_zh : p.title_en);
+
+  // Contents — a scannable index of section names + article titles, shown
+  // BEFORE the full details so a reader (or a printed page-one) sees the shape
+  // of the issue at a glance. Boxed in its own table so Outlook keeps the bg.
+  const contentsHtml = `<tr><td style="padding:22px 32px 0 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${RULE};border-radius:10px;background:${PAPER};">
+<tr><td style="padding:16px 18px;">
+<div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};font-weight:700;margin-bottom:6px;">${zh ? "目录 · Contents" : "Contents · 目录"}</div>
+${groups
+    .map(
+      (g, gi) => `<div style="margin-top:12px;">
+<div style="font-size:13px;font-weight:700;color:${ACCENT};">${secNo(gi)} · ${esc(zh ? g.zh : g.en)}</div>
+${g.picks
+        .map(
+          (p) =>
+            `<div style="font-size:13.5px;line-height:1.7;color:${INK};padding-left:2px;">· ${esc(pickTitle(p))}</div>`,
+        )
+        .join("")}
+</div>`,
+    )
+    .join("")}
+</td></tr>
+</table>
+</td></tr>`;
+
+  // Full details, section by section. Section numbers mirror the contents.
   const sectionsHtml = groups
-    .map((g) => {
+    .map((g, gi) => {
       const heading = zh ? g.zh : g.en;
       const items = g.picks
         .map((p) => {
-          const pTitle = zh ? p.title_zh : p.title_en;
           const pSummary = zh ? p.summary_zh : p.summary_en;
           const note = zh ? p.editor_note_zh : p.editor_note_en;
           const meta = `${esc(p.source_host)} · ${p.read_minutes} min`;
@@ -105,14 +132,14 @@ export function renderWeeklyExportHtml(args: {
           // Each pick is its own block so print can keep it whole (break-inside).
           return `<div class="pick" style="padding:16px 0;border-bottom:1px solid ${RULE};">
 <div style="font-size:12px;color:${MUTED};margin-bottom:4px;">${meta}</div>
-<a href="${base}/a/${esc(p.slug)}" style="font-size:17px;font-weight:600;color:${INK};text-decoration:none;line-height:1.4;">${esc(pTitle)}</a>
+<a href="${base}/a/${esc(p.slug)}" style="font-size:17px;font-weight:600;color:${INK};text-decoration:none;line-height:1.4;">${esc(pickTitle(p))}</a>
 <p style="margin:6px 0 0 0;font-size:14px;line-height:1.65;color:${MUTED};">${esc(pSummary)}</p>
 ${noteHtml}
 </div>`;
         })
         .join("");
-      return `<tr><td class="sec" style="padding:24px 32px 0 32px;">
-<div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${ACCENT};font-weight:600;margin-bottom:4px;">${esc(heading)}</div>
+      return `<tr><td class="sec" style="padding:26px 32px 0 32px;">
+<div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${ACCENT};font-weight:700;margin-bottom:6px;"><span style="display:inline-block;min-width:22px;padding:2px 7px;margin-right:8px;border-radius:6px;background:${PAPER};color:${ACCENT};border:1px solid ${RULE};letter-spacing:0;">${secNo(gi)}</span>${esc(heading)}</div>
 ${items}
 </td></tr>`;
     })
@@ -120,6 +147,12 @@ ${items}
 
   const readOnWeb = zh ? "在网页上阅读本期 →" : "Read this issue on the web →";
   const eyebrow = `${esc(siteName)} · ${zh ? "第" : "Issue"} ${no} ${zh ? "期" : ""} · ${esc(issue.dateStart)} → ${esc(issue.dateEnd)}`;
+
+  // Bilingual canonical links, appended at the very end (requested).
+  const zhUrl = `${base}/weekly/${issue.number}`;
+  const enUrl = `${base}/en/weekly/${issue.number}`;
+  const linkLine = (label: string, url: string) =>
+    `${label} · <a href="${url}" style="color:${ACCENT};text-decoration:none;">${esc(url.replace(/^https?:\/\//, ""))}</a>`;
 
   // <style> is for browser screen + print only; mail clients drop it, so it can
   // never override the inline styles that email rendering relies on.
@@ -154,17 +187,21 @@ ${styleBlock}
 <!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
 <table role="presentation" class="sheet" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:${CARD};border:1px solid ${RULE};border-radius:12px;overflow:hidden;">
 <tr><td style="padding:32px 32px 0 32px;">
+<div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;"></div>
 <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${eyebrow}</div>
 <h1 style="margin:8px 0 12px 0;font-size:26px;line-height:1.25;color:${INK};">${esc(title)}</h1>
 <p style="margin:0;font-size:15px;line-height:1.75;color:${MUTED};">${esc(intro)}</p>
 </td></tr>
+${contentsHtml}
 ${sectionsHtml}
-<tr><td class="web-cta" style="padding:24px 32px 8px 32px;">
-<a href="${base}/weekly/${issue.number}" style="display:inline-block;padding:11px 24px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${readOnWeb}</a>
+<tr><td class="web-cta" style="padding:26px 32px 8px 32px;">
+<a href="${zh ? zhUrl : enUrl}" style="display:inline-block;padding:11px 24px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${readOnWeb}</a>
 </td></tr>
-<tr><td style="padding:20px 32px 28px 32px;border-top:1px solid ${RULE};color:${MUTED};font-size:12px;line-height:1.7;">
-${esc(siteName)} · <a href="${base}" style="color:${MUTED};">${esc(base.replace(/^https?:\/\//, ""))}</a><br>
-${zh ? "本页可直接打印或另存为 PDF。" : "Print this page or save it as a PDF."}
+<tr><td style="padding:22px 32px 30px 32px;border-top:1px solid ${RULE};color:${MUTED};font-size:12px;line-height:1.8;">
+<div style="font-weight:700;color:${INK};font-size:13px;margin-bottom:6px;">${esc(siteName)}</div>
+${linkLine(zh ? "中文" : "中文 (Chinese)", zhUrl)}<br>
+${linkLine(zh ? "English (英文)" : "English", enUrl)}<br>
+<span style="color:${MUTED};">${zh ? "本页可直接打印或另存为 PDF。" : "Print this page or save it as a PDF."}</span>
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->

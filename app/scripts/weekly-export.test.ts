@@ -98,14 +98,27 @@ assert.ok(zh.includes("标题&lt;x&gt;"), "title is HTML-escaped");
 assert.ok(zh.includes("编辑点评&lt;b&gt;"), "editor note is HTML-escaped");
 assert.ok(!zh.includes("标题<x>"), "raw unescaped title not present");
 
+// Contents block lists section names + article titles before the details.
+assert.ok(/目录|Contents/.test(zh), "contents heading present");
+// "推理" and the title appear at least twice each (contents + detail).
+assert.ok(zh.split("推理").length - 1 >= 2, "section name appears in contents and detail");
+assert.ok(zh.split("第二篇").length - 1 >= 2, "article title appears in contents and detail");
+// Section numbering.
+assert.ok(zh.includes("01") && zh.includes("02"), "sections are numbered");
+
 // Links point at the site, no per-recipient/unsubscribe token.
 assert.ok(
   zh.includes("https://glean.smartcoder.ai/a/my-article"),
   "article link uses site base",
 );
+// Bilingual canonical links appended at the end.
 assert.ok(
   zh.includes("https://glean.smartcoder.ai/weekly/7"),
-  "read-on-web link present",
+  "zh canonical link present",
+);
+assert.ok(
+  zh.includes("https://glean.smartcoder.ai/en/weekly/7"),
+  "en canonical link present",
 );
 assert.ok(!/unsubscribe/i.test(zh), "no unsubscribe link in a generic export");
 
@@ -119,6 +132,9 @@ assert.ok(
 );
 assert.ok(en.includes("Title &amp; more"), "en title escaped");
 assert.ok(en.includes("Read this issue on the web"), "en read-on-web CTA");
+assert.ok(/Contents/.test(en), "en contents heading present");
+assert.ok(en.includes("https://glean.smartcoder.ai/en/weekly/7"), "en canonical link present");
+assert.ok(en.includes("https://glean.smartcoder.ai/weekly/7"), "zh canonical link also present in en doc");
 // zh-only editor note must NOT appear in the en render (note_en was null).
 assert.ok(!en.includes("编辑点评"), "zh editor note absent from en render");
 
