@@ -6,6 +6,7 @@ interface Props {
   /** Set true on /submit, /admin etc. so they aren't crawled. */
   noindex?: boolean;
 }
+import { CSS_VERSION } from "~/lib/assets";
 const { title, description, ogImage, noindex = false } = Astro.props;
 const lang = Astro.locals.lang ?? "zh";
 const htmlLang = lang === "zh" ? "zh-CN" : "en";
@@ -53,7 +54,7 @@ const isActive = (prefix: string): boolean => {
          which adds megabytes of woff2 subsets. font-display: swap is set
          in the @font-face rules, so the system CJK serif renders first. -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkai-regular.css" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href={`/styles.css?v=${CSS_VERSION}`} />
   </head>
   <body data-lang={lang}>
     <a href="#main" class="skip-link">跳到主要内容 · Skip to content</a>

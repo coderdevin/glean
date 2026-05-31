@@ -234,17 +234,8 @@ const toc = groups.map((g) => ({
         { rootMargin: "-20% 0px -65% 0px", threshold: 0 },
       );
       sections.forEach((s) => obs.observe(s));
-
-      // Mobile: the <details> TOC is `open` by default (so desktop shows it) —
-      // collapse it on small screens, and close it again after a jump.
-      const panel = document.querySelector(".issue-toc__panel");
-      const isMobile = () => window.matchMedia("(max-width: 979px)").matches;
-      if (panel && isMobile()) panel.removeAttribute("open");
-      document.querySelectorAll(".issue-toc__link, .issue-toc__sublink").forEach((a) => {
-        a.addEventListener("click", () => {
-          if (panel && isMobile()) panel.removeAttribute("open");
-        });
-      });
+      // The TOC is expanded by default everywhere (the <details> stays `open`);
+      // on mobile the summary still lets the reader collapse it manually.
     })();
   </script>
 </Site>

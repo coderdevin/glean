@@ -2,6 +2,7 @@
 interface Props {
   title: string;
 }
+import { CSS_VERSION } from "~/lib/assets";
 const { title } = Astro.props;
 const adminEmail = Astro.locals.adminEmail ?? "—";
 ---
@@ -20,7 +21,7 @@ const adminEmail = Astro.locals.adminEmail ?? "—";
       rel="stylesheet"
     />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
-    <link rel="stylesheet" href="/styles.css?v=admin2-8" />
+    <link rel="stylesheet" href={`/styles.css?v=${CSS_VERSION}`} />
     <slot name="head" />
   </head>
   <body data-lang="zh">

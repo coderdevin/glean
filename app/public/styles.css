@@ -1629,9 +1629,11 @@ body[data-lang="zh"] .lang-en {
 }
 .issue-masthead__lead {
   font-size: 17px;
-  line-height: 1.65;
+  line-height: 1.7;
   color: var(--c-on-dark-soft);
-  max-width: 58ch;
+  /* Wider measure so the lead uses the masthead width instead of wrapping
+     early with a big right gutter (it's max-width, not a <br>). */
+  max-width: 74ch;
   margin: 0 0 24px;
   position: relative;
   z-index: 1;
@@ -1661,13 +1663,13 @@ body[data-lang="zh"] .lang-en {
 .issue-list-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, auto) 1fr;
-  gap: clamp(20px, 4vw, 60px);
+  grid-template-columns: minmax(0, max-content) 1fr;
+  gap: clamp(18px, 3vw, 40px);
   align-items: start;
   text-decoration: none;
   color: inherit;
   border-top: 1px solid var(--c-hairline);
-  padding: var(--s-xxl) 0;
+  padding: var(--s-xl) 0;
 }
 .issue-list-card:first-child {
   border-top: 0;
@@ -1678,9 +1680,9 @@ body[data-lang="zh"] .lang-en {
 .issue-list-card__no {
   font-family: var(--f-display);
   font-weight: 500;
-  font-size: clamp(54px, 7vw, 104px);
-  line-height: 0.82;
-  letter-spacing: -3px;
+  font-size: clamp(40px, 5vw, 76px);
+  line-height: 0.9;
+  letter-spacing: -2px;
   color: var(--c-surface-cream-strong);
   font-variant-numeric: tabular-nums;
   user-select: none;
@@ -1817,13 +1819,19 @@ body[data-lang="zh"] .lang-en {
 .issue-toc__text { min-width: 0; font-size: 13px; font-weight: 600; }
 .issue-toc__count { flex: 0 0 auto; margin-left: auto; font-family: var(--f-mono); font-size: 11px; color: var(--c-muted-soft); }
 
-/* Article titles nested under each section */
-.issue-toc__sublist { list-style: none; margin: 1px 0 2px; padding: 0; }
+/* Article titles nested under each section — a left guide line ties the
+   titles to their section so the two levels read as distinct. */
+.issue-toc__sublist {
+  list-style: none;
+  margin: 3px 0 10px 19px;
+  padding: 0;
+  border-left: 1px solid var(--c-hairline);
+}
 .issue-toc__sublink {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 4px 10px 4px 30px;
+  padding: 4px 8px 4px 14px;
   text-decoration: none;
   color: var(--c-muted);
   line-height: 1.4;
