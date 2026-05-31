@@ -9,9 +9,11 @@
  *      cards). Email clients ignore <style>, so it can't hurt them.
  *   2. Copy-paste into an email compose window (Outlook / Apple Mail / Gmail).
  *      EVERY visible element is styled INLINE with a single-column <table>
- *      layout — the only thing that survives across mail clients. The doc adds
- *      an MSO "ghost table" so Outlook (Word engine, no max-width) keeps the
- *      600px column, and the Apple-Mail "disable reformatting" meta.
+ *      layout — the only thing that survives across mail clients. The body is
+ *      FULLY FLUID (width:100%, no inline max-width): mail clients ignore the
+ *      `<style>` block, so a max-width there can't make phone Outlook treat the
+ *      mail as a fixed-width page and zoom it out. The reading-width cap is a
+ *      screen-only media query, so it shapes the browser/PDF view only.
  *
  * The palette echoes the site's warm paper + terracotta accent without any
  * external CSS, so the file renders identically offline and inside an email.
@@ -104,20 +106,20 @@ export function renderWeeklyExportHtml(args: {
   }));
 
   // Contents — a scannable index of section names + numbered article titles,
-  // shown BEFORE the full details so a reader (or a printed page-one) sees the
-  // shape of the issue at a glance. Boxed in its own table so Outlook keeps bg.
-  const contentsHtml = `<tr><td style="padding:22px 24px 0 24px;">
+  // shown BEFORE the full details. Kept as ONE tinted card (its own table so
+  // Outlook keeps the bg); it's the only boxed element now the outer card is gone.
+  const contentsHtml = `<tr><td style="padding:20px 20px 0 20px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${RULE};border-radius:10px;background:${PAPER};">
-<tr><td style="padding:16px 18px;">
-<div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};font-weight:700;margin-bottom:6px;">${zh ? "目录 · Contents" : "Contents · 目录"}</div>
+<tr><td style="padding:14px 16px;">
+<div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};font-weight:700;margin-bottom:4px;">${zh ? "目录 · Contents" : "Contents · 目录"}</div>
 ${numberedGroups
     .map(
-      (g, gi) => `<div style="margin-top:12px;">
+      (g, gi) => `<div style="margin-top:10px;">
 <div style="font-size:14px;font-weight:700;color:${ACCENT};">${secNo(gi)} · ${esc(zh ? g.zh : g.en)}</div>
 ${g.picks
         .map(
           ({ pick, n }) =>
-            `<div style="font-size:14.5px;line-height:1.75;color:${INK};padding-left:2px;"><span style="color:${MUTED};font-variant-numeric:tabular-nums;">${n}.</span> ${esc(pickTitle(pick))}</div>`,
+            `<div style="font-size:14.5px;line-height:1.7;color:${INK};"><span style="color:${MUTED};font-variant-numeric:tabular-nums;">${n}.</span> ${esc(pickTitle(pick))}</div>`,
         )
         .join("")}
 </div>`,
@@ -153,7 +155,7 @@ ${noteHtml}
       // Number + heading share ONE tinted block (a section banner with a left
       // accent rule). A single bg cell — number and title sit on the same color
       // block, and there's no inline-block for Outlook to break onto two lines.
-      return `<tr><td class="sec" style="padding:28px 24px 0 24px;">
+      return `<tr><td class="sec" style="padding:26px 20px 0 20px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;"><tr>
 <td style="background:${PAPER};border-left:4px solid ${ACCENT};padding:11px 16px;line-height:1.35;"><span style="font-size:15px;font-weight:700;color:${ACCENT};">${secNo(gi)}</span><span style="color:${MUTED};">&nbsp;·&nbsp;</span><span style="font-size:19px;font-weight:700;color:${ACCENT};">${esc(heading)}</span></td>
 </tr></table>
@@ -177,10 +179,13 @@ ${items}
   @page { margin: 14mm; }
   body { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
   a { text-decoration: none; }
-  /* Phones: trim the 32px side padding so narrow screens aren't cramped.
-     Honored by Apple Mail / iOS Mail / Gmail app; desktop clients ignore it. */
-  @media only screen and (max-width: 600px) {
-    .sheet > tbody > tr > td { padding-left: 14px !important; padding-right: 14px !important; }
+  /* The email body is fully fluid (width:100%, NO inline max-width) so phone
+     mail clients render it at device width instead of treating a max-width as a
+     fixed px width and zooming the whole thing out. The reading-width cap is
+     applied ONLY for browser screens (preview + "save as PDF") and is ignored
+     by mail clients, so it can't trigger mobile zoom-to-fit. */
+  @media screen and (min-width: 720px) {
+    .sheet { max-width: 760px !important; margin: 0 auto !important; }
   }
   @media print {
     html, body { background: #ffffff !important; }
@@ -203,13 +208,12 @@ ${items}
 <!--[if mso]><style>table,td,div,p,a{font-family:'Segoe UI',Arial,sans-serif !important;}</style><![endif]-->
 ${styleBlock}
 </head>
-<body style="margin:0;padding:0;background:${PAPER};color:${INK};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
-<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${PAPER};opacity:0;">${esc(intro.slice(0, 110))}</div>
-<table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PAPER};">
-<tr><td align="center" style="padding:16px;">
-<!--[if mso]><table role="presentation" width="760" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-<table role="presentation" class="sheet" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:760px;background:${CARD};border:1px solid ${RULE};border-radius:12px;overflow:hidden;">
-<tr><td style="padding:30px 24px 0 24px;">
+<body style="margin:0;padding:0;background:${CARD};color:${INK};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${CARD};opacity:0;">${esc(intro.slice(0, 110))}</div>
+<table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${CARD};">
+<tr><td align="center" style="padding:8px 0 22px;">
+<table role="presentation" class="sheet" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${CARD};">
+<tr><td style="padding:28px 20px 0 20px;">
 <div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;font-size:0;line-height:3px;">&nbsp;</div>
 <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${eyebrow}</div>
 <h1 style="margin:8px 0 12px 0;font-size:26px;line-height:1.25;color:${INK};">${esc(title)}</h1>
@@ -217,11 +221,10 @@ ${styleBlock}
 </td></tr>
 ${contentsHtml}
 ${sectionsHtml}
-<tr><td class="web-cta" style="padding:26px 24px 34px 24px;">
+<tr><td class="web-cta" style="padding:26px 20px 32px 20px;">
 <a href="${zh ? zhUrl : enUrl}" style="display:inline-block;padding:12px 26px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">${readOnWeb}</a>
 </td></tr>
 </table>
-<!--[if mso]></td></tr></table><![endif]-->
 </td></tr>
 </table>
 </body>
