@@ -140,10 +140,10 @@ ${g.picks
             ? `<p style="margin:8px 0 0 0;font-size:13px;line-height:1.6;color:${ACCENT};"><span style="font-weight:600;">${zh ? "编辑" : "Editor"}</span> ${esc(note)}</p>`
             : "";
           // Each pick is its own block so print can keep it whole (break-inside).
-          // The number sits on the meta line, then the title on its own line.
+          // The running number leads the title (accent-colored), meta sits above.
           return `<div class="pick" style="padding:16px 0;border-bottom:1px solid ${RULE};">
-<div style="font-size:12px;color:${MUTED};margin-bottom:4px;"><span style="font-weight:700;color:${ACCENT};">${n}.</span> ${meta}</div>
-<a href="${base}/a/${esc(p.slug)}" style="font-size:17px;font-weight:600;color:${INK};text-decoration:none;line-height:1.4;">${esc(pickTitle(p))}</a>
+<div style="font-size:12px;color:${MUTED};margin-bottom:4px;">${meta}</div>
+<a href="${base}/a/${esc(p.slug)}" style="font-size:17px;font-weight:600;color:${INK};text-decoration:none;line-height:1.4;"><span style="color:${ACCENT};">${n}.</span> ${esc(pickTitle(p))}</a>
 <p style="margin:6px 0 0 0;font-size:14px;line-height:1.65;color:${MUTED};">${esc(pSummary)}</p>
 ${noteHtml}
 </div>`;
