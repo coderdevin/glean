@@ -67,8 +67,11 @@ const range = thisWeekToDate(new Date(), siteTz(env));
                   {iss.publishedAt ? "已发布" : "草稿"}
                 </span>
               )}
-              <span class="wk-row__chevron" aria-hidden="true">→</span>
             </a>
+            <a class="wk-row__export"
+               href={`/api/admin/weekly/${iss.id}/export?lang=zh&inline=1`}
+               target="_blank" rel="noopener"
+               title="导出 HTML（打印为 PDF / 复制到邮箱）">导出 HTML</a>
           </li>
         ))}
       </ul>
@@ -167,7 +170,14 @@ const range = thisWeekToDate(new Date(), siteTz(env));
     flex-direction: column;
     gap: var(--s-sm);
   }
+  .wk-row {
+    display: flex;
+    align-items: stretch;
+    gap: var(--s-sm);
+  }
   .wk-row__link {
+    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: var(--s-md);
@@ -181,6 +191,28 @@ const range = thisWeekToDate(new Date(), siteTz(env));
   }
   .wk-row__link:hover {
     border-color: var(--c-primary);
+    background: var(--c-surface-soft);
+  }
+
+  /* Export action — sibling of the editor link (anchors can't nest) */
+  .wk-row__export {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--s-md);
+    border: 1px solid var(--c-hairline);
+    border-radius: var(--r-lg);
+    background: var(--c-canvas);
+    color: var(--c-muted);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  }
+  .wk-row__export:hover {
+    border-color: var(--c-primary);
+    color: var(--c-primary);
     background: var(--c-surface-soft);
   }
   .wk-row__no {
@@ -210,10 +242,10 @@ const range = thisWeekToDate(new Date(), siteTz(env));
   }
   .wk-row__meta { font-size: 12px; color: var(--c-muted-soft); margin-top: 2px; }
   .wk-row__badge { flex: none; }
-  .wk-row__chevron { flex: none; color: var(--c-muted-soft); font-size: 16px; }
 
   @media (max-width: 620px) {
     .wk-head { flex-direction: column; align-items: stretch; }
     .wk-gen-open { width: 100%; }
+    .wk-row__export { padding: var(--s-sm) var(--s-md); }
   }
 </style>
