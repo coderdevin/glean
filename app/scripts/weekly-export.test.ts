@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  renderWeeklyEmailFragment,
   renderWeeklyExportHtml,
   exportFilename,
   type ExportGroup,
@@ -62,6 +63,7 @@ const args = {
 
 // --- zh render ------------------------------------------------------------
 const zh = renderWeeklyExportHtml({ lang: "zh", ...args });
+const zhFragment = renderWeeklyEmailFragment({ lang: "zh", ...args });
 
 assert.ok(zh.startsWith("<!doctype html>"), "is a full HTML document");
 assert.ok(/<html lang="zh-CN">/.test(zh), "zh sets lang=zh-CN");
@@ -78,9 +80,18 @@ assert.ok(!/<link\b/i.test(zh), "no <link> (no external stylesheet)");
 assert.ok(!/<script\b/i.test(zh), "no <script> in the artifact");
 assert.ok(!/\ssrc=/i.test(zh), "no external src= references");
 
-// Email-safe: table layout + inline styles present.
-assert.ok(/role="presentation"/.test(zh), "uses presentation tables");
+// Email-safe: inline styles present; copied body avoids table wrappers that can
+// make phone clients zoom a pasted desktop-width page down.
 assert.ok(zh.includes('style="'), "uses inline styles");
+
+// The clipboard payload must be a body fragment, not a full desktop HTML
+// document. Mobile mail clients often zoom out full pasted documents or
+// width-capped wrappers.
+assert.ok(!zhFragment.includes("<!doctype"), "copy fragment has no doctype");
+assert.ok(!/<html\b|<head\b|<body\b/i.test(zhFragment), "copy fragment has no document shell");
+assert.ok(!/max-width\s*:\s*\d+px/i.test(zhFragment), "copy fragment has no inline width cap");
+assert.ok(!/\bwidth=["']?100%["']?/i.test(zhFragment), "copy fragment avoids width=100% tables");
+assert.ok(zhFragment.includes("本期标题"), "copy fragment contains issue content");
 
 // Outlook / Apple Mail hardening.
 assert.ok(
@@ -88,8 +99,9 @@ assert.ok(
   "apple mail meta present",
 );
 assert.ok(zh.includes("[if mso]"), "MSO conditional (Outlook font fallback) present");
-// Body column capped at a comfortable reading width (not the old narrow 600).
-assert.ok(/max-width:\s*760px/.test(zh), "body capped at 760px reading width");
+// Browser/PDF preview gets a comfortable reading cap via CSS only; the copied
+// email fragment intentionally has no inline width cap.
+assert.ok(/\.glean-sheet\s*\{\s*max-width:\s*760px/i.test(zh), "browser preview capped at 760px");
 
 // Print support for browser PDF.
 assert.ok(zh.includes("@media print"), "print stylesheet present");

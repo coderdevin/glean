@@ -3,6 +3,7 @@ import { db } from "~/db/client";
 import { weeklyById, picksForWeekly } from "~/lib/queries";
 import { buildWeeklyGroups, type LayoutSection } from "~/lib/weekly";
 import {
+  renderWeeklyEmailFragment,
   renderWeeklyExportHtml,
   exportFilename,
   type ExportGroup,
@@ -72,6 +73,21 @@ export const GET: APIRoute = async (ctx) => {
     },
     groups: exportGroups,
   });
+  const emailFragment = renderWeeklyEmailFragment({
+    lang,
+    siteName: env.SITE_NAME || "Glean",
+    siteUrl: (env.SITE_URL || "").replace(/\/$/, ""),
+    issue: {
+      number: issue.number,
+      titleZh: issue.titleZh,
+      titleEn: issue.titleEn,
+      introZh: issue.introZh,
+      introEn: issue.introEn,
+      dateStart: issue.dateStart,
+      dateEnd: issue.dateEnd,
+    },
+    groups: exportGroups,
+  });
 
   const filename = exportFilename(issue.number, lang);
 
@@ -84,9 +100,12 @@ export const GET: APIRoute = async (ctx) => {
     });
   }
 
-  return new Response(previewPage(html, filename, lang, id, issue.number), {
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
+  return new Response(
+    previewPage(html, emailFragment, filename, lang, id, issue.number),
+    {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    },
+  );
 };
 
 /**
@@ -96,6 +115,7 @@ export const GET: APIRoute = async (ctx) => {
  */
 function previewPage(
   cleanHtml: string,
+  emailFragment: string,
   filename: string,
   lang: Lang,
   id: string,
@@ -106,6 +126,7 @@ function previewPage(
   // Embed safely: JSON-encode, then neutralize any "</script" so the literal
   // can't terminate the inline <script> early.
   const payload = JSON.stringify(cleanHtml).replace(/<\//g, "<\\/");
+  const copyPayload = JSON.stringify(emailFragment).replace(/<\//g, "<\\/");
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -145,6 +166,7 @@ function previewPage(
 </div>
 <script>
   const HTML = ${payload};
+  const EMAIL_FRAGMENT = ${copyPayload};
   const FILENAME = ${JSON.stringify(filename)};
   const frame = document.getElementById("frame");
   frame.srcdoc = HTML;
@@ -169,21 +191,29 @@ function previewPage(
     const ok = document.getElementById("ok");
     try {
       const item = new ClipboardItem({
-        "text/html": new Blob([HTML], { type: "text/html" }),
-        "text/plain": new Blob([HTML], { type: "text/plain" }),
+        "text/html": new Blob([EMAIL_FRAGMENT], { type: "text/html" }),
+        "text/plain": new Blob([EMAIL_FRAGMENT], { type: "text/plain" }),
       });
       await navigator.clipboard.write([item]);
     } catch (e) {
-      // Fallback: select the rendered iframe body and execCommand copy.
+      // Fallback: select only the paste-ready email fragment, never the full
+      // preview document shell.
       try {
-        const doc = frame.contentDocument;
+        const host = document.createElement("div");
+        host.contentEditable = "true";
+        host.style.position = "fixed";
+        host.style.left = "-9999px";
+        host.style.top = "0";
+        host.innerHTML = EMAIL_FRAGMENT;
+        document.body.appendChild(host);
         const sel = window.getSelection();
-        const range = doc.createRange();
-        range.selectNodeContents(doc.body);
+        const range = document.createRange();
+        range.selectNodeContents(host);
         sel.removeAllRanges();
         sel.addRange(range);
         document.execCommand("copy");
         sel.removeAllRanges();
+        host.remove();
       } catch (e2) {
         alert("自动复制失败，请在预览区手动全选复制。");
         return;

@@ -8,8 +8,8 @@
  *      `@media print` rules for tidy pagination (white background, no clipped
  *      cards). Email clients ignore <style>, so it can't hurt them.
  *   2. Copy-paste into an email compose window (Outlook / Apple Mail / Gmail).
- *      EVERY visible element is styled INLINE with a single-column <table>
- *      layout — the only thing that survives across mail clients. The body is
+ *      EVERY visible element is styled INLINE in a simple block document flow.
+ *      The body is
  *      FULLY FLUID (width:100%, no inline max-width): mail clients ignore the
  *      `<style>` block, so a max-width there can't make phone Outlook treat the
  *      mail as a fixed-width page and zoom it out. The reading-width cap is a
@@ -66,23 +66,28 @@ export interface ExportIssueMeta {
   dateEnd: string;
 }
 
+interface RenderArgs {
+  lang: Lang;
+  siteName: string;
+  siteUrl: string;
+  issue: ExportIssueMeta;
+  groups: ExportGroup[];
+}
+
 /** A safe, descriptive download filename for an issue in a given language. */
 export function exportFilename(number: number, lang: Lang): string {
   return `glean-weekly-${String(number).padStart(3, "0")}-${lang}.html`;
 }
 
 /**
- * Render one weekly issue as a self-contained HTML document in a single
- * language. No unsubscribe/recipient tokens — this is a generic, shareable
- * artifact, not a per-recipient send.
+ * Render the exact HTML fragment that should be pasted into an email composer.
+ *
+ * Deliberately no document shell, no width=100% tables, and no inline
+ * max-width. Mobile mail clients can treat pasted full documents / width-capped
+ * wrappers as desktop pages and zoom the whole message out. This fragment is a
+ * mobile-first document flow with inline styles only.
  */
-export function renderWeeklyExportHtml(args: {
-  lang: Lang;
-  siteName: string;
-  siteUrl: string;
-  issue: ExportIssueMeta;
-  groups: ExportGroup[];
-}): string {
+export function renderWeeklyEmailFragment(args: RenderArgs): string {
   const { lang, siteName, siteUrl, issue, groups } = args;
   const zh = lang === "zh";
   const base = siteUrl.replace(/\/$/, "");
@@ -90,8 +95,6 @@ export function renderWeeklyExportHtml(args: {
 
   const title = zh ? issue.titleZh : issue.titleEn;
   const intro = zh ? issue.introZh : issue.introEn;
-  const docTitle = `${siteName} ${zh ? "周刊" : "Weekly"} #${no} · ${title}`;
-  const langAttr = zh ? "zh-CN" : "en";
 
   const secNo = (i: number) => String(i + 1).padStart(2, "0");
   const pickTitle = (p: ExportPick) => (zh ? p.title_zh : p.title_en);
@@ -106,11 +109,9 @@ export function renderWeeklyExportHtml(args: {
   }));
 
   // Contents — a scannable index of section names + numbered article titles,
-  // shown BEFORE the full details. Kept as ONE tinted card (its own table so
-  // Outlook keeps the bg); it's the only boxed element now the outer card is gone.
-  const contentsHtml = `<tr><td style="padding:20px 20px 0 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${RULE};border-radius:10px;background:${PAPER};">
-<tr><td style="padding:14px 16px;">
+  // shown BEFORE the full details. Kept as ONE tinted card; it's the only boxed
+  // element now the outer card is gone.
+  const contentsHtml = `<div style="margin:20px 16px 0 16px;padding:14px 16px;border:1px solid ${RULE};border-radius:10px;background:${PAPER};overflow-wrap:anywhere;word-break:break-word;">
 <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};font-weight:700;margin-bottom:4px;">${zh ? "目录 · Contents" : "Contents · 目录"}</div>
 ${numberedGroups
     .map(
@@ -125,9 +126,7 @@ ${g.picks
 </div>`,
     )
     .join("")}
-</td></tr>
-</table>
-</td></tr>`;
+</div>`;
 
   // Full details, section by section. Section numbers mirror the contents;
   // each article carries its running number as a leading badge.
@@ -146,8 +145,8 @@ ${g.picks
           // The running number leads the title (accent-colored), meta sits above.
           return `<div class="pick" style="padding:16px 0;border-bottom:1px solid ${RULE};">
 <div style="font-size:13px;color:${MUTED};margin-bottom:4px;">${meta}</div>
-<a href="${base}/a/${esc(p.slug)}" style="font-size:18px;font-weight:600;color:${INK};text-decoration:none;line-height:1.45;"><span style="color:${MUTED};font-weight:500;">${n}.</span> ${esc(pickTitle(p))}</a>
-<p style="margin:7px 0 0 0;font-size:15.5px;line-height:1.75;color:${BODY};">${esc(pSummary)}</p>
+<a href="${base}/a/${esc(p.slug)}" style="font-size:18px;font-weight:600;color:${INK};text-decoration:none;line-height:1.45;overflow-wrap:anywhere;word-break:break-word;"><span style="color:${MUTED};font-weight:500;">${n}.</span> ${esc(pickTitle(p))}</a>
+<p style="margin:7px 0 0 0;font-size:15.5px;line-height:1.75;color:${BODY};overflow-wrap:anywhere;word-break:break-word;">${esc(pSummary)}</p>
 ${noteHtml}
 </div>`;
         })
@@ -155,12 +154,10 @@ ${noteHtml}
       // Number + heading share ONE tinted block (a section banner with a left
       // accent rule). A single bg cell — number and title sit on the same color
       // block, and there's no inline-block for Outlook to break onto two lines.
-      return `<tr><td class="sec" style="padding:26px 20px 0 20px;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;"><tr>
-<td style="background:${PAPER};border-left:4px solid ${ACCENT};padding:11px 16px;line-height:1.35;"><span style="font-size:15px;font-weight:700;color:${ACCENT};">${secNo(gi)}</span><span style="color:${MUTED};">&nbsp;·&nbsp;</span><span style="font-size:19px;font-weight:700;color:${ACCENT};">${esc(heading)}</span></td>
-</tr></table>
+      return `<div class="sec" style="padding:26px 16px 0 16px;">
+<div style="background:${PAPER};border-left:4px solid ${ACCENT};padding:11px 14px;line-height:1.35;overflow-wrap:anywhere;word-break:break-word;"><span style="font-size:15px;font-weight:700;color:${ACCENT};">${secNo(gi)}</span><span style="color:${MUTED};">&nbsp;·&nbsp;</span><span style="font-size:19px;font-weight:700;color:${ACCENT};">${esc(heading)}</span></div>
 ${items}
-</td></tr>`;
+</div>`;
     })
     .join("");
 
@@ -172,6 +169,38 @@ ${items}
   // Canonical web URLs (used by the read-on-web CTA).
   const zhUrl = `${base}/weekly/${issue.number}`;
   const enUrl = `${base}/en/weekly/${issue.number}`;
+
+  return `<div class="glean-export" style="margin:0;padding:0;background:${CARD};color:${INK};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',Arial,sans-serif;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%;">
+<div class="glean-sheet" style="margin:0 auto;background:${CARD};">
+<div style="padding:28px 16px 0 16px;">
+<div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;font-size:0;line-height:3px;">&nbsp;</div>
+<div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${eyebrow}</div>
+<h1 style="margin:8px 0 12px 0;font-size:26px;line-height:1.25;color:${INK};overflow-wrap:anywhere;word-break:break-word;">${esc(title)}</h1>
+<p style="margin:0;font-size:16px;line-height:1.8;color:${BODY};overflow-wrap:anywhere;word-break:break-word;">${esc(intro)}</p>
+</div>
+${contentsHtml}
+${sectionsHtml}
+<div class="web-cta" style="padding:26px 16px 32px 16px;">
+<a href="${zh ? zhUrl : enUrl}" style="display:block;text-align:center;padding:12px 18px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;line-height:1.4;overflow-wrap:anywhere;word-break:break-word;">${readOnWeb}</a>
+</div>
+</div>
+</div>`;
+}
+
+/**
+ * Render one weekly issue as a self-contained HTML document in a single
+ * language. No unsubscribe/recipient tokens — this is a generic, shareable
+ * artifact, not a per-recipient send.
+ */
+export function renderWeeklyExportHtml(args: RenderArgs): string {
+  const { lang, siteName, issue } = args;
+  const zh = lang === "zh";
+  const no = String(issue.number).padStart(3, "0");
+  const title = zh ? issue.titleZh : issue.titleEn;
+  const intro = zh ? issue.introZh : issue.introEn;
+  const docTitle = `${siteName} ${zh ? "周刊" : "Weekly"} #${no} · ${title}`;
+  const langAttr = zh ? "zh-CN" : "en";
+  const bodyHtml = renderWeeklyEmailFragment(args);
 
   // <style> is for browser screen + print only; mail clients drop it, so it can
   // never override the inline styles that email rendering relies on.
@@ -185,12 +214,12 @@ ${items}
      applied ONLY for browser screens (preview + "save as PDF") and is ignored
      by mail clients, so it can't trigger mobile zoom-to-fit. */
   @media screen and (min-width: 720px) {
-    .sheet { max-width: 760px !important; margin: 0 auto !important; }
+    .glean-sheet { max-width: 760px !important; margin: 0 auto !important; }
   }
   @media print {
     html, body { background: #ffffff !important; }
     .wrap { background: #ffffff !important; padding: 0 !important; }
-    .sheet { border: 0 !important; box-shadow: none !important; max-width: 100% !important; }
+    .glean-sheet { border: 0 !important; box-shadow: none !important; max-width: 100% !important; }
     .pick { break-inside: avoid; page-break-inside: avoid; }
     .sec { break-inside: avoid-page; }
     .web-cta { display: none !important; }
@@ -210,23 +239,9 @@ ${styleBlock}
 </head>
 <body style="margin:0;padding:0;background:${CARD};color:${INK};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;">
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${CARD};opacity:0;">${esc(intro.slice(0, 110))}</div>
-<table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${CARD};">
-<tr><td align="center" style="padding:8px 0 22px;">
-<table role="presentation" class="sheet" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${CARD};">
-<tr><td style="padding:28px 20px 0 20px;">
-<div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;font-size:0;line-height:3px;">&nbsp;</div>
-<div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${eyebrow}</div>
-<h1 style="margin:8px 0 12px 0;font-size:26px;line-height:1.25;color:${INK};">${esc(title)}</h1>
-<p style="margin:0;font-size:16px;line-height:1.8;color:${BODY};">${esc(intro)}</p>
-</td></tr>
-${contentsHtml}
-${sectionsHtml}
-<tr><td class="web-cta" style="padding:26px 20px 32px 20px;">
-<a href="${zh ? zhUrl : enUrl}" style="display:inline-block;padding:12px 26px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">${readOnWeb}</a>
-</td></tr>
-</table>
-</td></tr>
-</table>
+<div class="wrap" style="background:${CARD};padding:8px 0 22px;">
+${bodyHtml}
+</div>
 </body>
 </html>`;
 }
