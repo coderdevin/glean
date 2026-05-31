@@ -109,15 +109,15 @@ export function renderWeeklyExportHtml(args: {
   const contentsHtml = `<tr><td style="padding:22px 24px 0 24px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${RULE};border-radius:10px;background:${PAPER};">
 <tr><td style="padding:16px 18px;">
-<div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};font-weight:700;margin-bottom:6px;">${zh ? "目录 · Contents" : "Contents · 目录"}</div>
+<div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};font-weight:700;margin-bottom:6px;">${zh ? "目录 · Contents" : "Contents · 目录"}</div>
 ${numberedGroups
     .map(
       (g, gi) => `<div style="margin-top:12px;">
-<div style="font-size:13px;font-weight:700;color:${ACCENT};">${secNo(gi)} · ${esc(zh ? g.zh : g.en)}</div>
+<div style="font-size:14px;font-weight:700;color:${ACCENT};">${secNo(gi)} · ${esc(zh ? g.zh : g.en)}</div>
 ${g.picks
         .map(
           ({ pick, n }) =>
-            `<div style="font-size:13.5px;line-height:1.7;color:${INK};padding-left:2px;"><span style="color:${MUTED};font-variant-numeric:tabular-nums;">${n}.</span> ${esc(pickTitle(pick))}</div>`,
+            `<div style="font-size:14.5px;line-height:1.75;color:${INK};padding-left:2px;"><span style="color:${MUTED};font-variant-numeric:tabular-nums;">${n}.</span> ${esc(pickTitle(pick))}</div>`,
         )
         .join("")}
 </div>`,
@@ -138,14 +138,14 @@ ${g.picks
           const note = zh ? p.editor_note_zh : p.editor_note_en;
           const meta = `${esc(p.source_host)} · ${p.read_minutes} min`;
           const noteHtml = note
-            ? `<p style="margin:8px 0 0 0;font-size:13px;line-height:1.6;color:${ACCENT};"><span style="font-weight:600;">${zh ? "编辑" : "Editor"}</span> ${esc(note)}</p>`
+            ? `<p style="margin:9px 0 0 0;font-size:13.5px;line-height:1.65;color:${ACCENT};"><span style="font-weight:600;">${zh ? "编辑" : "Editor"}</span> ${esc(note)}</p>`
             : "";
           // Each pick is its own block so print can keep it whole (break-inside).
           // The running number leads the title (accent-colored), meta sits above.
           return `<div class="pick" style="padding:16px 0;border-bottom:1px solid ${RULE};">
-<div style="font-size:12px;color:${MUTED};margin-bottom:4px;">${meta}</div>
-<a href="${base}/a/${esc(p.slug)}" style="font-size:17px;font-weight:600;color:${INK};text-decoration:none;line-height:1.4;"><span style="color:${MUTED};font-weight:500;">${n}.</span> ${esc(pickTitle(p))}</a>
-<p style="margin:6px 0 0 0;font-size:14.5px;line-height:1.7;color:${BODY};">${esc(pSummary)}</p>
+<div style="font-size:13px;color:${MUTED};margin-bottom:4px;">${meta}</div>
+<a href="${base}/a/${esc(p.slug)}" style="font-size:18px;font-weight:600;color:${INK};text-decoration:none;line-height:1.45;"><span style="color:${MUTED};font-weight:500;">${n}.</span> ${esc(pickTitle(p))}</a>
+<p style="margin:7px 0 0 0;font-size:15.5px;line-height:1.75;color:${BODY};">${esc(pSummary)}</p>
 ${noteHtml}
 </div>`;
         })
@@ -155,7 +155,7 @@ ${noteHtml}
       // block, and there's no inline-block for Outlook to break onto two lines.
       return `<tr><td class="sec" style="padding:28px 24px 0 24px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;"><tr>
-<td style="background:${PAPER};border-left:4px solid ${ACCENT};padding:10px 16px;line-height:1.35;"><span style="font-size:14px;font-weight:700;color:${ACCENT};">${secNo(gi)}</span><span style="color:${MUTED};">&nbsp;·&nbsp;</span><span style="font-size:18px;font-weight:700;color:${ACCENT};">${esc(heading)}</span></td>
+<td style="background:${PAPER};border-left:4px solid ${ACCENT};padding:11px 16px;line-height:1.35;"><span style="font-size:15px;font-weight:700;color:${ACCENT};">${secNo(gi)}</span><span style="color:${MUTED};">&nbsp;·&nbsp;</span><span style="font-size:19px;font-weight:700;color:${ACCENT};">${esc(heading)}</span></td>
 </tr></table>
 ${items}
 </td></tr>`;
@@ -213,12 +213,12 @@ ${styleBlock}
 <div style="height:3px;width:44px;background:${ACCENT};border-radius:2px;margin-bottom:14px;font-size:0;line-height:3px;">&nbsp;</div>
 <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">${eyebrow}</div>
 <h1 style="margin:8px 0 12px 0;font-size:26px;line-height:1.25;color:${INK};">${esc(title)}</h1>
-<p style="margin:0;font-size:15px;line-height:1.75;color:${BODY};">${esc(intro)}</p>
+<p style="margin:0;font-size:16px;line-height:1.8;color:${BODY};">${esc(intro)}</p>
 </td></tr>
 ${contentsHtml}
 ${sectionsHtml}
 <tr><td class="web-cta" style="padding:26px 24px 34px 24px;">
-<a href="${zh ? zhUrl : enUrl}" style="display:inline-block;padding:11px 24px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${readOnWeb}</a>
+<a href="${zh ? zhUrl : enUrl}" style="display:inline-block;padding:12px 26px;border-radius:8px;background:${ACCENT};color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">${readOnWeb}</a>
 </td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->

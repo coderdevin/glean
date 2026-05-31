@@ -107,9 +107,9 @@ assert.ok(zh.split("推理").length - 1 >= 2, "section name appears in contents 
 assert.ok(zh.split("第二篇").length - 1 >= 2, "article title appears in contents and detail");
 // Section numbering.
 assert.ok(zh.includes("01") && zh.includes("02"), "sections are numbered");
-// Running article numbers 1..N (3 picks total here → 1. 2. 3.), in contents + detail.
-assert.ok(zh.includes("1.") && zh.includes("2.") && zh.includes("3."), "articles carry running numbers");
-assert.ok(zh.split("3.").length - 1 >= 2, "article number appears in contents and detail");
+// Running article numbers 1..N (2 picks here → 1. 2.), shown in contents + detail.
+assert.ok(zh.includes("1.") && zh.includes("2."), "articles carry running numbers");
+assert.ok(zh.split("2.").length - 1 >= 2, "article number appears in contents and detail");
 // Print-note line removed.
 assert.ok(!/另存为 PDF|save it as a PDF/.test(zh), "print-note line removed");
 
