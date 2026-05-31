@@ -1,30 +1,38 @@
 ---
 /** Styled, in-shell 404 body. Used by /404 and by routes that 404 on bad
  *  params (e.g. a weekly issue number that doesn't exist). */
+import Lang from "./Lang.astro";
+import { localizedPath } from "~/lib/i18n";
 interface Props {
   kind?: "weekly" | "site";
 }
 const { kind = "site" } = Astro.props;
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
 ---
 <section class="container notfound">
   <div class="notfound__inner">
     <div class="notfound__code" aria-hidden="true">404</div>
     <h1 class="notfound__title">
-      <span class="lang-zh">{kind === "weekly" ? "没有这一期" : "页面走丢了"}</span>
-      <span class="lang-en">{kind === "weekly" ? "No such issue" : "Page not found"}</span>
+      <Lang
+        zh={kind === "weekly" ? "没有这一期" : "页面走丢了"}
+        en={kind === "weekly" ? "No such issue" : "Page not found"}
+      />
     </h1>
     <p class="notfound__msg">
-      <span class="lang-zh">{kind === "weekly" ? "这一期可能还没发布，或期号不对。" : "链接可能失效，或地址拼错了。"}</span>
-      <span class="lang-en">{kind === "weekly"
-        ? "That issue isn’t published yet, or the number is wrong."
-        : "The link may be broken, or the address mistyped."}</span>
+      <Lang
+        zh={kind === "weekly" ? "这一期可能还没发布，或期号不对。" : "链接可能失效，或地址拼错了。"}
+        en={kind === "weekly"
+          ? "That issue isn’t published yet, or the number is wrong."
+          : "The link may be broken, or the address mistyped."}
+      />
     </p>
     <div class="notfound__actions">
-      <a class="btn btn-primary" href="/weekly">
-        <span class="lang-zh">所有周刊</span><span class="lang-en">All weeklies</span>
+      <a class="btn btn-primary" href={L("/weekly")}>
+        <Lang zh="所有周刊" en="All weeklies" />
       </a>
-      <a class="btn btn-secondary" href="/">
-        <span class="lang-zh">回首页</span><span class="lang-en">Home</span>
+      <a class="btn btn-secondary" href={L("/")}>
+        <Lang zh="回首页" en="Home" />
       </a>
     </div>
   </div>

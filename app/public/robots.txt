@@ -1,0 +1,11 @@
+# Glean · 拾遗 — crawl policy
+# Public content (/, /a/*, /daily/*, /weekly/*, /tag/*) is open to all crawlers.
+# Admin, API, and submit flows carry no indexable value and are disallowed.
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /submit
+
+Sitemap: https://glean.smartcoder.ai/sitemap.xml

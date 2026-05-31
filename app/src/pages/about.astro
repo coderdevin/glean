@@ -1,6 +1,16 @@
 ---
 import Site from "~/layouts/Site.astro";
-export const prerender = true;
+import Lang from "~/components/Lang.astro";
+import { localizedPath } from "~/lib/i18n";
+// SSR (not prerendered) so the /en/about variant resolves via the middleware
+// language rewrite and renders with lang=en. Heavily cached at the edge.
+export const prerender = false;
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, max-age=300, s-maxage=86400, stale-while-revalidate=86400",
+);
 ---
 <Site
   title="关于 · About — Glean · 拾遗"
@@ -9,11 +19,10 @@ export const prerender = true;
   <section class="page-banner">
     <div class="container">
       <span class="eyebrow">
-        <span class="lang-zh">关于</span><span class="lang-en">About</span>
+        <Lang zh="关于" en="About" />
       </span>
       <h1 class="balance" style="margin-top: 12px; max-width: 18ch">
-        <span class="lang-zh">一份双语技术刊</span>
-        <span class="lang-en">A bilingual tech zine</span>
+        <Lang zh="一份双语技术刊" en="A bilingual tech zine" />
       </h1>
     </div>
   </section>
@@ -22,12 +31,16 @@ export const prerender = true;
     <div class="container">
       <div class="prose-block" style="max-width: 640px; font-size: 17px; line-height: 1.8">
         <p>
-          <span class="lang-zh">Glean 是一份双语技术刊。起初，团队习惯用 email 分享好文章——一个链接丢过来，看不到全文，过几天也就忘了。于是我们开始每天挑几条值得读的工程内容，周一汇总成一期。AI 起草摘要，编辑把关。<strong>选稿和审核，始终由人。</strong></span>
-          <span class="lang-en">Glean is a bilingual technical zine. It began with how we used to share good articles — a link dropped into an email, no full text, forgotten a few days later. So we started picking a few engineering reads worth keeping each day, gathered into one issue every Monday. AI drafts the summaries; an editor signs off. <strong>Picks and review stay human.</strong></span>
+          <Lang>
+            <Fragment slot="zh">Glean 是一份双语技术刊。起初，团队习惯用 email 分享好文章——一个链接丢过来，看不到全文，过几天也就忘了。于是我们开始每天挑几条值得读的工程内容，周一汇总成一期。AI 起草摘要，编辑把关。<strong>选稿和审核，始终由人。</strong></Fragment>
+            <Fragment slot="en">Glean is a bilingual technical zine. It began with how we used to share good articles — a link dropped into an email, no full text, forgotten a few days later. So we started picking a few engineering reads worth keeping each day, gathered into one issue every Monday. AI drafts the summaries; an editor signs off. <strong>Picks and review stay human.</strong></Fragment>
+          </Lang>
         </p>
         <p>
-          <span class="lang-zh">看到好东西，欢迎<a href="/submit">投一条</a>。源码在 <a href="https://github.com/coderdevin/glean" rel="noopener">GitHub</a>。</span>
-          <span class="lang-en">Saw something good? <a href="/submit">Submit a link</a>. Source on <a href="https://github.com/coderdevin/glean" rel="noopener">GitHub</a>.</span>
+          <Lang>
+            <Fragment slot="zh">看到好东西，欢迎<a href={L("/submit")}>投一条</a>。源码在 <a href="https://github.com/coderdevin/glean" rel="noopener">GitHub</a>。</Fragment>
+            <Fragment slot="en">Saw something good? <a href={L("/submit")}>Submit a link</a>. Source on <a href="https://github.com/coderdevin/glean" rel="noopener">GitHub</a>.</Fragment>
+          </Lang>
         </p>
       </div>
     </div>

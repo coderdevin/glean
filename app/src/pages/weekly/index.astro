@@ -1,11 +1,15 @@
 ---
 export const prerender = false;
 import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
 import SubscribeCard from "~/components/SubscribeCard.astro";
 import { db } from "~/db/client";
 import { allWeeklies } from "~/lib/queries";
 import { issueNo, weeklyDateRange, weeklyReadDuration } from "~/lib/weeklyFormat";
+import { localizedPath } from "~/lib/i18n";
 
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
 const env = Astro.locals.runtime.env;
 const issues = await allWeeklies(db(env.DB));
 Astro.response.headers.set(
@@ -30,20 +34,13 @@ const fmtPubEn = (d: Date | null) => {
     <div class="container">
       <span class="eyebrow">
         {issues.length > 0 ? (
-          <>
-            <span class="lang-zh">{issues.length} 期 · 每周一</span>
-            <span class="lang-en">{issues.length} {issues.length === 1 ? "issue" : "issues"} · Mondays</span>
-          </>
+          <Lang><Fragment slot="zh">{issues.length} 期 · 每周一</Fragment><Fragment slot="en">{issues.length} {issues.length === 1 ? "issue" : "issues"} · Mondays</Fragment></Lang>
         ) : (
-          <>
-            <span class="lang-zh">首期筹备中 · 每周一</span>
-            <span class="lang-en">First issue coming · Mondays</span>
-          </>
+          <Lang zh="首期筹备中 · 每周一" en="First issue coming · Mondays" />
         )}
       </span>
       <h1 style="margin-top: 12px">
-        <span class="lang-zh">每周一一期 · 按主题分章</span>
-        <span class="lang-en">One issue every Monday · grouped by theme</span>
+        <Lang zh="每周一一期 · 按主题分章" en="One issue every Monday · grouped by theme" />
       </h1>
     </div>
   </section>
@@ -53,19 +50,18 @@ const fmtPubEn = (d: Date | null) => {
       {issues.length === 0 && (
         <div class="prose-block" style="text-align: center; padding: 48px 0">
           <p>
-            <span class="lang-zh">还没有发布的周刊。第一期会在周一发布。</span>
-            <span class="lang-en">No weekly issues yet. Issue 001 will land on a Monday.</span>
+            <Lang zh="还没有发布的周刊。第一期会在周一发布。" en="No weekly issues yet. Issue 001 will land on a Monday." />
           </p>
         </div>
       )}
       <div class="issue-list">
         {issues.map((iss, i) => (
-          <a class="issue-list-card" href={`/weekly/${iss.number}`}>
+          <a class="issue-list-card" href={L(`/weekly/${iss.number}`)}>
             <div class="issue-list-card__eyebrow">
               <span>{issueNo(iss.number)}</span>
               {i === 0 && (
                 <span class="issue-list-card__latest">
-                  <span class="lang-zh">最新</span><span class="lang-en">Latest</span>
+                  <Lang zh="最新" en="Latest" />
                 </span>
               )}
               <span class="issue-list-card__date">
@@ -73,8 +69,7 @@ const fmtPubEn = (d: Date | null) => {
                 {iss.publishedAt && (
                   <>
                     {" · "}
-                    <span class="lang-zh">{fmtPubZh(iss.publishedAt)}发布</span>
-                    <span class="lang-en">pub {fmtPubEn(iss.publishedAt)}</span>
+                    <Lang><Fragment slot="zh">{fmtPubZh(iss.publishedAt)}发布</Fragment><Fragment slot="en">pub {fmtPubEn(iss.publishedAt)}</Fragment></Lang>
                   </>
                 )}
               </span>
@@ -82,24 +77,20 @@ const fmtPubEn = (d: Date | null) => {
             <div class="issue-list-card__no" aria-hidden="true">{String(iss.number).padStart(3, "0")}</div>
             <div class="issue-list-card__body">
               <h2 class="issue-list-card__title">
-                <span class="lang-zh">{iss.titleZh}</span>
-                <span class="lang-en">{iss.titleEn}</span>
+                <Lang zh={iss.titleZh} en={iss.titleEn} />
               </h2>
               <p class="issue-list-card__lead">
-                <span class="lang-zh">{iss.introZh}</span>
-                <span class="lang-en">{iss.introEn}</span>
+                <Lang zh={iss.introZh} en={iss.introEn} />
               </p>
               <div class="issue-list-card__meta">
                 <span>
-                  <span class="lang-zh">{iss.pick_count} 篇</span>
-                  <span class="lang-en">{iss.pick_count} picks</span>
+                  <Lang><Fragment slot="zh">{iss.pick_count} 篇</Fragment><Fragment slot="en">{iss.pick_count} picks</Fragment></Lang>
                 </span>
                 {iss.section_count > 0 && (
                   <>
                     <span class="dot-sep"></span>
                     <span>
-                      <span class="lang-zh">{iss.section_count} 章</span>
-                      <span class="lang-en">{iss.section_count} sections</span>
+                      <Lang><Fragment slot="zh">{iss.section_count} 章</Fragment><Fragment slot="en">{iss.section_count} sections</Fragment></Lang>
                     </span>
                   </>
                 )}
@@ -107,8 +98,7 @@ const fmtPubEn = (d: Date | null) => {
                   <>
                     <span class="dot-sep"></span>
                     <span>
-                      <span class="lang-zh">{weeklyReadDuration(iss.read_minutes).zh}</span>
-                      <span class="lang-en">{weeklyReadDuration(iss.read_minutes).en}</span>
+                      <Lang zh={weeklyReadDuration(iss.read_minutes).zh} en={weeklyReadDuration(iss.read_minutes).en} />
                     </span>
                   </>
                 )}

@@ -44,6 +44,8 @@ interface Env {
 declare namespace App {
   interface Locals extends Runtime {
     lang: "zh" | "en";
+    /** Language-agnostic path (no /en prefix). Drives canonical + hreflang. */
+    basePath: string;
     adminEmail: string | null;
   }
 }

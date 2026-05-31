@@ -15,29 +15,29 @@ export interface WeeklyCoverIssue {
 interface Props { issue: WeeklyCoverIssue; }
 const { issue } = Astro.props;
 import { issueNo, weeklyDateRange } from "~/lib/weeklyFormat";
+import Lang from "./Lang.astro";
+import { localizedPath } from "~/lib/i18n";
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
 ---
 <article class="weekly-cover">
-  <a class="weekly-cover__link" href={`/weekly/${issue.number}`}>
+  <a class="weekly-cover__link" href={L(`/weekly/${issue.number}`)}>
     <div class="weekly-cover__meta">
       <span class="t-caption-up">{issueNo(issue.number)}</span>
       <span class="text-muted-soft">{weeklyDateRange(issue.date_start, issue.date_end)}</span>
     </div>
     <h2 class="weekly-cover__title">
-      <span class="lang-zh">{issue.title_zh}</span>
-      <span class="lang-en">{issue.title_en}</span>
+      <Lang zh={issue.title_zh} en={issue.title_en} />
     </h2>
     <p class="weekly-cover__intro">
-      <span class="lang-zh">{issue.intro_zh}</span>
-      <span class="lang-en">{issue.intro_en}</span>
+      <Lang zh={issue.intro_zh} en={issue.intro_en} />
     </p>
     <div class="weekly-cover__footer">
       <span class="t-body-sm text-muted">
-        <span class="lang-zh">{issue.pick_count} 篇</span>
-        <span class="lang-en">{issue.pick_count} picks</span>
+        <Lang zh={`${issue.pick_count} 篇`} en={`${issue.pick_count} picks`} />
       </span>
       <span class="t-body-sm text-link">
-        <span class="lang-zh">读这期 →</span>
-        <span class="lang-en">Read issue →</span>
+        <Lang zh="读这期 →" en="Read issue →" />
       </span>
     </div>
   </a>

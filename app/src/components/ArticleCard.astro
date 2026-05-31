@@ -1,5 +1,7 @@
 ---
 import TagBadge from "./TagBadge.astro";
+import Lang from "./Lang.astro";
+import { localizedPath } from "~/lib/i18n";
 
 export interface ArticleCardPick {
   id: string;
@@ -28,6 +30,8 @@ interface Props {
   dark?: boolean;
 }
 const { pick, featured = false, dark = false } = Astro.props;
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
 const classes = ["article-card"];
 if (dark) classes.push("article-card--featured");
 const showBullets = featured && pick.bullets.length > 0;
@@ -35,40 +39,34 @@ const showEditor = featured && (pick.editor_note_zh || pick.editor_note_en);
 ---
 <article class={classes.join(" ")}>
   <div class="article-card__head">
-    {featured && <span class="badge badge--coral"><span class="lang-zh">头条</span><span class="lang-en">Lead</span></span>}
+    {featured && <span class="badge badge--coral"><Lang zh="头条" en="Lead" /></span>}
     <span>{pick.source_host} · {pick.read_minutes} min read</span>
   </div>
   <h3 class="article-card__title">
-    <a href={`/a/${pick.slug}`}>
-      <span class="lang-zh">{pick.title_zh}</span>
-      <span class="lang-en">{pick.title_en}</span>
+    <a href={L(`/a/${pick.slug}`)}>
+      <Lang zh={pick.title_zh} en={pick.title_en} />
     </a>
   </h3>
   <p class="article-card__summary">
-    <span class="lang-zh">{pick.summary_zh}</span>
-    <span class="lang-en">{pick.summary_en}</span>
+    <Lang zh={pick.summary_zh} en={pick.summary_en} />
   </p>
   {showBullets && (
     <ul class="article-card__bullets">
       {pick.bullets.map((b) => (
-        <li>
-          <span class="lang-zh">{b.zh}</span>
-          <span class="lang-en">{b.en}</span>
-        </li>
+        <li><Lang zh={b.zh} en={b.en} /></li>
       ))}
     </ul>
   )}
   {showEditor && (
     <div class="article-card__editorial">
-      <span class="article-card__editorial-label">编辑短评 · Editor’s note</span>
-      <span class="lang-zh">{pick.editor_note_zh}</span>
-      <span class="lang-en">{pick.editor_note_en}</span>
+      <span class="article-card__editorial-label"><Lang zh="编辑短评" en="Editor’s note" /></span>
+      <Lang zh={pick.editor_note_zh ?? undefined} en={pick.editor_note_en ?? undefined} />
     </div>
   )}
   <div class="article-card__footer">
     <div class="article-card__meta">
       {pick.tags.map((t) => (
-        <TagBadge slug={t.slug} nameZh={t.name_zh} nameEn={t.name_en} family={t.family} href={`/tag/${t.slug}`} />
+        <TagBadge slug={t.slug} nameZh={t.name_zh} nameEn={t.name_en} family={t.family} href={L(`/tag/${t.slug}`)} />
       ))}
     </div>
   </div>

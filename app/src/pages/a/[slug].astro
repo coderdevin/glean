@@ -1,10 +1,15 @@
 ---
 export const prerender = false;
 import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
+import { localizedPath } from "~/lib/i18n";
 import { db } from "~/db/client";
 import { pickBySlug, adjacentPicks } from "~/lib/queries";
 import { formatDateISO, formatTimeHM, siteTz } from "~/lib/datetime";
 import MarkdownIt from "markdown-it";
+
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
 
 // Single shared instance — markdown-it is stateless after construction.
 // html:false guards against raw <script>/<iframe> sneaking in from LLM
@@ -82,10 +87,54 @@ function renderBody(text: string | null | undefined): string {
   if (!text) return "";
   return md.render(text);
 }
+
+// --- Structured data -------------------------------------------------------
+// A pick is a human-reviewed, bilingual write-up of a source article, so
+// TechArticle is the right type. `isBasedOn` credits the source; AI/answer
+// engines read this graph to attribute and cite. BreadcrumbList gives Google
+// the Home › Tag › Article trail for rich-result breadcrumbs.
+const canonicalUrl = new URL(`/a/${pick.slug}`, Astro.site).toString();
+const siteOrigin = new URL(Astro.site ?? "https://glean.smartcoder.ai").origin;
+const publishedIso = pick.published_at ? pick.published_at.toISOString() : undefined;
+const primaryTag = pick.tags[0];
+
+const articleLd: Record<string, unknown> = {
+  "@type": "TechArticle",
+  headline: pick.title_en,
+  alternativeHeadline: pick.title_zh,
+  description: pick.summary_en,
+  inLanguage: ["zh-CN", "en"],
+  url: canonicalUrl,
+  mainEntityOfPage: canonicalUrl,
+  ...(publishedIso ? { datePublished: publishedIso, dateModified: publishedIso } : {}),
+  articleSection: pick.category,
+  keywords: pick.tags.map((t) => t.name_en).join(", "),
+  isBasedOn: pick.source_url,
+  publisher: { "@id": `${siteOrigin}/#org` },
+};
+
+const breadcrumbLd = {
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: `${siteOrigin}/` },
+    ...(primaryTag
+      ? [{
+          "@type": "ListItem",
+          position: 2,
+          name: primaryTag.name_en,
+          item: `${siteOrigin}/tag/${primaryTag.slug}`,
+        }]
+      : []),
+    { "@type": "ListItem", position: primaryTag ? 3 : 2, name: pick.title_en, item: canonicalUrl },
+  ],
+};
 ---
 <Site
   title={`${pick.title_en} — Glean · 拾遗`}
   description={pick.summary_en}
+  ogType="article"
+  publishedTime={publishedIso}
+  jsonLd={[articleLd, breadcrumbLd]}
 >
   <link rel="stylesheet" href="/article.css?v=art3" slot="head" />
   <link rel="stylesheet" href="/article.css?v=art3" />
@@ -94,7 +143,7 @@ function renderBody(text: string | null | undefined): string {
     <div class="av2-layout">
       <aside class="av2-toc" aria-label="目录 / Contents">
         <div class="av2-toc__head">
-          <span class="lang-zh">目录</span><span class="lang-en">Contents</span>
+          <Lang zh="目录" en="Contents" />
         </div>
         <ol class="av2-toc__list">
           {tocItems.map((item) => (
@@ -106,8 +155,7 @@ function renderBody(text: string | null | undefined): string {
               >
                 <span class="sec-num">{item.section}</span>
                 <span class="title">
-                  <span class="lang-zh">{item.labelZh}</span>
-                  <span class="lang-en">{item.labelEn}</span>
+                  <Lang zh={item.labelZh} en={item.labelEn} />
                 </span>
                 {item.count > 0 && <span class="count">{item.count}</span>}
               </a>
@@ -116,8 +164,10 @@ function renderBody(text: string | null | undefined): string {
         </ol>
         {pick.annotations.length > 0 && (
           <div class="av2-toc__foot">
-            <span class="lang-zh">{pick.annotations.length} 条评注</span>
-            <span class="lang-en">{pick.annotations.length} notes</span>
+            <Lang>
+              <Fragment slot="zh">{pick.annotations.length} 条评注</Fragment>
+              <Fragment slot="en">{pick.annotations.length} notes</Fragment>
+            </Lang>
           </div>
         )}
       </aside>
@@ -125,31 +175,29 @@ function renderBody(text: string | null | undefined): string {
       <article class="av2">
         <header class="av2-head">
           <div class="av2-crumbs">
-            <a href="/daily"><span class="lang-zh">日刊</span><span class="lang-en">Daily</span></a>
-            {publishedDate && (<><span class="sep">/</span><a href={`/daily/${publishedDate}`}>{publishedDate}</a></>)}
+            <a href={L("/daily")}><Lang zh="日刊" en="Daily" /></a>
+            {publishedDate && (<><span class="sep">/</span><a href={L(`/daily/${publishedDate}`)}>{publishedDate}</a></>)}
             <span class="sep">/</span>
             <span>
-              <span class="lang-zh">{pick.title_zh}</span>
-              <span class="lang-en">{pick.title_en}</span>
+              <Lang zh={pick.title_zh} en={pick.title_en} />
             </span>
           </div>
 
           <h1 class="av2-head__title">
-            <span class="lang-zh">{pick.title_zh}</span>
-            <span class="lang-en">{pick.title_en}</span>
+            <Lang zh={pick.title_zh} en={pick.title_en} />
           </h1>
 
           <div class="av2-head__meta">
             <span>
-              <span class="k"><span class="lang-zh">原文</span><span class="lang-en">Source</span></span>
+              <span class="k"><Lang zh="原文" en="Source" /></span>
               <a class="v" href={pick.source_url} rel="noopener">{pick.source_host}</a>
             </span>
             <span>
-              <span class="k"><span class="lang-zh">收录</span><span class="lang-en">Glean’d</span></span>
+              <span class="k"><Lang zh="收录" en="Glean’d" /></span>
               <span class="v">{publishedDate} {publishedTime}</span>
             </span>
             <span>
-              <span class="k"><span class="lang-zh">阅读</span><span class="lang-en">Read</span></span>
+              <span class="k"><Lang zh="阅读" en="Read" /></span>
               <span class="v">{pick.read_minutes} min</span>
             </span>
           </div>
@@ -158,27 +206,27 @@ function renderBody(text: string | null | undefined): string {
         {(pick.summary_zh || pick.summary_en || pick.editor_note_zh || pick.editor_note_en) && (
           <section class="av2-decision" aria-label="AI summary">
             <div class="av2-decision__label">
-              <span class="lang-zh">AI 解读</span><span class="lang-en">AI summary</span>
+              <Lang zh="AI 解读" en="AI summary" />
             </div>
             {(pick.summary_zh || pick.summary_en) && (
               <div class="av2-decision__tldr">
                 <p class="av2-decision__tldr-text">
-                  <span class="lang-zh">{pick.summary_zh}</span>
-                  <span class="lang-en">{pick.summary_en}</span>
+                  <Lang zh={pick.summary_zh} en={pick.summary_en} />
                 </p>
               </div>
             )}
             {(pick.editor_note_zh || pick.editor_note_en) && (
               <p>
-                <span class="marker"><span class="lang-zh">编辑说</span><span class="lang-en">Editor</span></span>
-                <span class="lang-zh">{pick.editor_note_zh}</span>
-                <span class="lang-en">{pick.editor_note_en}</span>
+                <span class="marker"><Lang zh="编辑说" en="Editor" /></span>
+                <Lang zh={pick.editor_note_zh ?? undefined} en={pick.editor_note_en ?? undefined} />
               </p>
             )}
             <div class="av2-decision__pills">
               <span class="av2-decision__pill av2-decision__pill--depth">
-                <span class="lang-zh">原文 {pick.read_minutes} 分钟</span>
-                <span class="lang-en">Original · {pick.read_minutes} min</span>
+                <Lang>
+                  <Fragment slot="zh">原文 {pick.read_minutes} 分钟</Fragment>
+                  <Fragment slot="en">Original · {pick.read_minutes} min</Fragment>
+                </Lang>
               </span>
             </div>
           </section>
@@ -187,18 +235,20 @@ function renderBody(text: string | null | undefined): string {
         <div class="av2-modebar" role="tablist" aria-label="Reading mode">
           <div class="av2-modebar__group">
             <button class="av2-modebar__btn" data-mode-set="trans" role="tab">
-              <span class="lang-zh">{labelZhBtn.zh}</span><span class="lang-en">{labelZhBtn.en}</span>
+              <Lang zh={labelZhBtn.zh} en={labelZhBtn.en} />
             </button>
             <button class="av2-modebar__btn" data-mode-set="orig" role="tab">
-              <span class="lang-zh">{labelEnBtn.zh}</span><span class="lang-en">{labelEnBtn.en}</span>
+              <Lang zh={labelEnBtn.zh} en={labelEnBtn.en} />
             </button>
             <button class="av2-modebar__btn is-active" data-mode-set="parallel" role="tab" aria-selected="true">
-              <span class="lang-zh">对照</span><span class="lang-en">Parallel</span>
+              <Lang zh="对照" en="Parallel" />
             </button>
           </div>
           <a class="av2-modebar__source" href={pick.source_url} rel="noopener">
-            <span class="lang-zh">原文 {pick.source_host} ↗</span>
-            <span class="lang-en">{pick.source_host} ↗</span>
+            <Lang>
+              <Fragment slot="zh">原文 {pick.source_host} ↗</Fragment>
+              <Fragment slot="en">{pick.source_host} ↗</Fragment>
+            </Lang>
           </a>
         </div>
 
@@ -224,8 +274,7 @@ function renderBody(text: string | null | undefined): string {
 
         <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--c-hairline)">
           <a href={pick.source_url} class="btn btn-primary" rel="noopener">
-            <span class="lang-zh">打开原文 ↗</span>
-            <span class="lang-en">Open source ↗</span>
+            <Lang zh="打开原文 ↗" en="Open source ↗" />
           </a>
         </div>
 
@@ -236,12 +285,12 @@ function renderBody(text: string | null | undefined): string {
             <div class="av2-footer__col av2-footer__col--side">
               <div class="av2-footer__sec">
                 <div class="av2-footer__label">
-                  <span class="lang-zh">标签</span><span class="lang-en">Tags</span>
+                  <Lang zh="标签" en="Tags" />
                 </div>
                 <div class="aside-tags">
                   {pick.tags.map((t) => (
-                    <a href={`/tag/${t.slug}`} class={`badge badge--cat-${t.family}`}>
-                      <span class="lang-zh">{t.name_zh}</span><span class="lang-en">{t.name_en}</span>
+                    <a href={L(`/tag/${t.slug}`)} class={`badge badge--cat-${t.family}`}>
+                      <Lang zh={t.name_zh} en={t.name_en} />
                     </a>
                   ))}
                 </div>
@@ -250,11 +299,11 @@ function renderBody(text: string | null | undefined): string {
               {pick.next_hints.length > 0 && (
                 <div class="av2-footer__sec">
                   <div class="av2-footer__label">
-                    <span class="lang-zh">读完这条，下一步</span><span class="lang-en">What to read next</span>
+                    <Lang zh="读完这条，下一步" en="What to read next" />
                   </div>
                   <div class="row" style="gap: 6px; flex-wrap: wrap">
                     {pick.next_hints.map((h) => (
-                      <a class="badge" href={`/tag/${h.toLowerCase().replace(/\s+/g, "-")}`} style="text-decoration: none">→ {h}</a>
+                      <a class="badge" href={L(`/tag/${h.toLowerCase().replace(/\s+/g, "-")}`)} style="text-decoration: none">→ {h}</a>
                     ))}
                   </div>
                 </div>
@@ -265,7 +314,7 @@ function renderBody(text: string | null | undefined): string {
               <div class="av2-footer__col av2-footer__col--main">
                 <div class="av2-footer__sec">
                   <div class="av2-footer__label">
-                    <span class="lang-zh">术语</span><span class="lang-en">Glossary</span>
+                    <Lang zh="术语" en="Glossary" />
                   </div>
                   <dl class="av2-glossary">
                     {pick.glossary.map((g) => (
@@ -285,15 +334,14 @@ function renderBody(text: string | null | undefined): string {
           {pick.annotations.length > 0 && (
             <div class="av2-footer__sec av2-footer__sec--notes">
               <div class="av2-footer__label">
-                <span class="lang-zh">编辑注</span><span class="lang-en">Notes</span>
+                <Lang zh="编辑注" en="Notes" />
               </div>
               <ol class="av2-notes">
                 {pick.annotations.map((a) => (
                   <li>
                     <div class="av2-notes__anchor">{a.anchor}</div>
                     <p class="av2-notes__body">
-                      <span class="lang-zh">{a.body_zh}</span>
-                      <span class="lang-en">{a.body_en}</span>
+                      <Lang zh={a.body_zh} en={a.body_en} />
                     </p>
                   </li>
                 ))}
@@ -305,22 +353,28 @@ function renderBody(text: string | null | undefined): string {
         {(prev || next) && (
         <nav class="pn-nav" aria-label="上一篇 / 下一篇 · prev / next">
           {prev ? (
-            <a class="pn-card pn-card--prev" href={`/a/${prev.slug}`}>
+            <a class="pn-card pn-card--prev" href={L(`/a/${prev.slug}`)}>
               <span class="pn-card__dir">
-                ← <span class="lang-zh">上一条{neighborLabel(prev.daily_date) ? ` · ${neighborLabel(prev.daily_date)}` : " · 同日"}</span><span class="lang-en">Previous{neighborLabel(prev.daily_date) ? ` · ${neighborLabel(prev.daily_date)}` : " · same day"}</span>
+                ← <Lang>
+                  <Fragment slot="zh">上一条{neighborLabel(prev.daily_date) ? ` · ${neighborLabel(prev.daily_date)}` : " · 同日"}</Fragment>
+                  <Fragment slot="en">Previous{neighborLabel(prev.daily_date) ? ` · ${neighborLabel(prev.daily_date)}` : " · same day"}</Fragment>
+                </Lang>
               </span>
               <span class="pn-card__title">
-                <span class="lang-zh">{prev.title_zh}</span><span class="lang-en">{prev.title_en}</span>
+                <Lang zh={prev.title_zh} en={prev.title_en} />
               </span>
             </a>
           ) : <span class="pn-card pn-card--empty" aria-hidden="true"></span>}
           {next ? (
-            <a class="pn-card pn-card--next" href={`/a/${next.slug}`}>
+            <a class="pn-card pn-card--next" href={L(`/a/${next.slug}`)}>
               <span class="pn-card__dir">
-                <span class="lang-zh">下一条{neighborLabel(next.daily_date) ? ` · ${neighborLabel(next.daily_date)}` : " · 同日"}</span><span class="lang-en">Next{neighborLabel(next.daily_date) ? ` · ${neighborLabel(next.daily_date)}` : " · same day"}</span> →
+                <Lang>
+                  <Fragment slot="zh">下一条{neighborLabel(next.daily_date) ? ` · ${neighborLabel(next.daily_date)}` : " · 同日"}</Fragment>
+                  <Fragment slot="en">Next{neighborLabel(next.daily_date) ? ` · ${neighborLabel(next.daily_date)}` : " · same day"}</Fragment>
+                </Lang> →
               </span>
               <span class="pn-card__title">
-                <span class="lang-zh">{next.title_zh}</span><span class="lang-en">{next.title_en}</span>
+                <Lang zh={next.title_zh} en={next.title_en} />
               </span>
             </a>
           ) : <span class="pn-card pn-card--empty" aria-hidden="true"></span>}

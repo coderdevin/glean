@@ -1,14 +1,19 @@
 ---
 export const prerender = false;
 import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
+import { localizedPath } from "~/lib/i18n";
 import { eq } from "drizzle-orm";
 import { db } from "~/db/client";
 import { submissions } from "~/db/schema";
 import { successView } from "~/lib/submissionStatus";
 
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
+
 const id = Astro.url.searchParams.get("id");
 if (!id || !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(id)) {
-  return Astro.redirect("/submit", 303);
+  return Astro.redirect(L("/submit"), 303);
 }
 
 const env = Astro.locals.runtime.env;
@@ -18,7 +23,7 @@ const rows = await db(env.DB)
   .where(eq(submissions.id, id))
   .limit(1);
 const row = rows[0];
-if (!row) return Astro.redirect("/submit", 303);
+if (!row) return Astro.redirect(L("/submit"), 303);
 
 Astro.response.headers.set("Cache-Control", "no-store");
 
@@ -39,21 +44,22 @@ const rel = (d: Date) => {
 ---
 <Site title="收到 · Queued — Glean" noindex>
   <div class="container" style="padding-top: 64px; padding-bottom: 96px">
-    <a href="/submit" class="btn btn-text" style="margin-bottom: 24px; display: inline-block">
-      <span class="lang-zh">← 再提交一条</span><span class="lang-en">← Submit another</span>
+    <a href={L("/submit")} class="btn btn-text" style="margin-bottom: 24px; display: inline-block">
+      <Lang zh="← 再提交一条" en="← Submit another" />
     </a>
 
     {isDup && (
       <div style="margin-bottom: 16px; padding: 10px 14px; border: 1px solid var(--c-hairline); border-radius: 6px; background: var(--c-surface-card); font-size: 14px; color: var(--c-muted)">
-        <span class="lang-zh">这条链接之前已经提交过 · 跳到原投稿状态</span>
-        <span class="lang-en">This URL was already submitted · showing the original</span>
+        <Lang zh="这条链接之前已经提交过 · 跳到原投稿状态" en="This URL was already submitted · showing the original" />
       </div>
     )}
 
     <noscript>
       <p style="text-align: center; margin-bottom: 16px" class="t-body-sm text-muted">
-        <span class="lang-zh">开启 JavaScript 可自动刷新状态，或 <a href={`/submit/success?id=${row.id}`}>手动刷新</a>。</span>
-        <span class="lang-en">Enable JavaScript for live status, or <a href={`/submit/success?id=${row.id}`}>refresh</a>.</span>
+        <Lang>
+          <Fragment slot="zh">开启 JavaScript 可自动刷新状态，或 <a href={L(`/submit/success?id=${row.id}`)}>手动刷新</a>。</Fragment>
+          <Fragment slot="en">Enable JavaScript for live status, or <a href={L(`/submit/success?id=${row.id}`)}>refresh</a>.</Fragment>
+        </Lang>
       </p>
     </noscript>
 
@@ -63,7 +69,7 @@ const rel = (d: Date) => {
           <path d="M5 12 l5 5 l9-11" />
         </svg>
       </div>
-      <span class="eyebrow"><span class="lang-zh">投稿已入队</span><span class="lang-en">Queued</span></span>
+      <span class="eyebrow"><Lang zh="投稿已入队" en="Queued" /></span>
       <h1 id="js-success-headline" style="font-family: var(--f-display); font-weight: 500; font-size: 40px; letter-spacing: -0.6px; margin: 12px 0 8px">
         <span class="lang-zh">{headlineCopy.zh}</span>
         <span class="lang-en">{headlineCopy.en}</span>
@@ -73,12 +79,11 @@ const rel = (d: Date) => {
         <span class="lang-en">{subCopy.en}</span>
       </p>
       <div class="success-card__id" aria-label="Queue ID">
-        <span class="lang-zh">ID · </span><span class="lang-en">ID · </span>{row.id}
+        <Lang zh="ID · " en="ID · " />{row.id}
       </div>
       <p id="js-success-cta" style="margin-top: 24px" hidden={!view.hasPick}>
-        <a href={`/daily`} class="btn btn-primary">
-          <span class="lang-zh">看今日日刊 →</span>
-          <span class="lang-en">See today’s daily →</span>
+        <a href={L(`/daily`)} class="btn btn-primary">
+          <Lang zh="看今日日刊 →" en="See today’s daily →" />
         </a>
       </p>
     </div>
@@ -100,8 +105,8 @@ const rel = (d: Date) => {
         return (
           <div class={`progress-steps__cell ${cls}`} data-step={idx}>
             <div class="n">{s.n}</div>
-            <div class="name"><span class="lang-zh">{s.zh}</span><span class="lang-en">{s.en}</span></div>
-            <div class="note"><span class="lang-zh">{s.note_zh}</span><span class="lang-en">{s.note_en}</span></div>
+            <div class="name"><Lang zh={s.zh} en={s.en} /></div>
+            <div class="note"><Lang zh={s.note_zh} en={s.note_en} /></div>
           </div>
         );
       })}
@@ -110,10 +115,9 @@ const rel = (d: Date) => {
     {!isTerminal && (
       <div id="js-success-track" style="max-width: 480px; margin: 48px auto 0">
         <div class="card card--canvas" style="padding: 24px">
-          <span class="eyebrow"><span class="lang-zh">想知道结果？</span><span class="lang-en">Track it?</span></span>
+          <span class="eyebrow"><Lang zh="想知道结果？" en="Track it?" /></span>
           <h3 style="font-family: var(--f-display); font-size: 22px; margin: 8px 0 12px">
-            <span class="lang-zh">留个邮箱，发了通知你</span>
-            <span class="lang-en">Email me when it ships</span>
+            <Lang zh="留个邮箱，发了通知你" en="Email me when it ships" />
           </h3>
           <form data-subscribe-form>
             <input type="hidden" name="source" value="submit-success" />
@@ -121,17 +125,16 @@ const rel = (d: Date) => {
               <input class="input" type="email" name="email" placeholder="you@example.com" aria-label="Email address" style="flex: 1; height: 44px" required />
               <button class="btn btn-primary" type="submit" style="padding: 0 16px">
                 <span class="subscribe-card__cta-default">
-                  <span class="lang-zh">通知我</span><span class="lang-en">Notify me</span>
+                  <Lang zh="通知我" en="Notify me" />
                 </span>
                 <span class="subscribe-card__cta-done" aria-hidden="true">
-                  <span class="lang-zh">✓ 已订阅</span><span class="lang-en">✓ Subscribed</span>
+                  <Lang zh="✓ 已订阅" en="✓ Subscribed" />
                 </span>
               </button>
             </div>
             <p class="subscribe-card__status t-body-sm" role="status" aria-live="polite" style="margin: 8px 0 0"></p>
             <p class="t-body-sm text-muted-soft" style="margin: 8px 0 0">
-              <span class="lang-zh">只发这一封 · 不订阅周刊。</span>
-              <span class="lang-en">Single-use · no weekly signup.</span>
+              <Lang zh="只发这一封 · 不订阅周刊。" en="Single-use · no weekly signup." />
             </p>
           </form>
         </div>
@@ -139,9 +142,8 @@ const rel = (d: Date) => {
     )}
 
     <div style="text-align: center; margin-top: 48px">
-      <a class="btn btn-secondary" href="/daily">
-        <span class="lang-zh">回到今日日刊</span>
-        <span class="lang-en">Back to today’s daily</span>
+      <a class="btn btn-secondary" href={L("/daily")}>
+        <Lang zh="回到今日日刊" en="Back to today’s daily" />
       </a>
     </div>
   </div>

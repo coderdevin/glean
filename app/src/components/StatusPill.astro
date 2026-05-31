@@ -4,7 +4,8 @@ import { STATUS_META } from "~/lib/submissionStatus";
 interface Props { status: SubmissionStatus; }
 const { status } = Astro.props;
 const meta = STATUS_META[status];
+import Lang from "./Lang.astro";
 ---
 <span class={`status-pill status-${status}`}>
-  <span class="lang-zh">{meta.zh}</span><span class="lang-en">{meta.en}</span>
+  <Lang zh={meta.zh} en={meta.en} />
 </span>

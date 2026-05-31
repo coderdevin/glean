@@ -1,4 +1,5 @@
 import { defineMiddleware } from "astro:middleware";
+import { EN_PREFIX, splitLangPath } from "~/lib/i18n";
 
 const LANG_COOKIE = "glean_lang";
 
@@ -6,17 +7,26 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
   const url = new URL(ctx.request.url);
   const isAdmin =
     url.pathname.startsWith("/admin") || url.pathname.startsWith("/api/admin");
+  const isApi = url.pathname.startsWith("/api/");
 
-  const cookieLang = ctx.cookies.get(LANG_COOKIE)?.value;
-  const queryLang = url.searchParams.get("lang");
-  const lang =
-    queryLang === "en" || queryLang === "zh"
-      ? queryLang
-      : cookieLang === "en"
-        ? "en"
-        : "zh";
+  // Language is URL-driven: `/en/*` is English, everything else Chinese. This
+  // is deterministic for crawlers (no cookie/Accept-Language guessing), which
+  // is what makes the two language trees independently indexable. The cookie
+  // only remembers a human's choice so the lang toggle can deep-link; it never
+  // changes what a given URL renders.
+  const { lang, basePath } = isApi
+    ? { lang: "zh" as const, basePath: url.pathname }
+    : splitLangPath(url.pathname);
   ctx.locals.lang = lang;
+  ctx.locals.basePath = basePath;
   ctx.locals.adminEmail = null;
+
+  // English URLs share the Chinese route templates: strip the `/en` prefix and
+  // re-route internally. Middleware does not re-run on rewrite, so the locals
+  // set above (lang = "en") carry through to the page.
+  if (lang === "en" && url.pathname.startsWith(EN_PREFIX)) {
+    return next(new URL(basePath + url.search, url));
+  }
 
   // Header reads + Access gate only run for /admin* — those routes always run
   // on-demand (prerender = false), so request.headers is always available.
@@ -97,8 +107,11 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
 
   const res = await next();
 
-  if (queryLang === "en" || queryLang === "zh") {
-    ctx.cookies.set(LANG_COOKIE, queryLang, {
+  // Remember the language of the page actually served so the nav lang toggle
+  // (and any future "send returning visitors to their language" logic) has a
+  // signal. Routing never reads this — the URL is authoritative.
+  if (!isApi && !isAdmin) {
+    ctx.cookies.set(LANG_COOKIE, lang, {
       path: "/",
       maxAge: 60 * 60 * 24 * 365,
       sameSite: "lax",

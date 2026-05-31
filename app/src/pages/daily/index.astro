@@ -3,9 +3,10 @@ export const prerender = false;
 import { db } from "~/db/client";
 import { recentDailyDates } from "~/lib/queries";
 import { siteTz, todayInSiteTz } from "~/lib/datetime";
+import { localizedPath } from "~/lib/i18n";
 
 const env = Astro.locals.runtime.env;
 const dates = await recentDailyDates(db(env.DB), 1);
 const target = dates[0] ?? todayInSiteTz(siteTz(env));
-return Astro.redirect(`/daily/${target}`, 307);
+return Astro.redirect(localizedPath(`/daily/${target}`, Astro.locals.lang ?? "zh"), 307);
 ---
