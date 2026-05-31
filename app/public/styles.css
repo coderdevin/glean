@@ -1626,9 +1626,14 @@ body[data-lang="zh"] .lang-en {
   letter-spacing: -1.2px;
   color: var(--c-on-dark);
   margin: 16px 0 20px;
-  /* Was 22ch — too narrow, forced an early wrap with a large right gutter.
-     Let the title use the masthead width (it still wraps naturally). */
-  max-width: 30ch;
+  /* Fill the masthead width and wrap greedily. word-break:normal (NOT keep-all)
+     so a long CJK title can break between any characters — keep-all forbids
+     breaks inside CJK runs, forcing the only break onto the latin "AI" and
+     producing the awkward "…AI ↵ 工程…" split. */
+  max-width: none;
+  text-wrap: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
   position: relative;
   z-index: 1;
 }
@@ -1750,9 +1755,8 @@ body[data-lang="zh"] .lang-en {
   line-height: 1.65;
   color: var(--c-body);
   margin: 0;
-  /* Keep the lead at a readable measure even though the title now fills the
-     full column width. */
-  max-width: 64ch;
+  /* Fill the column like the title — a narrower cap left a confusing blank to
+     the right of the intro that read as missing content. */
 }
 .issue-list-card__meta {
   display: flex;
@@ -1809,12 +1813,12 @@ body[data-lang="zh"] .lang-en {
     max-height: calc(100vh - 104px);
     overflow-y: auto;
     overscroll-behavior: contain;
-    scrollbar-width: thin;
-    padding-right: 4px;
   }
-  .issue-toc__sticky::-webkit-scrollbar { width: 5px; }
-  .issue-toc__sticky::-webkit-scrollbar-thumb { background: var(--c-hairline); border-radius: 4px; }
 }
+/* No visible scrollbar on the TOC (desktop sidebar or mobile dropdown) — it
+   still scrolls by wheel/trackpad/keyboard, just without the grey bar. */
+.issue-toc__sticky { scrollbar-width: none; }
+.issue-toc__sticky::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
 .issue-toc__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .issue-toc__group + .issue-toc__group { margin-top: 4px; }
@@ -4019,7 +4023,6 @@ body[data-lang="zh"] .lang-en {
 .t-display-lg,
 .t-display-md,
 .t-display-sm,
-.issue-masthead__title,
 .issue-cover__title,
 .issue-list-card__title,
 .section-head__title,
@@ -4310,7 +4313,6 @@ body[data-lang="zh"] em {
    but lead paragraphs sitting on dark surfaces need light text.
    ========================================================================= */
 .issue-cover__lead,
-.issue-list-card__lead,
 .issue-masthead__lead,
 .article-card--featured .article-card__summary,
 .article-card--featured .article-card__bullets,
@@ -4323,8 +4325,7 @@ body[data-lang="zh"] em {
   color: var(--c-on-dark);
 }
 
-.issue-cover__lead,
-.issue-list-card__lead {
+.issue-cover__lead {
   /* slightly softer than pure cream so it doesn't compete with title */
   color: var(--scrim-cream-88);
 }
