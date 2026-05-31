@@ -1714,6 +1714,9 @@ body[data-lang="zh"] .lang-en {
   display: flex;
   flex-direction: column;
   padding: 28px;
+  /* Let the card shrink within the grid row and clip the scroller's edges. */
+  min-height: 0;
+  overflow: hidden;
 }
 .issue-contents__head { margin-bottom: 18px; }
 .issue-contents__list {
@@ -1723,10 +1726,13 @@ body[data-lang="zh"] .lang-en {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  /* Cap the overall height so a long issue (e.g. 38 picks) doesn't tower over
-     the cover card — the list scrolls within this bound. Slim quiet scrollbar
-     (matching the issue-page TOC) so it doesn't read as clipped. */
-  max-height: clamp(340px, 46vh, 520px);
+  /* Fill the card height (which tracks the cover card beside it via the grid's
+     stretch) and scroll only when the issue is long enough to overflow.
+     flex-basis:0 keeps a long TOC from inflating the row past the cover, so the
+     right column follows the left height instead of a rigid fixed cap. Slim
+     quiet scrollbar matches the issue-page TOC. */
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -1777,6 +1783,11 @@ body[data-lang="zh"] .lang-en {
 }
 .issue-contents__item:hover { color: var(--c-primary); text-decoration: none; }
 .issue-contents__cta { margin-top: auto; width: 100%; }
+/* Stacked layout (no cover beside it to borrow height from): size the list to
+   its content with a gentle cap so it doesn't run the whole page. */
+@media (max-width: 900px) {
+  .issue-contents__list { flex: none; max-height: 60vh; }
+}
 
 /* =========================================================================
    Issue list card (weekly-list page)
@@ -1784,10 +1795,11 @@ body[data-lang="zh"] .lang-en {
 .issue-list {
   display: flex;
   flex-direction: column;
+  gap: clamp(16px, 2vw, 24px);
 }
-/* Editorial issue index: a ghost serial number anchors each entry, the theme
-   carries the row. Whole card is the <a> (no nested links) so it's fully
-   clickable. Robust grid — no absolute-positioned cover to overlap. */
+/* Each archive entry is its own bound "issue card" — same cream surface as the
+   issue masthead, with a ghost serial in the left column. Whole card is the
+   <a> (no nested links) so it's fully clickable. */
 .issue-list-card {
   position: relative;
   display: grid;
@@ -1802,17 +1814,22 @@ body[data-lang="zh"] .lang-en {
   align-items: start;
   text-decoration: none;
   color: inherit;
-  border-top: 1px solid var(--c-hairline);
-  padding: var(--s-xl) 0;
+  background: var(--c-surface-soft);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-xl);
+  box-shadow: 0 1px 0 var(--shadow-ink-6), 0 24px 48px -32px var(--shadow-ink-13);
+  padding: clamp(28px, 4vw, 48px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .issue-list-card__eyebrow { grid-area: eyebrow; }
 .issue-list-card__no { grid-area: no; }
 .issue-list-card__body { grid-area: body; }
-.issue-list-card:first-child {
-  border-top: 0;
-  padding-top: var(--s-lg);
+.issue-list-card:hover {
+  text-decoration: none;
+  border-color: var(--coral-tint-strong);
+  box-shadow: 0 1px 0 var(--shadow-ink-6), 0 28px 56px -30px var(--shadow-ink-13);
+  transform: translateY(-2px);
 }
-.issue-list-card:hover { text-decoration: none; }
 .issue-list-card:hover .issue-list-card__title { color: var(--c-primary); }
 .issue-list-card__no {
   font-family: var(--f-display);
@@ -1933,18 +1950,10 @@ body[data-lang="zh"] .lang-en {
     overscroll-behavior: contain;
   }
 }
-/* Slim, quiet scrollbar on the TOC (desktop sidebar or mobile dropdown). A
-   fully hidden bar removed the only hint that a long outline scrolls, so it
-   read as "cut off" at the last visible row. Keep it faint at rest, firmer on
-   hover — affordance without the chunky default grey bar. */
-.issue-toc__sticky { scrollbar-width: thin; scrollbar-color: var(--c-hairline) transparent; }
-.issue-toc__sticky::-webkit-scrollbar { width: 6px; height: 6px; }
-.issue-toc__sticky::-webkit-scrollbar-track { background: transparent; }
-.issue-toc__sticky::-webkit-scrollbar-thumb {
-  background: var(--c-hairline);
-  border-radius: 4px;
-}
-.issue-toc__sticky:hover::-webkit-scrollbar-thumb { background: var(--c-muted-soft); }
+/* No visible scrollbar on the TOC (desktop sidebar or mobile dropdown) — it
+   still scrolls by wheel/trackpad/keyboard, just without the bar. */
+.issue-toc__sticky { scrollbar-width: none; }
+.issue-toc__sticky::-webkit-scrollbar { width: 0; height: 0; display: none; }
 
 .issue-toc__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .issue-toc__group + .issue-toc__group { margin-top: 4px; }
