@@ -5,6 +5,16 @@ const LANG_COOKIE = "glean_lang";
 
 export const onRequest = defineMiddleware(async (ctx, next) => {
   const url = new URL(ctx.request.url);
+
+  // Canonicalize trailing slashes → 301 to the no-slash URL. trailingSlash is
+  // "ignore", so /about/, /tag/foo/, /en/x/ now MATCH a route and reach here;
+  // we bounce them to the canonical form the whole site links to. (Static
+  // _redirects can't do this — Cloudflare ignores it when a _worker.js exists.)
+  if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
+    const stripped = url.pathname.replace(/\/+$/, "") || "/";
+    return Response.redirect(new URL(stripped + url.search, url), 301);
+  }
+
   const isAdmin =
     url.pathname.startsWith("/admin") || url.pathname.startsWith("/api/admin");
   const isApi = url.pathname.startsWith("/api/");

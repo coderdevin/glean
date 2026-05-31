@@ -732,13 +732,21 @@ button {
   background: transparent;
   border-bottom-color: var(--c-primary);
 }
-/* CTA-style nav link (e.g. "提交链接") — muted by default, coral on hover.
-   Lives in the nav row but isn't shouting like a primary button. */
+/* CTA-style nav link ("提交链接" / "Submit a link") — the core action, so it
+   reads as a button: coral outline that fills on hover. Overrides the base
+   .nav-link 2px transparent bottom-border with a full pill border. */
 .nav-link--cta {
-  color: var(--c-muted);
+  color: var(--c-primary);
+  border: 1px solid var(--c-primary);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-weight: 500;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
 }
 .nav-link--cta:hover {
-  color: var(--c-primary);
+  color: #fff;
+  background: var(--c-primary);
+  border-color: var(--c-primary);
   border-bottom-color: var(--c-primary);
 }
 /* Submit-link duplicate that lives inside the mobile drawer. Hidden on
@@ -755,41 +763,40 @@ button {
   gap: var(--s-md);
 }
 
-/* Lang toggle — editorial text-style, not a SaaS pill switch.
-   Active language goes ink/bold; inactive stays muted. Mono font so it reads
-   as a "label", not a UI control competing with nav-link underlines. */
+/* Lang toggle — compact segmented control. The active language sits in a
+   raised chip; the inactive one is muted. These are anchors (real navigation
+   between the / and /en URL trees), so anchor resets matter. */
 .lang-toggle {
   display: inline-flex;
-  align-items: baseline;
-  background: transparent;
-  border-radius: 0;
-  padding: 0;
-  gap: 0;
-}
-.lang-toggle button {
-  border: 0;
-  background: transparent;
-  padding: 8px 10px;
-  font-family: var(--f-mono);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  color: var(--c-muted-soft);
-  min-width: 32px;
-  cursor: pointer;
-  transition: color 0.12s;
-}
-.lang-toggle button:hover { color: var(--c-body); }
-.lang-toggle button + button {
-  border-left: 1px solid var(--c-hairline);
-  padding-left: 12px;
-  margin-left: 4px;
-}
-.lang-toggle button.is-active {
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
   background: var(--c-surface-soft);
+  border: 1px solid var(--c-hairline);
+}
+.lang-toggle a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--c-muted);
+  text-decoration: none;
+  transition: color 0.12s, background 0.12s;
+}
+.lang-toggle a:hover { color: var(--c-ink); }
+.lang-toggle a.is-active {
+  background: var(--c-canvas);
   color: var(--c-ink);
   font-weight: 600;
-  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 /* =========================================================================
@@ -3480,7 +3487,7 @@ body[data-lang="zh"] .lang-en {
 /* ---- Focus-visible (works across .btn / .nav-link / .lang-toggle / inputs) ---- */
 .btn:focus-visible,
 .nav-link:focus-visible,
-.lang-toggle button:focus-visible,
+.lang-toggle a:focus-visible,
 .feed-tag:focus-visible,
 .issue-toc__link:focus-visible,
 .brand:focus-visible,
@@ -4316,7 +4323,7 @@ body[data-lang="zh"] .lang-en {
 /* --- Functional surfaces stay sans (defensive — most already do) --- */
 .top-nav,
 .nav-link,
-.lang-toggle button,
+.lang-toggle a,
 .btn,
 .input,
 .textarea,
