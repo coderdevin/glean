@@ -254,7 +254,7 @@ export function publishFieldsFromAi(sub: Submission): PublishFields | null {
  */
 export async function autoPublishReady(
   env: PublishEnv,
-  limit = 5,
+  limit = 3,
 ): Promise<{ published: string[]; skipped: number }> {
   const drizzleDb = db(env.DB);
   const ready = await drizzleDb

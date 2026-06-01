@@ -37,7 +37,7 @@ LLM_FALLBACK_MODEL = "deepseek-v4-pro"
 #   */5 * * * *  reaper — sweep submissions/weeklies stranded past the 15-min
 #                worker ceiling into 'failed' (else they show "running…" forever)
 #   0 22 * * *   daily auto-publish — 06:00 Asia/Shanghai; publishes the oldest
-#                5 'ready' submissions so the editor needn't do it each morning
+#                3 'ready' submissions so the editor needn't do it each morning
 [triggers]
 crons = ["*/5 * * * *", "0 22 * * *"]
 

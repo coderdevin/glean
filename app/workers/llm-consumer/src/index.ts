@@ -37,9 +37,9 @@ import { getLlmProviderSetting, withLlmProviderSetting } from "../../../src/lib/
 import { autoPublishReady } from "../../../src/lib/publish";
 
 /** Daily auto-publish cron: 22:00 UTC = 06:00 Asia/Shanghai. Publishes the
- *  oldest 5 'ready' submissions so the editor doesn't have to each morning. */
+ *  oldest 3 'ready' submissions so the editor doesn't have to each morning. */
 const DAILY_PUBLISH_CRON = "0 22 * * *";
-const DAILY_PUBLISH_COUNT = 5;
+const DAILY_PUBLISH_COUNT = 3;
 import { drizzle } from "drizzle-orm/d1";
 import { asc, eq, inArray, isNotNull, and } from "drizzle-orm";
 import { submissions } from "../../../src/db/schema";
