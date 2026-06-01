@@ -1,6 +1,10 @@
 ---
 import Site from "~/layouts/Site.astro";
-export const prerender = true;
+// SSR (not prerendered) so the /en/design-system variant resolves via the
+// middleware, and so the site's no-trailing-slash canonical is enforced. When
+// prerendered, Cloudflare emits design-system/index.html and 308-redirects the
+// canonical /design-system → /design-system/, backwards from every other page.
+export const prerender = false;
 ---
 <Site
   title="设计系统 · Design system — Glean · 拾遗"

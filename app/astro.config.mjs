@@ -19,7 +19,11 @@ export default defineConfig({
     // whenever a _worker.js is present).
     routes: {
       extend: {
-        include: [{ pattern: "/about/" }, { pattern: "/standards/" }],
+        include: [
+          { pattern: "/about/" },
+          { pattern: "/standards/" },
+          { pattern: "/design-system/" },
+        ],
       },
     },
   }),
