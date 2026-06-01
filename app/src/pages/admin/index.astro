@@ -219,7 +219,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
                   {parseTags(upNext.aiTagsJson).slice(0, 3).map((t) => <span class="chip" style="cursor: inherit">{t}</span>)}
                   {upNext.aiScore !== null && upNext.aiScore !== undefined && <span>· score {Number(upNext.aiScore).toFixed(2)}</span>}
                   <span>· by {upNext.submitterName?.trim() || "Devin"}</span>
-                  <span>· {hms(upNext.createdAt)}</span>
+                  <span title={whenTitle(upNext.createdAt)}>· {whenLabel(upNext.createdAt)}</span>
                 </div>
               </div>
               <span class="q2-hero__cta">Review → <kbd>R</kbd></span>
@@ -245,7 +245,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
                 <span class="q2-row__title">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
                 <span class="q2-row__meta">{host(r.url)}</span>
                 <span class="q2-row__score">{r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}</span>
-                <span class="q2-row__time">{hms(r.createdAt)}</span>
+                <span class="q2-row__time" title={whenTitle(r.createdAt)}>{whenLabel(r.createdAt)}</span>
               </a>
             ))}
           </div>
@@ -284,7 +284,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
                     {stalled && <span class="q2-row__stall-pill">卡了 {mins}min</span>}
                   </span>
                   <span class="q2-row__score">{mins || "<1"}min</span>
-                  <span class="q2-row__time">{hms(r.createdAt)}</span>
+                  <span class="q2-row__time" title={whenTitle(r.createdAt)}>{whenLabel(r.createdAt)}</span>
                 </a>
               );
             })}
@@ -303,7 +303,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
                 <span class="q2-row__title" style="color: var(--c-muted)">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
                 <span class="q2-row__meta">{host(r.url)}</span>
                 <span class="q2-row__score">{r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}</span>
-                <span class="q2-row__time">{hms(r.createdAt)}</span>
+                <span class="q2-row__time" title={whenTitle(r.createdAt)}>{whenLabel(r.createdAt)}</span>
               </a>
             ))}
           </div>
@@ -323,7 +323,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
                 </span>
                 <span class="q2-row__meta">{r.rejectReason ?? host(r.url)}</span>
                 <span class="q2-row__score">—</span>
-                <span class="q2-row__time">{hms(r.createdAt)}</span>
+                <span class="q2-row__time" title={whenTitle(r.createdAt)}>{whenLabel(r.createdAt)}</span>
               </a>
             ))}
           </div>
@@ -343,7 +343,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
                 </span>
                 <span class="q2-row__meta">{host(r.url)}</span>
                 <span class="q2-row__score">—</span>
-                <span class="q2-row__time">{hms(r.createdAt)}</span>
+                <span class="q2-row__time" title={whenTitle(r.createdAt)}>{whenLabel(r.createdAt)}</span>
               </a>
             ))}
           </div>
