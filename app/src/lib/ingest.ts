@@ -38,6 +38,7 @@ import {
   callLlmWeekly,
   toWeeklyPickInput,
   defaultProviderName,
+  resolveProviderSpec,
   NO_RETRY_MARKER,
   type LlmEnv,
 } from "./llm";
@@ -312,8 +313,15 @@ export async function processLlm(
   const titleSeed =
     row.aiTitleEn?.trim() || obj.customMetadata?.title?.trim() || row.url;
 
+  // The analysis call resolves its provider+model from opts.modelOverride,
+  // falling back to the env default provider (modelscope unless overridden) —
+  // NOT a hardcoded deepseek model. Mirror that resolution here so the stored
+  // processing_model + the "started" event show what ACTUALLY runs. (The old
+  // DEFAULT_DEEPSEEK_MODEL fallback mislabeled default modelscope runs as
+  // deepseek-v4-pro, even though the "ok" event correctly logged modelscope.)
+  const resolved = resolveProviderSpec(env, opts.modelOverride);
   const processingModel =
-    opts.modelOverride ?? modelFromRow(row.processingModel) ?? row.aiModel?.split("/")[1] ?? DEFAULT_DEEPSEEK_MODEL;
+    opts.modelOverride ?? modelFromRow(row.processingModel) ?? row.aiModel?.split("/")[1] ?? resolved.model ?? DEFAULT_DEEPSEEK_MODEL;
   await db
     .update(submissions)
     .set({ status: "analyzing", processingStartedAt: new Date(), processingModel })
@@ -321,9 +329,10 @@ export async function processLlm(
   // One "started" per processLlm invocation. Phase boundaries are visible
   // via the "analysis phase ok" / "sections phase ok|failed" events below —
   // emitting a second "started" for each phase clutters the timeline without
-  // adding information.
+  // adding information. provider mirrors the "ok" event so the default
+  // modelscope-first path is visible from the start.
   await logEvent(env, id, "llm", "started", {
-    meta: { model: processingModel, body_chars: body.length },
+    meta: { provider: resolved.name, model: processingModel, body_chars: body.length },
   });
 
   // Existing tags shown to the model as reuse hints (most-used first, capped so
