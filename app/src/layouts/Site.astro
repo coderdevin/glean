@@ -94,6 +94,17 @@ const isActive = (prefix: string): boolean => {
     {/* Mobile address-bar tint tracks --c-canvas (warm-50 light / ink-900 dark). */}
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#faf9f6" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1c1b1a" />
+    {/* PWA: installable to the home screen ("添加到主屏幕"), launches standalone.
+        Icons live in /public; no service worker (no offline) so the site's
+        Cache-Control + bustForPick stay authoritative. */}
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="拾遗" />
     <title>{title}</title>
     {description && <meta name="description" content={description} />}
     <link rel="canonical" href={canonical} />
