@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeCategorySlug } from "./category";
 
 const Form = z.object({
   title_zh: z.string().max(200).default(""),
@@ -10,7 +11,15 @@ const Form = z.object({
   editor_zh: z.string().max(400).default(""),
   editor_en: z.string().max(400).default(""),
   tags: z.string().max(200).default(""),
-  category: z.enum(["infra", "data", "code"]).default("code"),
+  // Free-form category slug (self-growing taxonomy), NOT the old infra/data/code
+  // enum — the editor's category combobox sends any AI-proposed slug (e.g.
+  // "ai-engineering"). A hardcoded enum here made readAdminForm throw → publish
+  // 500 for every off-list category. Normalize to a kebab slug; empty → "code".
+  category: z
+    .string()
+    .max(60)
+    .default("code")
+    .transform((s) => normalizeCategorySlug(s) || "code"),
   score: z.coerce.number().min(0).max(1).default(0.5),
   submitter: z.string().max(40).default(""),
   reject_reason: z.string().max(200).optional(),
