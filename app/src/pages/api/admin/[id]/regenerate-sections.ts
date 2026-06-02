@@ -31,10 +31,28 @@ export const prerender = false;
 
 const LLM_WORKER_URL = "http://localhost:8788";
 
+// Optional sections model override (provider × tier). Empty/absent → the active
+// provider's Flash default (unchanged behavior). Allowlisted so the admin form
+// can't inject an arbitrary provider spec downstream. Specs resolve via
+// resolveProviderSpec (llm.ts): bare "deepseek-*" → DeepSeek API; "modelscope:…"
+// → ModelScope (free quota). Flash = fast/cheap; Pro = reasoning model, slower
+// but higher quality (e.g. GitHub project explainers read better on Pro).
+const SECTIONS_MODEL_SPECS = new Set([
+  "deepseek-v4-pro",
+  "deepseek-v4-flash",
+  "modelscope:deepseek-ai/DeepSeek-V4-Pro",
+  "modelscope:deepseek-ai/DeepSeek-V4-Flash",
+]);
+
 export const POST: APIRoute = async (ctx) => {
   const env = ctx.locals.runtime.env;
   const id = ctx.params.id;
   if (!id) return new Response("missing id", { status: 400 });
+
+  // Optional model picker from the regenerate form; ignore anything off-list.
+  const form = await ctx.request.formData().catch(() => null);
+  const modelRaw = (form?.get("model") ?? "").toString().trim();
+  const model = SECTIONS_MODEL_SPECS.has(modelRaw) ? modelRaw : undefined;
 
   const sRows = await db(env.DB).select().from(submissions).where(eq(submissions.id, id)).limit(1);
   const sub = sRows[0];
@@ -61,16 +79,17 @@ export const POST: APIRoute = async (ctx) => {
   }
   await logEvent(env, id, "queue", "queued", {
     message: "sections regenerate requested by admin",
-    meta: { target: "glean-llm", source: "regenerate", phase: "sections" },
+    meta: { target: "glean-llm", source: "regenerate", phase: "sections", model: model ?? "default(flash)" },
   });
 
-  const msgBody = `${id}|phase=sections`;
+  const msgBody = model ? `${id}|phase=sections&model=${model}` : `${id}|phase=sections`;
   if (import.meta.env.DEV) {
     // Dev: proxy directly to the local llm-consumer fetch handler so the
     // sections call fires without waiting for the dev queue poller.
     const proxyUrl = new URL(`${LLM_WORKER_URL}/process`);
     proxyUrl.searchParams.set("id", id);
     proxyUrl.searchParams.set("phase", "sections");
+    if (model) proxyUrl.searchParams.set("model", model);
     fetch(proxyUrl.toString(), { method: "POST" }).catch((err) =>
       console.warn("dev llm proxy fire-and-forget failed:", (err as Error).message),
     );

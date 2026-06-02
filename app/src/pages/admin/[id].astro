@@ -673,7 +673,13 @@ const sectionsTotalChars = aiSections.reduce(
             {failureErrorShort && (
               <pre class="r2-sections__error-msg">{failureErrorShort}</pre>
             )}
-            <form action={`/api/admin/${row.id}/regenerate-sections`} method="post" style="margin-top: 12px">
+            <form action={`/api/admin/${row.id}/regenerate-sections`} method="post" style="margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+              <select name="model" aria-label="Sections 模型 / model" class="r2-regen-model">
+                <option value="modelscope:deepseek-ai/DeepSeek-V4-Pro" selected>ModelScope · Pro（免费额度，默认）</option>
+                <option value="modelscope:deepseek-ai/DeepSeek-V4-Flash">ModelScope · Flash（免费额度）</option>
+                <option value="deepseek-v4-pro">DeepSeek · Pro（质量高 / 慢）</option>
+                <option value="deepseek-v4-flash">DeepSeek · Flash（快）</option>
+              </select>
               <button class="btn btn-secondary" type="submit">重新生成 sections</button>
             </form>
           </div>
@@ -707,7 +713,13 @@ const sectionsTotalChars = aiSections.reduce(
         )}
 
         {aiSections.length > 0 && (
-          <form action={`/api/admin/${row.id}/regenerate-sections`} method="post" style="margin-top: 18px">
+          <form action={`/api/admin/${row.id}/regenerate-sections`} method="post" style="margin-top: 18px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+            <select name="model" aria-label="Sections 模型 / model" class="r2-regen-model">
+              <option value="modelscope:deepseek-ai/DeepSeek-V4-Pro" selected>ModelScope · Pro（免费额度，默认）</option>
+              <option value="modelscope:deepseek-ai/DeepSeek-V4-Flash">ModelScope · Flash（免费额度）</option>
+              <option value="deepseek-v4-pro">DeepSeek · Pro（质量高 / 慢）</option>
+              <option value="deepseek-v4-flash">DeepSeek · Flash（快）</option>
+            </select>
             <button class="btn btn-secondary" type="submit">重新生成 sections</button>
           </form>
         )}
