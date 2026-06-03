@@ -437,6 +437,13 @@ const sectionsTotalChars = aiSections.reduce(
           </div>
         </div>
 
+        {row.originalTitle && (
+          <p class="r2-original" title="Source article's own title (read-only)">
+            <span class="r2-original__label">原文标题</span>
+            <span class="r2-original__text">{row.originalTitle}</span>
+          </p>
+        )}
+
         <h1
           class="r2-title ie lang-zh-only"
           contenteditable="true"

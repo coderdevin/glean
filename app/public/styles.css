@@ -4611,6 +4611,29 @@ body[data-lang="zh"] em {
 .r2-card__eyebrow .r2-card__sep { color: var(--c-muted-soft); opacity: 0.6; }
 .r2-card__eyebrow > .lang3-toggle { margin-left: auto; }
 
+/* Read-only reference to the source article's own title, so the editor can
+   see at a glance whether the AI-rewritten title (the editable h1 below) drifts
+   from the original. Quiet by design — it is reference, not an editable field. */
+.r2-original {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0 0 var(--s-md);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--c-muted);
+}
+.r2-original__label {
+  flex: none;
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--c-muted-soft);
+  transform: translateY(-1px);
+}
+.r2-original__text { word-break: break-word; }
+
 /* Inline-editable affordance. Subtle on hover; warm when focused. */
 /* Editable cell — looks exactly like the published text by default. The only
    affordance is `cursor: text` + a whisper of background on hover. Focus is

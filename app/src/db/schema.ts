@@ -155,6 +155,11 @@ export const submissions = sqliteTable(
 
     rawR2Key: text("raw_r2_key"),
     extractedLang: text("extracted_lang"),
+    /** The source article's own title, captured at extract time (≤256 chars).
+     *  Read-only reference shown in admin so the editor can compare against the
+     *  AI-rewritten ai_title_* fields. Not published. Null on rows predating
+     *  migration 0015 or when the source had no title. */
+    originalTitle: text("original_title"),
 
     aiTitleZh: text("ai_title_zh"),
     aiTitleEn: text("ai_title_en"),

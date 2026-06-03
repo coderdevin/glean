@@ -241,7 +241,13 @@ export async function processExtract(env: IngestEnv, id: string): Promise<Extrac
   });
   await db
     .update(submissions)
-    .set({ rawR2Key: rawKey, extractedLang: body.detectedLang })
+    .set({
+      rawR2Key: rawKey,
+      extractedLang: body.detectedLang,
+      // Same value stashed on the R2 object above — also persisted as a column
+      // so admin can show it without an R2 round-trip. Null when title-less.
+      originalTitle: body.title.slice(0, 256) || null,
+    })
     .where(eq(submissions.id, id));
   await logEvent(env, id, "extract", "ok", {
     meta: {
