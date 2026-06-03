@@ -1,28 +1,45 @@
 import { z } from "zod";
 import { normalizeCategorySlug } from "./category";
 
+// Editor input is TRUSTED (admin-only) and free-form. A hard cap that *rejects*
+// makes readAdminForm throw → the route returns a bare HTTP 500 (this is exactly
+// how the category enum, then the summary/bullets length caps, each surfaced as
+// "publish 500s again"). So bound by *truncation*, not rejection: clip overly
+// long values to a generous limit instead of failing the whole form. Limits are
+// sized well above real bilingual content; the columns are plain D1 TEXT.
+const clip = (max: number) =>
+  z
+    .string()
+    .default("")
+    .transform((s) => s.slice(0, max));
+
 const Form = z.object({
-  title_zh: z.string().max(200).default(""),
-  title_en: z.string().max(200).default(""),
-  summary_zh: z.string().max(1000).default(""),
-  summary_en: z.string().max(1000).default(""),
-  bullets_zh: z.string().max(4000).default(""),
-  bullets_en: z.string().max(4000).default(""),
-  editor_zh: z.string().max(400).default(""),
-  editor_en: z.string().max(400).default(""),
-  tags: z.string().max(200).default(""),
+  title_zh: clip(300),
+  title_en: clip(300),
+  summary_zh: clip(8000),
+  summary_en: clip(8000),
+  bullets_zh: clip(20000),
+  bullets_en: clip(20000),
+  editor_zh: clip(8000),
+  editor_en: clip(8000),
+  tags: clip(1000),
   // Free-form category slug (self-growing taxonomy), NOT the old infra/data/code
-  // enum — the editor's category combobox sends any AI-proposed slug (e.g.
-  // "ai-engineering"). A hardcoded enum here made readAdminForm throw → publish
-  // 500 for every off-list category. Normalize to a kebab slug; empty → "code".
+  // enum — the editor's combobox sends any AI-proposed slug. Normalize to a kebab
+  // slug; empty → "code".
   category: z
     .string()
-    .max(60)
     .default("code")
     .transform((s) => normalizeCategorySlug(s) || "code"),
-  score: z.coerce.number().min(0).max(1).default(0.5),
-  submitter: z.string().max(40).default(""),
-  reject_reason: z.string().max(200).optional(),
+  // Empty / malformed / out-of-range score falls back to 0.5 — never throws.
+  score: z.preprocess(
+    (v) => (v === "" || v == null ? 0.5 : v),
+    z.coerce.number().min(0).max(1).catch(0.5),
+  ),
+  submitter: clip(80),
+  reject_reason: z
+    .string()
+    .optional()
+    .transform((s) => (typeof s === "string" ? s.slice(0, 1000) : s)),
 });
 
 export type AdminFormInput = z.infer<typeof Form>;
