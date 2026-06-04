@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import {
   normalizeEmail,
   parseCookies,
-  signLoginToken,
-  verifyLoginToken,
+  generateOtpCode,
+  signOtpChallenge,
+  verifyOtpChallenge,
   signSession,
   verifySession,
   READER_COOKIE,
@@ -23,42 +24,56 @@ assert.equal(normalizeEmail("  Foo@Bar.COM "), "foo@bar.com");
   assert.deepEqual(parseCookies(null), {});
 }
 
-// --- login token: round-trip ---
+// --- generateOtpCode: 6 digits ---
+{
+  for (let i = 0; i < 50; i++) {
+    const c = generateOtpCode();
+    assert.match(c, /^[0-9]{6}$/, "always a zero-padded 6-digit code");
+  }
+}
+
+// --- OTP challenge: correct code round-trips, binds the email ---
 {
   const now = 1_000_000;
-  const tok = await signLoginToken(SECRET, "Reader@Example.com", now);
-  const email = await verifyLoginToken(SECRET, tok, now + 60_000); // 1 min later
+  const ch = await signOtpChallenge(SECRET, "Reader@Example.com", "123456", now);
+  const email = await verifyOtpChallenge(SECRET, ch, "123456", now + 60_000);
   assert.equal(email, "reader@example.com");
 }
 
-// login token: expired
+// OTP: wrong code rejected
 {
   const now = 1_000_000;
-  const tok = await signLoginToken(SECRET, "a@b.com", now);
-  const email = await verifyLoginToken(SECRET, tok, now + 16 * 60 * 1000); // 16 min later
-  assert.equal(email, null);
+  const ch = await signOtpChallenge(SECRET, "a@b.com", "111111", now);
+  assert.equal(await verifyOtpChallenge(SECRET, ch, "222222", now + 1000), null);
 }
 
-// login token: wrong secret rejected
+// OTP: expired
 {
-  const tok = await signLoginToken(SECRET, "a@b.com", 1000);
-  assert.equal(await verifyLoginToken("other-secret", tok, 2000), null);
+  const now = 1_000_000;
+  const ch = await signOtpChallenge(SECRET, "a@b.com", "123456", now);
+  assert.equal(await verifyOtpChallenge(SECRET, ch, "123456", now + 11 * 60 * 1000), null);
 }
 
-// a session token must not validate as a login token (purpose check)
+// OTP: wrong secret rejected (forged challenge)
+{
+  const ch = await signOtpChallenge(SECRET, "a@b.com", "123456", 1000);
+  assert.equal(await verifyOtpChallenge("other-secret", ch, "123456", 2000), null);
+}
+
+// a session token must not validate as an OTP challenge (purpose check)
 {
   const sess = await signSession(SECRET, "reader-id-1", 1000);
-  assert.equal(await verifyLoginToken(SECRET, sess, 2000), null);
+  assert.equal(await verifyOtpChallenge(SECRET, sess, "123456", 2000), null);
 }
 
 // --- session token: round-trip + expiry ---
 {
   const now = 5_000_000;
   const tok = await signSession(SECRET, "reader-id-42", now);
-  const ok = await verifySession(SECRET, tok, now + 24 * 60 * 60 * 1000); // 1 day later
+  const ok = await verifySession(SECRET, tok, now + 200 * 24 * 60 * 60 * 1000); // 200 days later
   assert.deepEqual(ok, { readerId: "reader-id-42" });
 
-  const expired = await verifySession(SECRET, tok, now + 91 * 24 * 60 * 60 * 1000);
+  const expired = await verifySession(SECRET, tok, now + 366 * 24 * 60 * 60 * 1000); // > 1 year
   assert.equal(expired, null);
 }
 

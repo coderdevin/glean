@@ -80,34 +80,29 @@ export function renderConfirmEmail(args: {
   return { subject, html, text };
 }
 
-/** Magic-link login email for reader accounts (reading notes). */
-export function renderLoginEmail(args: {
+/** Email-OTP login code for reader accounts (reading notes). */
+export function renderOtpEmail(args: {
   lang: Lang;
   siteName: string;
-  loginUrl: string;
+  code: string;
 }): EmailContent {
-  const { lang, siteName, loginUrl } = args;
+  const { lang, siteName, code } = args;
   const zh = lang === "zh";
 
-  const subject = zh ? `登录 ${siteName}` : `Sign in to ${siteName}`;
-  const heading = zh ? "点这里登录" : "Tap to sign in";
+  const subject = zh ? `${siteName} 登录验证码：${code}` : `${siteName} sign-in code: ${code}`;
+  const heading = zh ? "你的登录验证码" : "Your sign-in code";
   const body = zh
-    ? "点下面的按钮即可登录，你的阅读笔记会跟着账号在各设备间同步。链接 15 分钟内有效。如果不是你本人操作，忽略这封邮件即可。"
-    : "Tap the button to sign in — your reading notes follow your account across devices. This link expires in 15 minutes. If this wasn't you, just ignore this email.";
-  const cta = zh ? "登录" : "Sign in";
-  const fallback = zh ? "按钮打不开就复制这个链接：" : "If the button doesn't work, paste this link:";
+    ? "在登录框里输入下面的验证码即可登录。验证码 10 分钟内有效。如果不是你本人操作，忽略这封邮件即可。"
+    : "Enter this code in the sign-in box to continue. It expires in 10 minutes. If this wasn't you, just ignore this email.";
 
   const html = shell(
     `<h1 style="margin:0 0 16px 0;font-size:24px;color:${INK};">${esc(heading)}</h1>
 <p style="margin:0 0 24px 0;font-size:15px;line-height:1.7;color:${MUTED};">${esc(body)}</p>
-<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:${ACCENT};">
-<a href="${esc(loginUrl)}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;">${esc(cta)}</a>
-</td></tr></table>
-<p style="margin:24px 0 0 0;font-size:12px;line-height:1.6;color:${MUTED};">${esc(fallback)}<br><a href="${esc(loginUrl)}" style="color:${ACCENT};word-break:break-all;">${esc(loginUrl)}</a></p>`,
+<div style="font-size:34px;font-weight:700;letter-spacing:8px;color:${INK};background:${PAPER};border:1px solid ${RULE};border-radius:10px;padding:18px 0;text-align:center;">${esc(code)}</div>`,
     `${esc(siteName)}`,
   );
 
-  const text = `${heading}\n\n${body}\n\n${cta}: ${loginUrl}`;
+  const text = `${heading}: ${code}\n\n${body}`;
   return { subject, html, text };
 }
 

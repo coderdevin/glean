@@ -36,7 +36,7 @@ export async function verifyToken(
   }
 }
 
-async function hmac(secret: string, data: string): Promise<string> {
+export async function hmac(secret: string, data: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

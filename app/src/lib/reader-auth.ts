@@ -1,56 +1,88 @@
 /**
- * Reader identity — passwordless magic-link login + signed session cookie.
+ * Reader identity — passwordless email-OTP login + signed session cookie.
  * Built on the existing HMAC token primitives (lib/auth.ts) and reused across
  * the reader API routes and /me/* pages. Soft auth, completely separate from
  * the admin gate in middleware.ts — never touches ADMIN_EMAILS.
  *
- * Token shapes (HMAC-signed, see signToken):
- *   login:   { e: <email>, p: "login", exp: <ms> }   — short-lived, emailed
- *   session: { rid: <readerId>, exp: <ms> }           — long-lived, in cookie
+ * Login is a 6-digit code emailed to the reader, verified in-page (no link to
+ * click, no new tab). It's stateless: the server signs an opaque "challenge"
+ * token holding the email + an HMAC of the code, hands it to the client, and
+ * later re-derives the HMAC from the typed code to check it — no KV/DB row for
+ * pending codes. The challenge carries only a hash, so it's safe client-side.
  *
- * Pure logic (sign/verify/normalize/parse) is unit-tested via
- * scripts/reader-auth.test.ts. Cookie attributes live here too so routes stay
- * thin and the flags can't drift.
+ * Token shapes (HMAC-signed, see signToken):
+ *   challenge: { e: <email>, p: "otp", h: <hmac(code)>, exp: <ms> } — emailed code
+ *   session:   { rid: <readerId>, exp: <ms> }                        — in cookie
+ *
+ * Pure logic is unit-tested via scripts/reader-auth.test.ts. Cookie attributes
+ * live here too so routes stay thin and the flags can't drift.
  */
-import { signToken, verifyToken } from "./auth";
+import { signToken, verifyToken, hmac } from "./auth";
 
 export const READER_COOKIE = "glean_reader";
-export const LOGIN_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes
-export const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+export const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+export const SESSION_TTL_MS = 365 * 24 * 60 * 60 * 1000; // 1 year (rolling)
 
 /** Trim + lowercase so identity is canonical regardless of how it was typed. */
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-/** Sign a magic-link login token bound to an email, expiring in ~15 min. */
-export function signLoginToken(
+/** A fresh 6-digit numeric login code (zero-padded, cryptographically random). */
+export function generateOtpCode(): string {
+  const n = crypto.getRandomValues(new Uint32Array(1))[0]! % 1_000_000;
+  return n.toString().padStart(6, "0");
+}
+
+/** Keyed hash binding a code to an email — never reversible without the secret. */
+function codeHash(secret: string, email: string, code: string): Promise<string> {
+  return hmac(secret, `otp:${normalizeEmail(email)}:${code.trim()}`);
+}
+
+/**
+ * Sign an opaque OTP challenge for (email, code). Safe to hand to the client:
+ * it carries only the keyed hash of the code, not the code itself.
+ */
+export async function signOtpChallenge(
   secret: string,
   email: string,
+  code: string,
   nowMs: number = Date.now(),
 ): Promise<string> {
   return signToken(secret, {
     e: normalizeEmail(email),
-    p: "login",
-    exp: nowMs + LOGIN_TOKEN_TTL_MS,
+    p: "otp",
+    h: await codeHash(secret, email, code),
+    exp: nowMs + OTP_TTL_MS,
   });
 }
 
-/** Verify a login token; returns the email if valid and unexpired, else null. */
-export async function verifyLoginToken(
+/**
+ * Verify a typed code against a challenge. Returns the bound email on success,
+ * else null (bad signature, expired, wrong purpose, or wrong code).
+ */
+export async function verifyOtpChallenge(
   secret: string,
-  token: string,
+  challenge: string,
+  code: string,
   nowMs: number = Date.now(),
 ): Promise<string | null> {
-  const payload = await verifyToken(secret, token);
+  const payload = await verifyToken(secret, challenge);
   if (!payload) return null;
-  if (payload.p !== "login") return null;
+  if (payload.p !== "otp") return null;
   if (typeof payload.exp !== "number" || nowMs > payload.exp) return null;
   if (typeof payload.e !== "string" || !payload.e) return null;
+  if (typeof payload.h !== "string") return null;
+  const expected = await codeHash(secret, payload.e, code);
+  // Constant-time-ish compare via the HMAC equality of equal-length b64 strings.
+  if (expected.length !== payload.h.length) return null;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ payload.h.charCodeAt(i);
+  if (diff !== 0) return null;
   return payload.e;
 }
 
-/** Sign a session token carrying the reader id, expiring in ~90 days. */
+/** Sign a session token carrying the reader id, expiring in ~1 year (rolling). */
 export function signSession(
   secret: string,
   readerId: string,

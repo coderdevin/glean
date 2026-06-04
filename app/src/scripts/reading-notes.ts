@@ -30,15 +30,21 @@ interface Note {
 }
 
 const COLORS: Color[] = ["yellow", "green", "pink"];
-const PENDING_KEY = "glean:pending-highlight";
+const COLOR_LABELS: Record<Color, string> = {
+  yellow: "黄色高亮",
+  green: "绿色高亮",
+  pink: "粉色高亮",
+};
 
 const body = document.querySelector<HTMLElement>(".av2-body[data-pick-id]");
 if (body) init(body);
 
 function init(bodyEl: HTMLElement): void {
   const pickId = bodyEl.dataset.pickId!;
-  const articlePath = location.pathname + location.search;
   let loggedIn = false;
+  // A highlight the reader started before logging in — applied in-page right
+  // after the OTP succeeds (no reload, so it just lives in memory).
+  let pendingPayload: Omit<Note, "id"> | null = null;
 
   const containers = Array.from(
     bodyEl.querySelectorAll<HTMLElement>(".av2-prose[data-sec][data-lang]"),
@@ -59,8 +65,6 @@ function init(bodyEl: HTMLElement): void {
       loggedIn = true;
       const data = (await res.json()) as { notes: Note[] };
       for (const n of data.notes) paintNote(n);
-      // Resume a highlight the reader attempted before logging in.
-      await resumePending();
       focusHashTarget();
     } catch {
       /* network hiccup — notes just won't show this load */
@@ -230,11 +234,36 @@ function init(bodyEl: HTMLElement): void {
     el.hidden = true;
     let current: ReturnType<typeof selectionInfo> = null;
 
+    // Core action: copy (no login needed). Kept first, like 微信读书 — more
+    // actions (分享/AI) can slot in here later without restructuring.
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "rn-toolbar__btn rn-toolbar__btn--first";
+    copyBtn.textContent = "复制";
+    copyBtn.title = "复制所选文字";
+    copyBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      // Read the LIVE selection at click time, not the cached one, so copying
+      // matches exactly what's highlighted even if the reader just adjusted it.
+      const text = window.getSelection()?.toString() || current?.exact || "";
+      if (text) void navigator.clipboard?.writeText(text).catch(() => {});
+      window.getSelection()?.removeAllRanges();
+      el.hidden = true;
+      current = null;
+    });
+    el.appendChild(copyBtn);
+
+    const hint = document.createElement("span");
+    hint.className = "rn-toolbar__hint";
+    hint.textContent = "高亮";
+    el.appendChild(hint);
+
     for (const c of COLORS) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = `rn-toolbar__swatch rn-toolbar__swatch--${c}`;
-      b.setAttribute("aria-label", `高亮 ${c}`);
+      b.setAttribute("aria-label", COLOR_LABELS[c]);
+      b.title = COLOR_LABELS[c];
       b.addEventListener("mousedown", (e) => {
         e.preventDefault();
         if (current) void onHighlight(current, c);
@@ -245,6 +274,7 @@ function init(bodyEl: HTMLElement): void {
     noteBtn.type = "button";
     noteBtn.className = "rn-toolbar__note";
     noteBtn.textContent = "批注";
+    noteBtn.title = "高亮并写批注";
     noteBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
       if (current) void onHighlight(current, "yellow", true);
@@ -289,7 +319,7 @@ function init(bodyEl: HTMLElement): void {
     window.getSelection()?.removeAllRanges();
 
     if (!loggedIn) {
-      stashPending(payload);
+      pendingPayload = payload;
       openLogin();
       return;
     }
@@ -399,28 +429,17 @@ function init(bodyEl: HTMLElement): void {
     });
   }
 
-  // ---- inline login -----------------------------------------------------
+  // ---- inline login (email → 6-digit code, all in-page) -----------------
 
-  function stashPending(payload: Omit<Note, "id">): void {
-    try {
-      sessionStorage.setItem(PENDING_KEY, JSON.stringify({ pickId, payload }));
-    } catch {
-      /* storage disabled — pending resume just won't happen */
+  /** Called once the OTP verifies: hydrate notes + apply the pending highlight. */
+  async function onLoggedIn(): Promise<void> {
+    loggedIn = true;
+    await hydrate();
+    if (pendingPayload) {
+      const created = await createNote(pendingPayload);
+      pendingPayload = null;
+      if (created) paintNote(created);
     }
-  }
-
-  async function resumePending(): Promise<void> {
-    let stashed: { pickId: string; payload: Omit<Note, "id"> } | null = null;
-    try {
-      const s = sessionStorage.getItem(PENDING_KEY);
-      if (s) stashed = JSON.parse(s);
-    } catch {
-      return;
-    }
-    if (!stashed || stashed.pickId !== pickId) return;
-    sessionStorage.removeItem(PENDING_KEY);
-    const created = await createNote(stashed.payload);
-    if (created) paintNote(created);
   }
 
   /** Deep-link from /me/notes: #rn-<id> scrolls to and flashes that highlight. */
@@ -436,36 +455,74 @@ function init(bodyEl: HTMLElement): void {
 
   function openLogin(): void {
     closePopover();
-    const existing = document.querySelector("[data-rn-login]");
-    if (existing) return;
+    if (document.querySelector("[data-rn-login]")) return;
+    const backdrop = document.createElement("div");
+    backdrop.className = "rn-login-backdrop";
+    backdrop.dataset.rnLogin = "1";
     const box = document.createElement("div");
     box.className = "rn-login";
-    box.dataset.rnLogin = "1";
     box.innerHTML = `
+      <button type="button" class="rn-login__close" aria-label="关闭">×</button>
       <p class="rn-login__msg">登录后即可高亮、做笔记，并在各设备间同步。</p>
-      <form class="rn-login__form">
-        <input type="email" required placeholder="you@example.com" class="rn-login__input" />
-        <button type="submit" class="rn-login__submit">发送登录链接</button>
+      <form class="rn-login__form rn-login__step" data-step="email">
+        <input type="email" required placeholder="you@example.com" class="rn-login__input" autocomplete="email" />
+        <button type="submit" class="rn-login__submit">发送验证码</button>
       </form>
-      <p class="rn-login__hint" hidden>登录链接已发到邮箱，点开后回到本页继续。</p>
-      <button type="button" class="rn-login__close" aria-label="关闭">×</button>`;
-    document.body.appendChild(box);
+      <form class="rn-login__form rn-login__step" data-step="code" hidden>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" required placeholder="6 位验证码" class="rn-login__input rn-login__input--code" autocomplete="one-time-code" />
+        <button type="submit" class="rn-login__submit">登录</button>
+      </form>
+      <p class="rn-login__hint" hidden></p>`;
+    backdrop.appendChild(box);
+    document.body.appendChild(backdrop);
 
-    const form = box.querySelector<HTMLFormElement>(".rn-login__form")!;
-    const input = box.querySelector<HTMLInputElement>(".rn-login__input")!;
+    const emailForm = box.querySelector<HTMLFormElement>('[data-step="email"]')!;
+    const codeForm = box.querySelector<HTMLFormElement>('[data-step="code"]')!;
+    const emailInput = emailForm.querySelector<HTMLInputElement>("input")!;
+    const codeInput = codeForm.querySelector<HTMLInputElement>("input")!;
     const hint = box.querySelector<HTMLElement>(".rn-login__hint")!;
-    form.addEventListener("submit", async (e) => {
+    let challenge = "";
+
+    const close = () => backdrop.remove();
+    box.querySelector(".rn-login__close")!.addEventListener("click", close);
+    backdrop.addEventListener("mousedown", (e) => { if (e.target === backdrop) close(); });
+
+    emailForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      hint.hidden = true;
       const res = await fetch("/api/reader/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: input.value, next: articlePath }),
+        body: JSON.stringify({ email: emailInput.value }),
       });
-      if (res.ok) {
-        form.hidden = true;
-        hint.hidden = false;
-      }
+      if (!res.ok) { hint.hidden = false; hint.textContent = "发送失败，稍后再试。"; return; }
+      const data = (await res.json()) as { challenge?: string };
+      challenge = data.challenge ?? "";
+      emailForm.hidden = true;
+      codeForm.hidden = false;
+      hint.hidden = false;
+      hint.textContent = `验证码已发到 ${emailInput.value}，输入即可登录。`;
+      codeInput.focus();
     });
-    box.querySelector(".rn-login__close")!.addEventListener("click", () => box.remove());
+
+    let submitting = false;
+    codeForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (submitting) return; // guard against a double-submit creating dup notes
+      submitting = true;
+      const res = await fetch("/api/reader/verify-otp", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ challenge, code: codeInput.value }),
+      });
+      if (!res.ok) {
+        submitting = false; // let them retry
+        hint.textContent = "验证码不对或已过期，请重试。";
+        return;
+      }
+      close();
+      await onLoggedIn();
+    });
   }
 }

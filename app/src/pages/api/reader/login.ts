@@ -1,24 +1,16 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
 import { rateLimit } from "~/lib/ratelimit";
-import { signLoginToken, normalizeEmail } from "~/lib/reader-auth";
+import { signOtpChallenge, generateOtpCode, normalizeEmail } from "~/lib/reader-auth";
 import { emailEnabled, sendEmail } from "~/lib/email";
-import { renderLoginEmail } from "~/lib/email-templates";
+import { renderOtpEmail } from "~/lib/email-templates";
 
 export const prerender = false;
 
 const Body = z.object({
   email: z.string().email().max(200),
   lang: z.enum(["zh", "en"]).optional(),
-  // Where to land after clicking the link. Must be a same-site path.
-  next: z.string().max(300).optional(),
 });
-
-/** Only allow same-site relative paths as the post-login redirect target. */
-function safeNext(next: string | undefined): string {
-  if (next && next.startsWith("/") && !next.startsWith("//")) return next;
-  return "/me/notes";
-}
 
 export const POST: APIRoute = async (ctx) => {
   const env = ctx.locals.runtime.env;
@@ -38,42 +30,41 @@ export const POST: APIRoute = async (ctx) => {
   if (!parsed.success) return json({ ok: false, error: "invalid email" }, 400);
   const email = normalizeEmail(parsed.data.email);
 
-  // Rate-limit by IP so the link can't be used to spam an inbox.
+  // Rate-limit by IP so codes can't be used to spam an inbox.
   const rl = await rateLimit(env.CACHE, "reader-login", 5, 3600, ip);
   if (!rl.ok) return json({ ok: false, error: "rate limit" }, 429);
 
   const lang = parsed.data.lang ?? (ctx.locals.lang as "zh" | "en") ?? "zh";
-  const next = safeNext(parsed.data.next);
   const secret = env.COOKIE_SIGNING_KEY || "dev-key-please-set";
-  const token = await signLoginToken(secret, email);
+  const code = generateOtpCode();
+  // The challenge is opaque (carries only a keyed hash of the code) — safe to
+  // return to the client, which holds it and submits it with the typed code.
+  const challenge = await signOtpChallenge(secret, email, code);
 
   const sent = emailEnabled(env);
   if (sent) {
-    const base = (env.SITE_URL || "").replace(/\/$/, "");
-    const loginUrl =
-      `${base}/api/reader/verify?token=${encodeURIComponent(token)}` +
-      `&next=${encodeURIComponent(next)}`;
-    const mail = renderLoginEmail({ lang, siteName: env.SITE_NAME || "Glean", loginUrl });
+    const mail = renderOtpEmail({ lang, siteName: env.SITE_NAME || "Glean", code });
     const res = await sendEmail(env, {
       to: email,
       subject: mail.subject,
       html: mail.html,
       text: mail.text,
     });
-    if (!res.ok) console.error("login email send failed", res.error);
+    if (!res.ok) console.error("login code email send failed", res.error);
   } else {
-    // Local dev without a provider key: log the link so login still works.
-    const base = (env.SITE_URL || "").replace(/\/$/, "");
-    console.log(`[reader-login] ${base}/api/reader/verify?token=${token}&next=${encodeURIComponent(next)}`);
+    // Local dev without a provider key: log the code so login still works.
+    console.log(`[reader-login] code for ${email}: ${code}`);
   }
 
-  // Always the same response — never reveal whether an account exists.
-  return json({ ok: true, sent });
+  // Passwordless: login and signup are the same path (the reader row is created
+  // on first successful verify), so there's no account to enumerate. The code
+  // is always emailed; the per-IP rate limit above bounds inbox-spam abuse.
+  return json({ ok: true, challenge, sent });
 };
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
 }

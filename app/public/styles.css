@@ -6479,16 +6479,24 @@ mark.rn-hl--flash { animation: rn-flash 1.4s ease; }
 .rn-toolbar__swatch--green  { background: oklch(82% 0.16 150); }
 .rn-toolbar__swatch--pink   { background: oklch(80% 0.13 0); }
 .rn-toolbar__swatch.is-active { border-color: #fff; }
+.rn-toolbar__hint {
+  color: rgba(255,255,255,0.55);
+  font-size: 12px;
+  margin-right: 2px;
+  user-select: none;
+}
+.rn-toolbar__btn,
 .rn-toolbar__note {
   background: transparent;
   color: #fff;
   border: none;
   font-size: 13px;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 2px 8px;
   border-left: 1px solid rgba(255,255,255,0.2);
   margin-left: 2px;
 }
+.rn-toolbar__btn--first { border-left: none; margin-left: 0; }
 
 /* Edit popover */
 .rn-popover {
@@ -6528,20 +6536,29 @@ mark.rn-hl--flash { animation: rn-flash 1.4s ease; }
   border: none; padding: 6px 8px; font-size: 14px; cursor: pointer;
 }
 
-/* Inline login prompt (anonymous reader tries to highlight) */
-.rn-login {
+/* Inline login prompt (anonymous reader tries to highlight) — centered modal */
+.rn-login-backdrop {
   position: fixed;
+  inset: 0;
   z-index: 70;
-  left: 50%; bottom: 24px;
-  transform: translateX(-50%);
-  width: min(440px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in oklch, var(--c-ink, #2b2722) 28%, transparent);
+  backdrop-filter: blur(2px);
+}
+.rn-login {
+  position: relative;
+  width: min(440px, 100%);
   background: var(--c-canvas, #fff);
   border: 1px solid var(--c-hairline, #e7e1d8);
   border-radius: 14px;
   box-shadow: 0 14px 40px rgba(0,0,0,0.2);
-  padding: 18px 20px;
+  padding: 22px 22px 20px;
 }
-.rn-login__msg { margin: 0 0 12px; font-size: 14px; color: var(--c-ink, #2b2722); }
+.rn-login__msg { margin: 0 28px 14px 0; font-size: 14px; color: var(--c-ink, #2b2722); }
+.rn-login__input--code { letter-spacing: 6px; text-align: center; font-size: 18px; }
 .rn-login__form { display: flex; gap: 8px; flex-wrap: wrap; }
 .rn-login__input {
   flex: 1; min-width: 200px;
