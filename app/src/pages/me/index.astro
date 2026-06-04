@@ -101,7 +101,13 @@ if (session) {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ email }),
         });
-        if (!res.ok) { if (hint) { hint.hidden = false; hint.textContent = "发送失败，稍后再试。"; } return; }
+        if (!res.ok) {
+          if (hint) {
+            hint.hidden = false;
+            hint.textContent = res.status === 429 ? "请求太频繁，请过几分钟再试。" : "发送失败，稍后再试。";
+          }
+          return;
+        }
         const data = (await res.json()) as { challenge?: string; sent?: boolean };
         if (!data.sent) {
           if (hint) { hint.hidden = false; hint.textContent = "邮件服务暂未开启，验证码无法发送，请稍后再试或联系管理员。"; }

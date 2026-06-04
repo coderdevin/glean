@@ -30,8 +30,9 @@ export const POST: APIRoute = async (ctx) => {
   if (!parsed.success) return json({ ok: false, error: "invalid email" }, 400);
   const email = normalizeEmail(parsed.data.email);
 
-  // Rate-limit by IP so codes can't be used to spam an inbox.
-  const rl = await rateLimit(env.CACHE, "reader-login", 5, 3600, ip);
+  // Rate-limit by IP so codes can't be used to spam an inbox — but loose enough
+  // that a legit "didn't get it, resend" sequence doesn't get blocked.
+  const rl = await rateLimit(env.CACHE, "reader-login", 8, 3600, ip);
   if (!rl.ok) return json({ ok: false, error: "rate limit" }, 429);
 
   const lang = parsed.data.lang ?? (ctx.locals.lang as "zh" | "en") ?? "zh";

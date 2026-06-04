@@ -177,6 +177,9 @@ const isActive = (prefix: string): boolean => {
           <a class="nav-link" href={L("/about")} aria-current={isActive("/about") || isActive("/standards") ? "page" : undefined}>
             <Lang zh="关于" en="About" />
           </a>
+          <a class="nav-link" href={L("/me/notes")} aria-current={isActive("/me") ? "page" : undefined}>
+            <Lang zh="我的笔记" en="My notes" />
+          </a>
           <a class="nav-link nav-link--cta nav-link--drawer-only" href={L("/submit")}>
             <Lang zh="提交链接" en="Submit a link" />
           </a>

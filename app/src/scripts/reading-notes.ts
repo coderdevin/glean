@@ -184,7 +184,9 @@ function init(bodyEl: HTMLElement): void {
       method: "POST",
       credentials: "include",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
+      // pickId is required by the API but lives outside the Note shape — without
+      // it the POST 400s and the highlight silently never appears.
+      body: JSON.stringify({ ...payload, pickId }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { id: string };
@@ -468,7 +470,13 @@ function init(bodyEl: HTMLElement): void {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email: emailInput.value }),
       });
-      if (!res.ok) { hint.hidden = false; hint.textContent = "发送失败，稍后再试。"; return; }
+      if (!res.ok) {
+        hint.hidden = false;
+        hint.textContent = res.status === 429
+          ? "请求太频繁，请过几分钟再试。"
+          : "发送失败，稍后再试。";
+        return;
+      }
       const data = (await res.json()) as { challenge?: string; sent?: boolean };
       hint.hidden = false;
       if (!data.sent) {
