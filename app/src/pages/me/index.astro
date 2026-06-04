@@ -1,0 +1,105 @@
+---
+import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
+import { localizedPath } from "~/lib/i18n";
+import { eq } from "drizzle-orm";
+import { db } from "~/db/client";
+import { readers } from "~/db/schema";
+import { readReaderSession } from "~/lib/reader-auth";
+
+// SSR + per-user → never cache. The /en/me variant resolves via middleware.
+export const prerender = false;
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+const env = Astro.locals.runtime.env;
+const secret = env.COOKIE_SIGNING_KEY || "dev-key-please-set";
+const session = await readReaderSession(Astro.request, secret);
+
+let email: string | null = null;
+if (session) {
+  const rows = await db(env.DB)
+    .select({ email: readers.email })
+    .from(readers)
+    .where(eq(readers.id, session.readerId))
+    .limit(1);
+  email = rows[0]?.email ?? null;
+}
+---
+<Site title="我的账号 · Account — Glean" description="Reader account">
+  <section class="section--tight" style="padding-top: 64px">
+    <div class="container" style="max-width: 520px">
+      <span class="eyebrow"><Lang zh="账号" en="Account" /></span>
+      {email ? (
+        <div style="margin-top: 16px">
+          <h1 class="balance" style="font-size: 28px"><Lang zh="已登录" en="Signed in" /></h1>
+          <p style="color: var(--c-muted); margin-top: 8px">{email}</p>
+          <div style="margin-top: 24px; display: flex; gap: 12px">
+            <a class="btn btn-primary" href={L("/me/notes")}>
+              <Lang zh="我的笔记 →" en="My notes →" />
+            </a>
+            <button type="button" id="rn-logout" class="btn">
+              <Lang zh="登出" en="Sign out" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style="margin-top: 16px">
+          <h1 class="balance" style="font-size: 28px"><Lang zh="登录" en="Sign in" /></h1>
+          <p style="color: var(--c-muted); margin-top: 8px">
+            <Lang
+              zh="用邮箱登录，你的阅读笔记会跟着账号在各设备间同步。"
+              en="Sign in with your email — your reading notes sync across devices."
+            />
+          </p>
+          <form id="rn-login-form" style="margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap">
+            <input
+              type="email"
+              name="email"
+              required
+              placeholder="you@example.com"
+              class="input"
+              style="flex: 1; min-width: 220px; padding: 10px 12px; border: 1px solid var(--c-hairline); border-radius: 8px; background: var(--c-canvas)"
+            />
+            <button type="submit" class="btn btn-primary">
+              <Lang zh="发送登录链接" en="Send link" />
+            </button>
+          </form>
+          <p id="rn-login-hint" hidden style="margin-top: 14px; color: var(--c-muted)">
+            <Lang
+              zh="登录链接已发到你的邮箱，点开即可登录。"
+              en="A sign-in link is on its way to your inbox."
+            />
+          </p>
+        </div>
+      )}
+    </div>
+  </section>
+  <script>
+    const form = document.getElementById("rn-login-form") as HTMLFormElement | null;
+    if (form) {
+      const hint = document.getElementById("rn-login-hint");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+        const res = await fetch("/api/reader/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email, next: "/me/notes" }),
+        });
+        if (res.ok) {
+          form.hidden = true;
+          if (hint) hint.hidden = false;
+        }
+      });
+    }
+    const logout = document.getElementById("rn-logout");
+    if (logout) {
+      logout.addEventListener("click", async () => {
+        await fetch("/api/reader/logout", { method: "POST", credentials: "include" });
+        location.reload();
+      });
+    }
+  </script>
+</Site>

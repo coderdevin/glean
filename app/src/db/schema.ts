@@ -238,6 +238,54 @@ export const weeklyDeliveries = sqliteTable(
   }),
 );
 
+/** Reader accounts (passwordless / magic-link). Distinct from the admin gate —
+ *  these identify public readers so their reading notes sync across devices.
+ *  Identity is the email; the session cookie carries the readers.id. */
+export const readers = sqliteTable("readers", {
+  id: text("id").primaryKey(), // ULID
+  email: text("email").notNull().unique(), // lowercased
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  lastSeenAt: integer("last_seen_at", { mode: "timestamp" }),
+});
+
+export const READER_NOTE_COLORS = ["yellow", "green", "pink"] as const;
+export type ReaderNoteColor = (typeof READER_NOTE_COLORS)[number];
+
+/** A reader's highlight (+ optional annotation) anchored to a passage of a
+ *  published pick. Anchoring is text-quote based (exact + prefix/suffix +
+ *  offset hint) so it survives editorial re-publishes; see lib/anchor.ts.
+ *  `note` null = highlight only. Bilingual: a note is bound to one language
+ *  pane (`lang`) — a zh highlight never shows on the en column. */
+export const readerNotes = sqliteTable(
+  "reader_notes",
+  {
+    id: text("id").primaryKey(), // ULID
+    readerId: text("reader_id").notNull(),
+    pickId: text("pick_id").notNull(),
+    sectionIndex: integer("section_index").notNull(), // 1-based, matches row-{i}
+    lang: text("lang", { enum: ["zh", "en"] as const }).notNull(),
+    exact: text("exact").notNull(), // the highlighted quote
+    prefix: text("prefix"), // chars before the quote (disambiguation)
+    suffix: text("suffix"), // chars after the quote
+    startOffset: integer("start_offset").notNull(), // char offset hint in section text
+    color: text("color", { enum: READER_NOTE_COLORS }).notNull().default("yellow"),
+    note: text("note"), // annotation; null = highlight only
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => ({
+    readerPickIdx: index("reader_notes_reader_pick_idx").on(t.readerId, t.pickId),
+    pickIdx: index("reader_notes_pick_idx").on(t.pickId), // future: popular highlights
+    readerIdx: index("reader_notes_reader_idx").on(t.readerId, t.createdAt),
+  }),
+);
+
 export const EVENT_STAGES = ["queue", "extract", "llm", "pipeline"] as const;
 export type EventStage = (typeof EVENT_STAGES)[number];
 

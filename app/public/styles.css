@@ -6420,3 +6420,152 @@ a.pn-card:hover {
   .pn-card--next { align-items: flex-start; text-align: left; }
   .pn-card--empty { display: none; }
 }
+
+/* ============================================================
+   Reader reading-notes — highlights, toolbar, popover, login.
+   Client-applied overlay on /a/[slug]; see scripts/reading-notes.ts.
+   ============================================================ */
+:root {
+  --rn-yellow: oklch(92% 0.13 95 / 55%);
+  --rn-green:  oklch(90% 0.13 150 / 50%);
+  --rn-pink:   oklch(90% 0.10 0 / 50%);
+}
+mark.rn-hl {
+  background: var(--rn-yellow);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+mark.rn-hl--yellow { background: var(--rn-yellow); }
+mark.rn-hl--green  { background: var(--rn-green); }
+mark.rn-hl--pink   { background: var(--rn-pink); }
+/* A highlight that carries an annotation gets a quiet dotted underline + 📝. */
+mark.rn-hl[data-has-note="1"] { text-decoration: underline dotted color-mix(in oklch, var(--c-ink) 40%, transparent); text-underline-offset: 3px; }
+mark.rn-hl[data-has-note="1"]::after {
+  content: "📝";
+  font-size: 0.7em;
+  vertical-align: super;
+  margin-left: 1px;
+  opacity: 0.7;
+}
+@keyframes rn-flash { 0%, 100% { box-shadow: none } 30% { box-shadow: 0 0 0 4px var(--rn-yellow) } }
+mark.rn-hl--flash { animation: rn-flash 1.4s ease; }
+
+/* Floating selection toolbar */
+.rn-toolbar {
+  position: absolute;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--c-ink, #2b2722);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.22);
+}
+.rn-toolbar[hidden] { display: none; }
+.rn-toolbar__swatch {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.rn-toolbar__swatch--yellow { background: oklch(88% 0.16 95); }
+.rn-toolbar__swatch--green  { background: oklch(82% 0.16 150); }
+.rn-toolbar__swatch--pink   { background: oklch(80% 0.13 0); }
+.rn-toolbar__swatch.is-active { border-color: #fff; }
+.rn-toolbar__note {
+  background: transparent;
+  color: #fff;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-left: 1px solid rgba(255,255,255,0.2);
+  margin-left: 2px;
+}
+
+/* Edit popover */
+.rn-popover {
+  position: absolute;
+  z-index: 60;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  background: var(--c-canvas, #fff);
+  border: 1px solid var(--c-hairline, #e7e1d8);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+  padding: 12px;
+}
+.rn-popover__colors { display: flex; gap: 8px; margin-bottom: 10px; }
+.rn-popover__text {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border: 1px solid var(--c-hairline, #e7e1d8);
+  border-radius: 8px;
+  padding: 8px;
+  font: inherit;
+  font-size: 14px;
+  background: var(--c-canvas, #fff);
+  color: var(--c-ink, #2b2722);
+}
+.rn-popover__actions { display: flex; justify-content: space-between; margin-top: 10px; }
+.rn-popover__save {
+  background: var(--c-primary, #b1543a);
+  color: #fff;
+  border: none; border-radius: 8px;
+  padding: 6px 16px; font-size: 14px; cursor: pointer;
+}
+.rn-popover__delete {
+  background: transparent;
+  color: var(--c-muted, #6b6357);
+  border: none; padding: 6px 8px; font-size: 14px; cursor: pointer;
+}
+
+/* Inline login prompt (anonymous reader tries to highlight) */
+.rn-login {
+  position: fixed;
+  z-index: 70;
+  left: 50%; bottom: 24px;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 24px));
+  background: var(--c-canvas, #fff);
+  border: 1px solid var(--c-hairline, #e7e1d8);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.2);
+  padding: 18px 20px;
+}
+.rn-login__msg { margin: 0 0 12px; font-size: 14px; color: var(--c-ink, #2b2722); }
+.rn-login__form { display: flex; gap: 8px; flex-wrap: wrap; }
+.rn-login__input {
+  flex: 1; min-width: 200px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-hairline, #e7e1d8);
+  border-radius: 8px;
+  font: inherit;
+  background: var(--c-canvas, #fff);
+  color: var(--c-ink, #2b2722);
+}
+.rn-login__submit {
+  background: var(--c-primary, #b1543a);
+  color: #fff; border: none; border-radius: 8px;
+  padding: 10px 16px; font-size: 14px; cursor: pointer; white-space: nowrap;
+}
+.rn-login__hint { margin: 12px 0 0; font-size: 13px; color: var(--c-muted, #6b6357); }
+.rn-login__close {
+  position: absolute; top: 8px; right: 12px;
+  background: transparent; border: none;
+  font-size: 20px; line-height: 1; color: var(--c-muted, #6b6357); cursor: pointer;
+}
+
+/* Quote colors on the /me/notes list */
+.rn-quote { border-bottom: 2px solid transparent; }
+.rn-quote--yellow { box-shadow: inset 0 -0.55em 0 var(--rn-yellow); }
+.rn-quote--green  { box-shadow: inset 0 -0.55em 0 var(--rn-green); }
+.rn-quote--pink   { box-shadow: inset 0 -0.55em 0 var(--rn-pink); }

@@ -253,7 +253,7 @@ const breadcrumbLd = {
           </a>
         </div>
 
-        <div class="av2-body" data-mode="parallel">
+        <div class="av2-body" data-mode="parallel" data-pick-id={pick.id}>
           {pick.sections.map((s, i) => {
             const anchorId = s.anchor_id ?? "";
             const noteCount = anchorId ? annotationsByAnchor.get(anchorId) ?? 0 : 0;
@@ -266,12 +266,15 @@ const breadcrumbLd = {
                 ) : (
                   <span class="av2-row__num">§ {i + 1}</span>
                 )}
-                <div class="av2-orig av2-prose" lang="en" set:html={renderBody(s.body_en)} />
-                <div class="av2-trans av2-prose" lang="zh" set:html={renderBody(s.body_zh)} />
+                <div class="av2-orig av2-prose" lang="en" data-sec={i + 1} data-lang="en" set:html={renderBody(s.body_en)} />
+                <div class="av2-trans av2-prose" lang="zh" data-sec={i + 1} data-lang="zh" set:html={renderBody(s.body_zh)} />
               </div>
             );
           })}
         </div>
+        <script>
+          import "../../scripts/reading-notes";
+        </script>
 
         <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--c-hairline)">
           <a href={pick.source_url} class="btn btn-primary" rel="noopener">

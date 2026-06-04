@@ -1,0 +1,141 @@
+---
+import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
+import { localizedPath } from "~/lib/i18n";
+import { eq, desc } from "drizzle-orm";
+import { db } from "~/db/client";
+import { readerNotes, picks } from "~/db/schema";
+import { readReaderSession } from "~/lib/reader-auth";
+import { notesToMarkdown, type ExportGroup } from "~/lib/notes-export";
+
+// SSR + per-user → never cache. Logged-out readers bounce to /me to sign in.
+export const prerender = false;
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
+Astro.response.headers.set("Cache-Control", "private, no-store");
+
+const env = Astro.locals.runtime.env;
+const secret = env.COOKIE_SIGNING_KEY || "dev-key-please-set";
+const session = await readReaderSession(Astro.request, secret);
+if (!session) return Astro.redirect(L("/me"));
+
+const base = (env.SITE_URL || "").replace(/\/$/, "");
+
+const rows = await db(env.DB)
+  .select({
+    id: readerNotes.id,
+    exact: readerNotes.exact,
+    note: readerNotes.note,
+    color: readerNotes.color,
+    lang: readerNotes.lang,
+    pickId: readerNotes.pickId,
+    slug: picks.slug,
+    titleZh: picks.titleZh,
+    titleEn: picks.titleEn,
+  })
+  .from(readerNotes)
+  .leftJoin(picks, eq(readerNotes.pickId, picks.id))
+  .where(eq(readerNotes.readerId, session.readerId))
+  .orderBy(desc(readerNotes.createdAt));
+
+interface ViewNote { id: string; exact: string; note: string | null; color: string; lang: string }
+interface Group { slug: string | null; title: string; notes: ViewNote[] }
+
+// Group by pick, preserving newest-first order of first appearance.
+const order: string[] = [];
+const byPick = new Map<string, Group>();
+for (const r of rows) {
+  const key = r.pickId;
+  if (!byPick.has(key)) {
+    order.push(key);
+    byPick.set(key, {
+      slug: r.slug ?? null,
+      title: (lang === "en" ? r.titleEn : r.titleZh) ?? r.titleZh ?? "(untitled)",
+      notes: [],
+    });
+  }
+  byPick.get(key)!.notes.push({ id: r.id, exact: r.exact, note: r.note, color: r.color, lang: r.lang });
+}
+const groups: Group[] = order.map((k) => byPick.get(k)!);
+
+// Markdown for the export button — built server-side from the same data.
+const exportGroups: ExportGroup[] = groups.map((g) => ({
+  title: g.title,
+  url: g.slug ? `${base}/a/${g.slug}` : base,
+  notes: g.notes.map((n) => ({ exact: n.exact, note: n.note })),
+}));
+const markdown = notesToMarkdown(exportGroups, lang === "en" ? "My notes" : "我的笔记");
+const total = rows.length;
+---
+<Site title="我的笔记 · My notes — Glean" description="Your reading notes">
+  <section class="section--tight" style="padding-top: 64px">
+    <div class="container" style="max-width: 720px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+        <div>
+          <span class="eyebrow"><Lang zh="我的笔记" en="My notes" /></span>
+          <h1 class="balance" style="font-size: 28px; margin-top: 8px">
+            <Lang zh={`${total} 条笔记`} en={`${total} notes`} />
+          </h1>
+        </div>
+        {total > 0 && (
+          <button type="button" id="rn-export" class="btn">
+            <Lang zh="导出 Markdown" en="Export Markdown" />
+          </button>
+        )}
+      </div>
+
+      {total === 0 ? (
+        <p style="margin-top: 24px; color: var(--c-muted)">
+          <Lang
+            zh="还没有笔记。在文章里选中一段话就能高亮、写批注。"
+            en="No notes yet. Select any passage in an article to highlight and annotate."
+          />
+        </p>
+      ) : (
+        <div style="margin-top: 28px; display: flex; flex-direction: column; gap: 28px">
+          {groups.map((g) => (
+            <div>
+              <h2 style="font-size: 18px; margin-bottom: 12px">
+                {g.slug ? (
+                  <a href={L(`/a/${g.slug}`)} style="color: inherit">{g.title}</a>
+                ) : (
+                  g.title
+                )}
+              </h2>
+              <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px">
+                {g.notes.map((n) => (
+                  <li style="border-left: 3px solid var(--c-hairline); padding-left: 14px">
+                    <a
+                      href={g.slug ? L(`/a/${g.slug}`) + `#rn-${n.id}` : "#"}
+                      class={`rn-quote rn-quote--${n.color}`}
+                      style="display: block; color: inherit; text-decoration: none"
+                    >{n.exact}</a>
+                    {n.note && <p style="margin: 6px 0 0; color: var(--c-muted)">{n.note}</p>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <script type="application/json" id="rn-export-data" set:html={JSON.stringify(markdown).replace(/</g, "\\u003c")}></script>
+  <script>
+    const btn = document.getElementById("rn-export");
+    if (btn) {
+      btn.addEventListener("click", () => {
+        const el = document.getElementById("rn-export-data");
+        const md = el ? (JSON.parse(el.textContent || '""') as string) : "";
+        navigator.clipboard?.writeText(md).catch(() => {});
+        const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "glean-notes.md";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+    }
+  </script>
+</Site>

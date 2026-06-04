@@ -80,6 +80,37 @@ export function renderConfirmEmail(args: {
   return { subject, html, text };
 }
 
+/** Magic-link login email for reader accounts (reading notes). */
+export function renderLoginEmail(args: {
+  lang: Lang;
+  siteName: string;
+  loginUrl: string;
+}): EmailContent {
+  const { lang, siteName, loginUrl } = args;
+  const zh = lang === "zh";
+
+  const subject = zh ? `登录 ${siteName}` : `Sign in to ${siteName}`;
+  const heading = zh ? "点这里登录" : "Tap to sign in";
+  const body = zh
+    ? "点下面的按钮即可登录，你的阅读笔记会跟着账号在各设备间同步。链接 15 分钟内有效。如果不是你本人操作，忽略这封邮件即可。"
+    : "Tap the button to sign in — your reading notes follow your account across devices. This link expires in 15 minutes. If this wasn't you, just ignore this email.";
+  const cta = zh ? "登录" : "Sign in";
+  const fallback = zh ? "按钮打不开就复制这个链接：" : "If the button doesn't work, paste this link:";
+
+  const html = shell(
+    `<h1 style="margin:0 0 16px 0;font-size:24px;color:${INK};">${esc(heading)}</h1>
+<p style="margin:0 0 24px 0;font-size:15px;line-height:1.7;color:${MUTED};">${esc(body)}</p>
+<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="border-radius:8px;background:${ACCENT};">
+<a href="${esc(loginUrl)}" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;">${esc(cta)}</a>
+</td></tr></table>
+<p style="margin:24px 0 0 0;font-size:12px;line-height:1.6;color:${MUTED};">${esc(fallback)}<br><a href="${esc(loginUrl)}" style="color:${ACCENT};word-break:break-all;">${esc(loginUrl)}</a></p>`,
+    `${esc(siteName)}`,
+  );
+
+  const text = `${heading}\n\n${body}\n\n${cta}: ${loginUrl}`;
+  return { subject, html, text };
+}
+
 export interface EmailPick {
   title_zh: string;
   title_en: string;
