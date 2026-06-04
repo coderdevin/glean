@@ -141,7 +141,10 @@ function init(bodyEl: HTMLElement): void {
     wrapRange(container, range.start, range.end, n);
   }
 
-  /** Wrap [start,end) of container.textContent in <mark> spans (one per text node). */
+  /** Wrap [start,end) of container.textContent in <mark> spans (one per text
+   *  node). A highlight may span several text nodes; whitespace-only fragments
+   *  (the indentation/newlines between block elements) are skipped so they don't
+   *  become stray marks floating in the margin. */
   function wrapRange(container: HTMLElement, start: number, end: number, n: Note): void {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
     let pos = 0;
@@ -149,15 +152,23 @@ function init(bodyEl: HTMLElement): void {
     let cur: Node | null;
     while ((cur = walker.nextNode())) {
       const t = cur as Text;
-      const len = (t.textContent ?? "").length;
+      const text = t.textContent ?? "";
+      const len = text.length;
       const nodeStart = pos;
       const nodeEnd = pos + len;
       const from = Math.max(start, nodeStart);
       const to = Math.min(end, nodeEnd);
-      if (from < to) targets.push({ node: t, from: from - nodeStart, to: to - nodeStart });
+      if (from < to) {
+        const fragFrom = from - nodeStart;
+        const fragTo = to - nodeStart;
+        // Skip a fragment that's only whitespace — it'd render as an empty,
+        // marker-bearing mark stranded in the margin.
+        if (text.slice(fragFrom, fragTo).trim()) targets.push({ node: t, from: fragFrom, to: fragTo });
+      }
       pos = nodeEnd;
       if (pos >= end) break;
     }
+    const created: HTMLElement[] = [];
     for (const { node, from, to } of targets) {
       const range = document.createRange();
       range.setStart(node, from);
@@ -165,23 +176,37 @@ function init(bodyEl: HTMLElement): void {
       const mark = document.createElement("mark");
       mark.className = `rn-hl rn-hl--${n.color}`;
       mark.dataset.noteId = n.id;
-      if (n.note) mark.dataset.hasNote = "1";
       mark.title = n.note ?? "";
       try {
         range.surroundContents(mark);
+        created.push(mark);
       } catch {
         /* range crosses element boundaries oddly — skip this fragment */
       }
     }
+    applyNoteMarker(created, n);
+  }
+
+  /** Annotated highlights underline every fragment but show the 📝 only once,
+   *  on the last fragment — otherwise a multi-node highlight shows N markers. */
+  function applyNoteMarker(marks: HTMLElement[], n: Note): void {
+    marks.forEach((m, i) => {
+      if (n.note) m.dataset.hasNote = "1";
+      else delete m.dataset.hasNote;
+      if (n.note && i === marks.length - 1) m.dataset.noteEnd = "1";
+      else delete m.dataset.noteEnd;
+    });
   }
 
   function repaintNote(n: Note): void {
-    document.querySelectorAll<HTMLElement>(`mark.rn-hl[data-note-id="${n.id}"]`).forEach((m) => {
+    const marks = Array.from(
+      document.querySelectorAll<HTMLElement>(`mark.rn-hl[data-note-id="${n.id}"]`),
+    );
+    marks.forEach((m) => {
       m.className = `rn-hl rn-hl--${n.color}`;
-      if (n.note) m.dataset.hasNote = "1";
-      else delete m.dataset.hasNote;
       m.title = n.note ?? "";
     });
+    applyNoteMarker(marks, n);
   }
 
   function unpaintNote(id: string): void {

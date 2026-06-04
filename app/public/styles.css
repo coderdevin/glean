@@ -6444,8 +6444,10 @@ mark.rn-hl--yellow { background: var(--rn-yellow); }
 mark.rn-hl--green  { background: var(--rn-green); }
 mark.rn-hl--pink   { background: var(--rn-pink); }
 /* A highlight that carries an annotation gets a quiet dotted underline + 📝. */
+/* Annotated highlight: dotted underline on every fragment, but the 📝 marker
+   only on the last fragment (data-note-end) so one note shows one marker. */
 mark.rn-hl[data-has-note="1"] { text-decoration: underline dotted color-mix(in oklch, var(--c-ink) 40%, transparent); text-underline-offset: 3px; }
-mark.rn-hl[data-has-note="1"]::after {
+mark.rn-hl[data-note-end="1"]::after {
   content: "📝";
   font-size: 0.7em;
   vertical-align: super;
