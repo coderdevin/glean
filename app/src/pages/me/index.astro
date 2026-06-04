@@ -66,7 +66,7 @@ if (session) {
               <Lang zh="发送验证码" en="Send code" />
             </button>
           </form>
-          <form id="rn-code-form" hidden style="margin-top: 20px; display: flex; gap: 8px; flex-wrap: wrap">
+          <form id="rn-code-form" style="margin-top: 20px; display: none; gap: 8px; flex-wrap: wrap">
             <input
               type="text"
               name="code"
@@ -104,8 +104,8 @@ if (session) {
         if (!res.ok) { if (hint) { hint.hidden = false; hint.textContent = "发送失败，稍后再试。"; } return; }
         const data = (await res.json()) as { challenge?: string };
         challenge = data.challenge ?? "";
-        emailForm.hidden = true;
-        codeForm.hidden = false;
+        emailForm.style.display = "none";
+        codeForm.style.display = "flex";
         if (hint) { hint.hidden = false; hint.textContent = `验证码已发到 ${email}，输入即可登录。`; }
         (codeForm.elements.namedItem("code") as HTMLInputElement).focus();
       });

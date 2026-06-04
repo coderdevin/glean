@@ -6468,23 +6468,6 @@ mark.rn-hl--flash { animation: rn-flash 1.4s ease; }
   box-shadow: 0 6px 24px rgba(0,0,0,0.22);
 }
 .rn-toolbar[hidden] { display: none; }
-.rn-toolbar__swatch {
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  padding: 0;
-}
-.rn-toolbar__swatch--yellow { background: oklch(88% 0.16 95); }
-.rn-toolbar__swatch--green  { background: oklch(82% 0.16 150); }
-.rn-toolbar__swatch--pink   { background: oklch(80% 0.13 0); }
-.rn-toolbar__swatch.is-active { border-color: #fff; }
-.rn-toolbar__hint {
-  color: rgba(255,255,255,0.55);
-  font-size: 12px;
-  margin-right: 2px;
-  user-select: none;
-}
 .rn-toolbar__btn,
 .rn-toolbar__note {
   background: transparent;
@@ -6510,7 +6493,6 @@ mark.rn-hl--flash { animation: rn-flash 1.4s ease; }
   box-shadow: 0 10px 30px rgba(0,0,0,0.18);
   padding: 12px;
 }
-.rn-popover__colors { display: flex; gap: 8px; margin-bottom: 10px; }
 .rn-popover__text {
   width: 100%;
   min-height: 72px;
@@ -6557,24 +6539,33 @@ mark.rn-hl--flash { animation: rn-flash 1.4s ease; }
   box-shadow: 0 14px 40px rgba(0,0,0,0.2);
   padding: 22px 22px 20px;
 }
-.rn-login__msg { margin: 0 28px 14px 0; font-size: 14px; color: var(--c-ink, #2b2722); }
-.rn-login__input--code { letter-spacing: 6px; text-align: center; font-size: 18px; }
-.rn-login__form { display: flex; gap: 8px; flex-wrap: wrap; }
+.rn-login__msg { margin: 0 28px 16px 0; font-size: 14px; line-height: 1.6; color: var(--c-ink, #2b2722); }
+/* Vertical layout: full-width input, full-width button below. One step shown at
+   a time — the explicit display:flex must be re-hidden, since it would override
+   the [hidden] attribute's display:none. */
+.rn-login__form { display: flex; flex-direction: column; gap: 10px; }
+.rn-login__form[hidden] { display: none; }
 .rn-login__input {
-  flex: 1; min-width: 200px;
-  padding: 10px 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
   border: 1px solid var(--c-hairline, #e7e1d8);
-  border-radius: 8px;
+  border-radius: 10px;
   font: inherit;
+  font-size: 15px;
   background: var(--c-canvas, #fff);
   color: var(--c-ink, #2b2722);
 }
+.rn-login__input:focus { outline: none; border-color: var(--c-primary, #b1543a); }
+.rn-login__input--code { letter-spacing: 6px; text-align: center; font-size: 20px; }
 .rn-login__submit {
+  width: 100%;
   background: var(--c-primary, #b1543a);
-  color: #fff; border: none; border-radius: 8px;
-  padding: 10px 16px; font-size: 14px; cursor: pointer; white-space: nowrap;
+  color: #fff; border: none; border-radius: 10px;
+  padding: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
 }
-.rn-login__hint { margin: 12px 0 0; font-size: 13px; color: var(--c-muted, #6b6357); }
+.rn-login__submit:hover { background: color-mix(in oklch, var(--c-primary, #b1543a) 88%, #000); }
+.rn-login__hint { margin: 14px 0 0; font-size: 13px; line-height: 1.5; color: var(--c-muted, #6b6357); }
 .rn-login__close {
   position: absolute; top: 8px; right: 12px;
   background: transparent; border: none;

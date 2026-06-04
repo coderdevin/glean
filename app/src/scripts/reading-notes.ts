@@ -29,12 +29,9 @@ interface Note {
   note: string | null;
 }
 
-const COLORS: Color[] = ["yellow", "green", "pink"];
-const COLOR_LABELS: Record<Color, string> = {
-  yellow: "黄色高亮",
-  green: "绿色高亮",
-  pink: "粉色高亮",
-};
+// Single highlight color (the palette was dropped per feedback). The `color`
+// field stays in the data model so any pre-existing colored notes still render.
+const HL_COLOR: Color = "yellow";
 
 const body = document.querySelector<HTMLElement>(".av2-body[data-pick-id]");
 if (body) init(body);
@@ -253,23 +250,17 @@ function init(bodyEl: HTMLElement): void {
     });
     el.appendChild(copyBtn);
 
-    const hint = document.createElement("span");
-    hint.className = "rn-toolbar__hint";
-    hint.textContent = "高亮";
-    el.appendChild(hint);
+    const hlBtn = document.createElement("button");
+    hlBtn.type = "button";
+    hlBtn.className = "rn-toolbar__btn";
+    hlBtn.textContent = "高亮";
+    hlBtn.title = "高亮所选文字";
+    hlBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      if (current) void onHighlight(current, HL_COLOR);
+    });
+    el.appendChild(hlBtn);
 
-    for (const c of COLORS) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = `rn-toolbar__swatch rn-toolbar__swatch--${c}`;
-      b.setAttribute("aria-label", COLOR_LABELS[c]);
-      b.title = COLOR_LABELS[c];
-      b.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        if (current) void onHighlight(current, c);
-      });
-      el.appendChild(b);
-    }
     const noteBtn = document.createElement("button");
     noteBtn.type = "button";
     noteBtn.className = "rn-toolbar__note";
@@ -277,7 +268,7 @@ function init(bodyEl: HTMLElement): void {
     noteBtn.title = "高亮并写批注";
     noteBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      if (current) void onHighlight(current, "yellow", true);
+      if (current) void onHighlight(current, HL_COLOR, true);
     });
     el.appendChild(noteBtn);
 
@@ -357,23 +348,6 @@ function init(bodyEl: HTMLElement): void {
     pop.className = "rn-popover";
     pop.dataset.popover = "1";
 
-    const swatches = document.createElement("div");
-    swatches.className = "rn-popover__colors";
-    for (const c of COLORS) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = `rn-toolbar__swatch rn-toolbar__swatch--${c}${n.color === c ? " is-active" : ""}`;
-      b.addEventListener("click", async () => {
-        if (await patchNote(n.id, { color: c })) {
-          n.color = c;
-          repaintNote(n);
-          swatches.querySelectorAll(".rn-toolbar__swatch").forEach((s) => s.classList.remove("is-active"));
-          b.classList.add("is-active");
-        }
-      });
-      swatches.appendChild(b);
-    }
-
     const ta = document.createElement("textarea");
     ta.className = "rn-popover__text";
     ta.placeholder = "写点批注…";
@@ -404,7 +378,6 @@ function init(bodyEl: HTMLElement): void {
     });
     actions.appendChild(del);
     actions.appendChild(save);
-    pop.appendChild(swatches);
     pop.appendChild(ta);
     pop.appendChild(actions);
     document.body.appendChild(pop);
