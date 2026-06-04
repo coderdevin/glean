@@ -6448,11 +6448,17 @@ mark.rn-hl--pink   { background: var(--rn-pink); }
    only on the last fragment (data-note-end) so one note shows one marker. */
 mark.rn-hl[data-has-note="1"] { text-decoration: underline dotted color-mix(in oklch, var(--c-ink) 40%, transparent); text-underline-offset: 3px; }
 mark.rn-hl[data-note-end="1"]::after {
-  content: "📝";
-  font-size: 0.7em;
-  vertical-align: super;
-  margin-left: 1px;
-  opacity: 0.7;
+  content: "";
+  display: inline-block;
+  width: 0.82em;
+  height: 0.82em;
+  margin-left: 3px;
+  vertical-align: -0.08em;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23b1543a'%20stroke-width='2.2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M12%2020h9'/%3E%3Cpath%20d='M16.5%203.5a2.1%202.1%200%200%201%203%203L7%2019l-4%201%201-4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.85;
 }
 @keyframes rn-flash { 0%, 100% { box-shadow: none } 30% { box-shadow: 0 0 0 4px var(--rn-yellow) } }
 mark.rn-hl--flash { animation: rn-flash 1.4s ease; }
