@@ -389,7 +389,12 @@ Astro.response.headers.set("Cache-Control", "no-store");
               const title = r.aiTitleZh || r.aiTitleEn || r.url;
               return (
                 <div class="q2-row q2-row--browse" data-href={`/admin/${r.id}`}>
-                  <a class="q2-row__title" href={`/admin/${r.id}`} title={title}>{title}</a>
+                  <span class="q2-row__titlewrap">
+                    <a class="q2-row__title" href={`/admin/${r.id}`} title={title}>{title}</a>
+                    {r.originalTitle && (
+                      <span class="q2-row__orig" title={r.originalTitle}>{r.originalTitle}</span>
+                    )}
+                  </span>
                   <span class="q2-row__meta">
                     {filterKey === "all" && <StatusPill status={r.status} />}
                     <span>{host(r.url)}</span>

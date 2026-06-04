@@ -6216,6 +6216,15 @@ body[data-lang="zh"] em {
   text-decoration: none;
 }
 .q2-row--browse .q2-row__title:hover { text-decoration: underline; }
+/* Title cell stacks the AI title over the source's own (original) title. */
+.q2-row__titlewrap { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.q2-row__orig {
+  font-size: 11.5px;
+  color: var(--c-muted-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .q2-row__meta {
   font-size: 12px;
   color: var(--c-muted-soft);
