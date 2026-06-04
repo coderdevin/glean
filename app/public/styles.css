@@ -6225,6 +6225,11 @@ body[data-lang="zh"] em {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.q2-hero__orig {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--c-muted-soft);
+}
 .q2-row__meta {
   font-size: 12px;
   color: var(--c-muted-soft);

@@ -240,6 +240,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
                   <span>Ready · {readyOldestFirst.length} total</span>
                 </div>
                 <h2 class="q2-hero__title">{upNext.aiTitleZh || upNext.aiTitleEn || upNext.url}</h2>
+                {upNext.originalTitle && <p class="q2-hero__orig">原文：{upNext.originalTitle}</p>}
                 <div class="q2-hero__meta">
                   <span>{host(upNext.url)}</span>
                   {parseTags(upNext.aiTagsJson).slice(0, 3).map((t) => <span class="chip" style="cursor: inherit">{t}</span>)}
@@ -268,7 +269,10 @@ Astro.response.headers.set("Cache-Control", "no-store");
           <div class="q2-section__list">
             {restReady.map((r) => (
               <a href={`/admin/${r.id}`} class="q2-row">
-                <span class="q2-row__title">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
+                <span class="q2-row__titlewrap">
+                  <span class="q2-row__title">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
+                  {r.originalTitle && <span class="q2-row__orig" title={r.originalTitle}>{r.originalTitle}</span>}
+                </span>
                 <span class="q2-row__meta">{host(r.url)}</span>
                 <span class="q2-row__score" title={scoreTitle(r.aiSubscoresJson)}>{r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}</span>
                 <span class="q2-row__time" title={whenTitle(r.createdAt)}>{whenLabel(r.createdAt)}</span>
