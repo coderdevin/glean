@@ -102,7 +102,11 @@ if (session) {
           body: JSON.stringify({ email }),
         });
         if (!res.ok) { if (hint) { hint.hidden = false; hint.textContent = "发送失败，稍后再试。"; } return; }
-        const data = (await res.json()) as { challenge?: string };
+        const data = (await res.json()) as { challenge?: string; sent?: boolean };
+        if (!data.sent) {
+          if (hint) { hint.hidden = false; hint.textContent = "邮件服务暂未开启，验证码无法发送，请稍后再试或联系管理员。"; }
+          return;
+        }
         challenge = data.challenge ?? "";
         emailForm.style.display = "none";
         codeForm.style.display = "flex";

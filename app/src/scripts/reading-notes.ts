@@ -469,11 +469,16 @@ function init(bodyEl: HTMLElement): void {
         body: JSON.stringify({ email: emailInput.value }),
       });
       if (!res.ok) { hint.hidden = false; hint.textContent = "发送失败，稍后再试。"; return; }
-      const data = (await res.json()) as { challenge?: string };
+      const data = (await res.json()) as { challenge?: string; sent?: boolean };
+      hint.hidden = false;
+      if (!data.sent) {
+        // Email isn't configured server-side — don't pretend a code was sent.
+        hint.textContent = "邮件服务暂未开启，验证码无法发送，请稍后再试或联系管理员。";
+        return;
+      }
       challenge = data.challenge ?? "";
       emailForm.hidden = true;
       codeForm.hidden = false;
-      hint.hidden = false;
       hint.textContent = `验证码已发到 ${emailInput.value}，输入即可登录。`;
       codeInput.focus();
     });
