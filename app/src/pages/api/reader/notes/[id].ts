@@ -1,16 +1,11 @@
 import type { APIRoute } from "astro";
-import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db } from "~/db/client";
-import { readerNotes, READER_NOTE_COLORS } from "~/db/schema";
+import { readerNotes } from "~/db/schema";
 import { readReaderSession } from "~/lib/reader-auth";
+import { PatchNoteBody } from "~/lib/reader-notes-schema";
 
 export const prerender = false;
-
-const PatchBody = z.object({
-  color: z.enum(READER_NOTE_COLORS).optional(),
-  note: z.string().max(4000).nullable().optional(),
-});
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -48,7 +43,7 @@ export const PATCH: APIRoute = async (ctx) => {
   try { raw = await ctx.request.json(); }
   catch { return json({ ok: false, error: "bad request" }, 400); }
 
-  const parsed = PatchBody.safeParse(raw);
+  const parsed = PatchNoteBody.safeParse(raw);
   if (!parsed.success) return json({ ok: false, error: "invalid patch" }, 400);
 
   const set: Record<string, unknown> = { updatedAt: new Date() };

@@ -1,24 +1,12 @@
 import type { APIRoute } from "astro";
-import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db } from "~/db/client";
-import { readerNotes, READER_NOTE_COLORS } from "~/db/schema";
+import { readerNotes } from "~/db/schema";
 import { ulid } from "~/lib/ulid";
 import { readReaderSession } from "~/lib/reader-auth";
+import { CreateNoteBody } from "~/lib/reader-notes-schema";
 
 export const prerender = false;
-
-const CreateBody = z.object({
-  pickId: z.string().min(1).max(40),
-  sectionIndex: z.number().int().min(0).max(10000),
-  lang: z.enum(["zh", "en"]),
-  exact: z.string().min(1).max(4000),
-  prefix: z.string().max(400).optional(),
-  suffix: z.string().max(400).optional(),
-  startOffset: z.number().int().min(0).max(2_000_000),
-  color: z.enum(READER_NOTE_COLORS).default("yellow"),
-  note: z.string().max(4000).optional(),
-});
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -85,7 +73,7 @@ export const POST: APIRoute = async (ctx) => {
   try { raw = await ctx.request.json(); }
   catch { return json({ ok: false, error: "bad request" }, 400); }
 
-  const parsed = CreateBody.safeParse(raw);
+  const parsed = CreateNoteBody.safeParse(raw);
   if (!parsed.success) return json({ ok: false, error: "invalid note" }, 400);
   const b = parsed.data;
 

@@ -43,6 +43,21 @@ function init(bodyEl: HTMLElement): void {
   // after the OTP succeeds (no reload, so it just lives in memory).
   let pendingPayload: Omit<Note, "id"> | null = null;
 
+  // Transient bottom-center message — so a failed save is never a silent no-op.
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  function toast(msg: string): void {
+    let el = document.querySelector<HTMLElement>(".rn-toast");
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "rn-toast";
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.add("is-shown");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el?.classList.remove("is-shown"), 2600);
+  }
+
   const containers = Array.from(
     bodyEl.querySelectorAll<HTMLElement>(".av2-prose[data-sec][data-lang]"),
   );
@@ -59,8 +74,10 @@ function init(bodyEl: HTMLElement): void {
         loggedIn = false;
         return;
       }
+      if (!res.ok) return; // 4xx/5xx other than 401 — no notes payload to paint
       loggedIn = true;
-      const data = (await res.json()) as { notes: Note[] };
+      const data = (await res.json()) as { notes?: Note[] };
+      if (!Array.isArray(data.notes)) return;
       for (const n of data.notes) paintNote(n);
       focusHashTarget();
     } catch {
@@ -259,7 +276,10 @@ function init(bodyEl: HTMLElement): void {
     hlBtn.title = "高亮所选文字";
     hlBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      if (current) void onHighlight(current, HL_COLOR);
+      // Re-read the live selection at click time; fall back to the cached one.
+      // Guards against a selectionchange rAF having cleared `current` mid-press.
+      const info = selectionInfo() ?? current;
+      if (info) void onHighlight(info, HL_COLOR);
     });
     el.appendChild(hlBtn);
 
@@ -270,7 +290,8 @@ function init(bodyEl: HTMLElement): void {
     noteBtn.title = "高亮并写批注";
     noteBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
-      if (current) void onHighlight(current, HL_COLOR, true);
+      const info = selectionInfo() ?? current;
+      if (info) void onHighlight(info, HL_COLOR, true);
     });
     el.appendChild(noteBtn);
 
@@ -317,7 +338,10 @@ function init(bodyEl: HTMLElement): void {
       return;
     }
     const created = await createNote(payload);
-    if (!created) return;
+    if (!created) {
+      toast("高亮保存失败，请重试");
+      return;
+    }
     paintNote(created);
     if (withNote) openPopover(created);
   }
@@ -353,6 +377,7 @@ function init(bodyEl: HTMLElement): void {
     const ta = document.createElement("textarea");
     ta.className = "rn-popover__text";
     ta.placeholder = "写点批注…";
+    ta.maxLength = 4000; // matches PatchNoteBody.note cap so save can't silently 400
     ta.value = n.note ?? "";
 
     const actions = document.createElement("div");
@@ -366,6 +391,8 @@ function init(bodyEl: HTMLElement): void {
         n.note = ta.value.trim() || null;
         repaintNote(n);
         closePopover();
+      } else {
+        toast("批注保存失败，请重试");
       }
     });
     const del = document.createElement("button");
