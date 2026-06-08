@@ -2,19 +2,31 @@
 export const prerender = false;
 import Admin from "~/layouts/Admin.astro";
 import { db } from "~/db/client";
-import { currentWikiIndex, searchPicks, allTagsWithCounts } from "~/lib/queries";
+import { currentWikiIndex, searchPicks, allTagsWithCounts, latestWikiEvent } from "~/lib/queries";
 import { lintAll } from "~/lib/lint";
 
 const env = Astro.locals.runtime.env;
 const drizzleDb = db(env.DB);
-const [wiki, picks, tags] = await Promise.all([
+const [wiki, picks, tags, ev] = await Promise.all([
   currentWikiIndex(drizzleDb),
   searchPicks(drizzleDb, { limit: 200 }),
   allTagsWithCounts(drizzleDb),
+  latestWikiEvent(drizzleDb),
 ]);
 
 const findings = lintAll(picks, tags, wiki);
 const generated = wiki?.generated_at ? new Date(wiki.generated_at).toISOString().replace("T", " ").slice(0, 16) : null;
+
+// Live build state from the latest "wiki" lifecycle event.
+const building = ev?.status === "queued" || ev?.status === "started";
+const failed = ev?.status === "failed";
+const evTime = ev?.created_at ? new Date(ev.created_at).toISOString().replace("T", " ").slice(0, 16) : null;
+const stateLabel =
+  ev?.status === "queued" ? "已请求，排队中 · queued"
+  : ev?.status === "started" ? "正在生成 · building…"
+  : ev?.status === "failed" ? "上次重建失败 · failed"
+  : ev?.status === "ok" ? "已生成 · done"
+  : "尚未生成 · not built yet";
 
 Astro.response.headers.set("Cache-Control", "no-store");
 ---
@@ -28,18 +40,34 @@ Astro.response.headers.set("Cache-Control", "no-store");
         </p>
       </header>
 
-      <section style="margin-block: 1.5rem; display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
-        <form method="POST" action="/api/admin/wiki/rebuild">
-          <button type="submit" class="btn btn--primary">重建导览 · Rebuild</button>
-        </form>
-        {wiki ? (
-          <span class="t-code text-muted-soft">
-            生成于 {generated} · {wiki.picks_count} 篇 · {wiki.topics.length} 个主题 · {wiki.model ?? "?"}
-          </span>
-        ) : (
-          <span class="t-code text-muted-soft">尚未生成 · not built yet — 点击重建。重建是异步的，几秒后刷新本页。</span>
+      <section style="margin-block: 1.5rem">
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+          <form method="POST" action="/api/admin/wiki/rebuild">
+            <button type="submit" class="btn btn--primary">重建导览 · Rebuild</button>
+          </form>
+          {building && (
+            <span class="t-code" style="color: #b8860b">● {stateLabel}{evTime ? ` · ${evTime}` : ""} — 本页每 4 秒自动刷新</span>
+          )}
+          {!building && failed && (
+            <span class="t-code" style="color: #c0392b">✕ {stateLabel}{evTime ? ` · ${evTime}` : ""}</span>
+          )}
+          {!building && !failed && wiki && (
+            <span class="t-code text-muted-soft">
+              ✓ 生成于 {generated} · {wiki.picks_count} 篇 · {wiki.topics.length} 个主题 · {wiki.model ?? "?"}
+            </span>
+          )}
+          {!building && !failed && !wiki && (
+            <span class="t-code text-muted-soft">尚未生成 · 点击重建（异步，几秒后自动刷新）</span>
+          )}
+        </div>
+
+        {failed && ev?.message && (
+          <pre style="margin-top: 12px; padding: 12px; background: #fdecea; color: #611a15; border-radius: 6px; white-space: pre-wrap; word-break: break-word; font-size: 0.82rem; line-height: 1.5">失败原因 · reason:
+{ev.message}</pre>
         )}
       </section>
+
+      {building && <script is:inline>{`setTimeout(function(){location.reload()},4000)`}</script>}
 
       {wiki && (
         <section style="margin-block: 1.5rem">

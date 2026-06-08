@@ -15,6 +15,7 @@ import {
   subscribers,
   articleAnnotations,
   wikiIndex,
+  submissionEvents,
   type CategoryRow,
 } from "~/db/schema";
 import type { WikiIndexView, WikiTopic } from "./wiki";
@@ -485,6 +486,31 @@ export async function allTagsWithCounts(db: DB): Promise<{ slug: string; name_zh
 /** All categories (for tag-index grouping labels + admin category input). */
 export async function allCategories(db: DB): Promise<CategoryRow[]> {
   return db.select().from(categoriesTable).orderBy(categoriesTable.slug);
+}
+
+export interface WikiStatusEvent {
+  stage: string;
+  status: string;
+  message: string | null;
+  created_at: Date | null;
+}
+
+/** Latest wiki-build lifecycle event (queued | started | ok | failed) so
+ *  /admin/wiki can show live state + the failure reason. Keyed by the stable
+ *  "wiki" submission id that the rebuild endpoint + runWikiBuild both log under. */
+export async function latestWikiEvent(db: DB): Promise<WikiStatusEvent | null> {
+  const rows = await db
+    .select({
+      stage: submissionEvents.stage,
+      status: submissionEvents.status,
+      message: submissionEvents.message,
+      created_at: submissionEvents.createdAt,
+    })
+    .from(submissionEvents)
+    .where(eq(submissionEvents.submissionId, "wiki"))
+    .orderBy(desc(submissionEvents.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 /** The live wiki index = the most recently generated row (rebuild publishes live). */
