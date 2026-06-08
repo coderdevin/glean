@@ -38,7 +38,8 @@ import { getLlmProviderSetting, withLlmProviderSetting } from "../../../src/lib/
 import { autoPublishReady } from "../../../src/lib/publish";
 
 /** Daily auto-publish cron: 22:00 UTC = 06:00 Asia/Shanghai. Publishes the
- *  oldest 3 'ready' submissions so the editor doesn't have to each morning. */
+ *  newest 3 'ready' submissions (most recently added first) so the editor
+ *  doesn't have to each morning. */
 const DAILY_PUBLISH_CRON = "0 22 * * *";
 const DAILY_PUBLISH_COUNT = 3;
 import { drizzle } from "drizzle-orm/d1";
@@ -253,7 +254,7 @@ export default {
     const w = await reapStalledWeeklyDrafts(env);
     if (w > 0) console.log(`reaper: marked ${w} stalled weekly draft(s) failed`);
 
-    // Daily-only: auto-publish the oldest N 'ready' submissions. Gated on the
+    // Daily-only: auto-publish the newest N 'ready' submissions. Gated on the
     // exact cron so it never fires on the */5 reaper tick.
     if (controller.cron === DAILY_PUBLISH_CRON) {
       const r = await autoPublishReady(env, DAILY_PUBLISH_COUNT);

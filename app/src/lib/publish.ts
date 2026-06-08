@@ -8,7 +8,7 @@
  * drift on slug shape, position assignment, read-time, tag linking, or the
  * submission write-back.
  */
-import { asc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { ulid } from "./ulid";
 import { db } from "~/db/client";
 import { pickTags, picks, submissions, tags, categories, type Submission } from "~/db/schema";
@@ -248,9 +248,10 @@ export function publishFieldsFromAi(sub: Submission): PublishFields | null {
 }
 
 /**
- * Auto-publish the oldest `limit` 'ready' submissions (FIFO by createdAt) from
- * their AI output, no human review. Used by the daily cron. Non-throwing per
- * item — one bad row never blocks the rest. Returns ids published + skipped.
+ * Auto-publish the newest `limit` 'ready' submissions (LIFO — most recently
+ * added first, by createdAt desc) from their AI output, no human review. Used by
+ * the daily cron. Non-throwing per item — one bad row never blocks the rest.
+ * Returns ids published + skipped.
  */
 export async function autoPublishReady(
   env: PublishEnv,
@@ -261,7 +262,7 @@ export async function autoPublishReady(
     .select()
     .from(submissions)
     .where(eq(submissions.status, "ready"))
-    .orderBy(asc(submissions.createdAt))
+    .orderBy(desc(submissions.createdAt))
     .limit(limit);
 
   const published: string[] = [];
