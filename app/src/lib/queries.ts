@@ -14,8 +14,10 @@ import {
   weeklyDeliveries,
   subscribers,
   articleAnnotations,
+  wikiIndex,
   type CategoryRow,
 } from "~/db/schema";
+import type { WikiIndexView, WikiTopic } from "./wiki";
 import type { ArticleCardPick } from "~/components/ArticleCard.astro";
 import type { WeeklyCoverIssue } from "~/components/WeeklyCover.astro";
 import { buildWeeklyGroups, type LayoutSection } from "~/lib/weekly";
@@ -109,6 +111,7 @@ async function rawPicks(
   where: ReturnType<typeof and> | undefined,
   orderBy: any[],
   limit?: number,
+  offset?: number,
 ): Promise<{ id: string; row: PickRow }[]> {
   let q = db
     .select({
@@ -135,6 +138,7 @@ async function rawPicks(
     .where(where)
     .orderBy(...orderBy);
   if (limit) q = q.limit(limit) as typeof q;
+  if (offset) q = q.offset(offset) as typeof q;
   const result = (await q) as PickRow[] & { id: string }[];
   return result.map((r) => ({ id: r.id, row: r }));
 }
@@ -258,6 +262,72 @@ export async function picksForTag(db: DB, tagSlug: string, limit = 100): Promise
     and(eq(picks.status, "published"), inArray(picks.id, ids)),
     [desc(picks.publishedAt)],
     limit,
+  );
+  return hydrate(db, rows);
+}
+
+export interface SearchPicksParams {
+  /** Case-insensitive substring match over zh/en title + summary. */
+  q?: string;
+  /** Tag slug — only picks carrying this tag. */
+  tag?: string;
+  /** Category slug. */
+  category?: string;
+  /** Exact daily date (YYYY-MM-DD). */
+  date?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Page-size defaults for the public picks API — shared so the endpoint's
+ *  pagination math agrees with the clamp applied here. */
+export const PICKS_DEFAULT_LIMIT = 50;
+export const PICKS_MAX_LIMIT = 200;
+
+/** Escape LIKE wildcards so a literal % or _ in the query is matched literally. */
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
+/**
+ * Search/filter published picks for the public read API (powers the CLI's
+ * `query` and the index for `ask`). All filters are AND-ed; `q` is OR-ed across
+ * the four text columns. Newest-published first.
+ */
+export async function searchPicks(db: DB, params: SearchPicksParams): Promise<ArticleCardPick[]> {
+  const limit = Math.min(Math.max(params.limit ?? PICKS_DEFAULT_LIMIT, 1), PICKS_MAX_LIMIT);
+  const offset = Math.max(params.offset ?? 0, 0);
+
+  const conds = [eq(picks.status, "published")];
+  if (params.category) conds.push(eq(picks.category, params.category));
+  if (params.date) conds.push(eq(picks.dailyDate, params.date));
+  const q = params.q?.trim();
+  if (q) {
+    const needle = `%${escapeLike(q.toLowerCase())}%`;
+    const text = or(
+      sql`lower(${picks.titleZh}) like ${needle} escape '\\'`,
+      sql`lower(${picks.titleEn}) like ${needle} escape '\\'`,
+      sql`lower(${picks.summaryZh}) like ${needle} escape '\\'`,
+      sql`lower(${picks.summaryEn}) like ${needle} escape '\\'`,
+    );
+    if (text) conds.push(text);
+  }
+  if (params.tag) {
+    const idRows = await db
+      .select({ id: pickTags.pickId })
+      .from(pickTags)
+      .where(eq(pickTags.tagSlug, params.tag));
+    const ids = idRows.map((r) => r.id);
+    if (ids.length === 0) return [];
+    conds.push(inArray(picks.id, ids));
+  }
+
+  const rows = await rawPicks(
+    db,
+    and(...conds),
+    [desc(picks.publishedAt), desc(picks.positionInDay)],
+    limit,
+    offset,
   );
   return hydrate(db, rows);
 }
@@ -415,6 +485,25 @@ export async function allTagsWithCounts(db: DB): Promise<{ slug: string; name_zh
 /** All categories (for tag-index grouping labels + admin category input). */
 export async function allCategories(db: DB): Promise<CategoryRow[]> {
   return db.select().from(categoriesTable).orderBy(categoriesTable.slug);
+}
+
+/** The live wiki index = the most recently generated row (rebuild publishes live). */
+export async function currentWikiIndex(db: DB): Promise<WikiIndexView | null> {
+  const rows = await db
+    .select()
+    .from(wikiIndex)
+    .orderBy(desc(wikiIndex.generatedAt))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    intro_zh: row.introZh,
+    intro_en: row.introEn,
+    topics: safeJson(row.topicsJson) as WikiTopic[],
+    picks_count: row.picksCount,
+    model: row.model,
+    generated_at: row.generatedAt,
+  };
 }
 
 /** Admin: all issues incl. drafts, newest first. */

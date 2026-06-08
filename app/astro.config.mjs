@@ -23,6 +23,7 @@ export default defineConfig({
           { pattern: "/about/" },
           { pattern: "/standards/" },
           { pattern: "/design-system/" },
+          { pattern: "/wiki/" },
         ],
       },
     },

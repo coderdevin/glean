@@ -33,6 +33,7 @@ import {
   type IngestEnv,
 } from "../../../src/lib/ingest";
 import { NO_RETRY_MARKER } from "../../../src/lib/llm";
+import { runWikiBuild } from "../../../src/lib/wiki";
 import { getLlmProviderSetting, withLlmProviderSetting } from "../../../src/lib/settings";
 import { autoPublishReady } from "../../../src/lib/publish";
 
@@ -56,7 +57,7 @@ function parseMessage(raw: string): {
   id: string;
   modelOverride?: string;
   phase?: "sections";
-  kind?: "weekly";
+  kind?: "weekly" | "wiki";
 } {
   const pipeIdx = raw.indexOf("|");
   const id = pipeIdx >= 0 ? raw.slice(0, pipeIdx) : raw;
@@ -73,7 +74,7 @@ function parseMessage(raw: string): {
     id,
     modelOverride: trimmed || undefined,
     phase: phaseRaw === "sections" ? "sections" : undefined,
-    kind: kindRaw === "weekly" ? "weekly" : undefined,
+    kind: kindRaw === "weekly" ? "weekly" : kindRaw === "wiki" ? "wiki" : undefined,
   };
 }
 
@@ -144,6 +145,24 @@ export default {
     const env = withLlmProviderSetting(rawEnv, await getLlmProviderSetting(rawEnv.DB));
     for (const msg of batch.messages) {
       const { id, modelOverride, phase, kind } = parseMessage(msg.body);
+
+      // Wiki index rebuild. runWikiBuild is non-throwing and writes its own
+      // wiki_index row (rebuild publishes live), so we just ack regardless.
+      if (kind === "wiki") {
+        try {
+          const result = await runWikiBuild(env);
+          console.log("wiki build", result);
+        } catch (err) {
+          const reason = (err as Error).message ?? "unknown wiki build error";
+          console.error("wiki build fail", { reason });
+          await logEvent(env, id, "llm", "failed", {
+            message: reason,
+            meta: { kind: "wiki", source: "wiki-throw" },
+          });
+        }
+        msg.ack();
+        continue;
+      }
 
       // Weekly-issue draft. runWeeklyDraft is non-throwing and writes its own
       // terminal state (draft_status = 'ready' | 'failed') onto the issue row,
@@ -250,7 +269,14 @@ export default {
       const explicitId = url.searchParams.get("id");
       const modelOverride = url.searchParams.get("model") || undefined;
       const phase = url.searchParams.get("phase") === "sections" ? "sections" : undefined;
-      const kind = url.searchParams.get("kind") === "weekly" ? "weekly" : undefined;
+      const kindRaw = url.searchParams.get("kind");
+      const kind = kindRaw === "weekly" ? "weekly" : kindRaw === "wiki" ? "wiki" : undefined;
+
+      // Wiki rebuild (dev): no id needed — runWikiBuild reads all published picks.
+      if (kind === "wiki") {
+        const result = await runWikiBuild(env);
+        return json({ ok: result.ok, stage: "wiki", result });
+      }
 
       // Weekly draft (dev): the Pages route proxies here with an explicit id so
       // the draft fires without waiting for the dev queue poller.

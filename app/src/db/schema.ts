@@ -107,6 +107,28 @@ export const weeklyIssues = sqliteTable("weekly_issues", {
     .$defaultFn(() => new Date()),
 });
 
+/**
+ * Wiki index — the LLM-synthesized "map of the corpus" (see migration 0017).
+ * Published picks are the raw data; admin rebuilds this index on demand and a
+ * rebuild publishes live (no draft state). The newest row is the live index.
+ */
+export const wikiIndex = sqliteTable("wiki_index", {
+  id: text("id").primaryKey(),
+  introZh: text("intro_zh").notNull(),
+  introEn: text("intro_en").notNull(),
+  /** JSON: [{title_zh,title_en,blurb_zh,blurb_en,pick_slugs:[]}] */
+  topicsJson: text("topics_json").notNull().default("[]"),
+  model: text("model"),
+  /** Snapshot of how many published picks were folded in at generation time. */
+  picksCount: integer("picks_count").notNull().default(0),
+  generatedAt: integer("generated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 /** Self-growing tag taxonomy. `family` is a category slug (see `categories`). */
 export const tags = sqliteTable("tags", {
   slug: text("slug").primaryKey(),

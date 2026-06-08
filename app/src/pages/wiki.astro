@@ -1,0 +1,72 @@
+---
+export const prerender = false;
+import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
+import { localizedPath } from "~/lib/i18n";
+import { db } from "~/db/client";
+import { currentWikiIndex, searchPicks } from "~/lib/queries";
+
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
+
+const env = Astro.locals.runtime.env;
+const drizzleDb = db(env.DB);
+const [wiki, allPicks] = await Promise.all([
+  currentWikiIndex(drizzleDb),
+  searchPicks(drizzleDb, { limit: 200 }),
+]);
+
+// slug → title, so topic cross-links show the article title (the wiki stores slugs).
+const titleBySlug = new Map(allPicks.map((p) => [p.slug, lang === "en" ? p.title_en : p.title_zh]));
+
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+);
+
+const intro = wiki ? (lang === "en" ? wiki.intro_en : wiki.intro_zh) : "";
+---
+<Site title={lang === "en" ? "Wiki — Glean" : "导览 · Wiki — Glean · 拾遗"}>
+  <section class="page-banner">
+    <div class="container">
+      <span class="eyebrow"><Lang zh="导览" en="Wiki" /></span>
+      <h1 class="tag-hero__name"><Lang zh="拾遗导览" en="The Map" /></h1>
+      <p style="max-width: 60ch; margin-top: 16px">
+        {intro || (
+          <Lang
+            zh="导览还没生成。编辑在后台重建后，这里会出现一张精选合集的主题地图。"
+            en="The map hasn't been built yet. Once an editor rebuilds it, a themed map of the collection appears here."
+          />
+        )}
+      </p>
+    </div>
+  </section>
+
+  {wiki && (
+    <section class="section--tight" style="padding-top: 16px">
+      <div class="container">
+        {wiki.topics.map((t) => (
+          <div style="margin-bottom: 40px">
+            <h2 class="section-head__title">{lang === "en" ? t.title_en : t.title_zh}</h2>
+            <p style="max-width: 60ch; margin: 8px 0 12px; opacity: 0.8">
+              {lang === "en" ? t.blurb_en : t.blurb_zh}
+            </p>
+            <ul style="margin: 0; padding-left: 1.1em; line-height: 1.9">
+              {t.pick_slugs.map((slug) => (
+                <li>
+                  <a href={L(`/a/${slug}`)}>{titleBySlug.get(slug) ?? slug}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {wiki.generated_at && (
+          <p style="opacity: 0.5; font-size: 0.85em; margin-top: 32px">
+            <Lang zh="生成于" en="Generated" /> {new Date(wiki.generated_at).toISOString().slice(0, 10)}
+            · {wiki.picks_count} <Lang zh="篇" en="picks" />
+          </p>
+        )}
+      </div>
+    </section>
+  )}
+</Site>

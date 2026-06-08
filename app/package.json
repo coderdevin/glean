@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "glean": "scripts/cli/index.ts"
+  },
   "scripts": {
+    "cli": "tsx scripts/cli/index.ts",
+    "typecheck:cli": "tsc -p scripts/cli/tsconfig.json",
     "dev": "astro dev",
     "build": "astro build",
     "preview": "wrangler pages dev ./dist --d1 DB --kv CACHE --r2 RAW",

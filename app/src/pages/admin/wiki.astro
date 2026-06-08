@@ -1,0 +1,86 @@
+---
+export const prerender = false;
+import Admin from "~/layouts/Admin.astro";
+import { db } from "~/db/client";
+import { currentWikiIndex, searchPicks, allTagsWithCounts } from "~/lib/queries";
+import { lintAll } from "~/lib/lint";
+
+const env = Astro.locals.runtime.env;
+const drizzleDb = db(env.DB);
+const [wiki, picks, tags] = await Promise.all([
+  currentWikiIndex(drizzleDb),
+  searchPicks(drizzleDb, { limit: 200 }),
+  allTagsWithCounts(drizzleDb),
+]);
+
+const findings = lintAll(picks, tags, wiki);
+const generated = wiki?.generated_at ? new Date(wiki.generated_at).toISOString().replace("T", " ").slice(0, 16) : null;
+
+Astro.response.headers.set("Cache-Control", "no-store");
+---
+<Admin title="导览 · Wiki">
+  <main id="main" class="q2">
+    <div class="container" style="max-width: 920px">
+      <header class="q2-header">
+        <h1>导览 · Wiki</h1>
+        <p class="q2-header__sub">
+          已发布的精选是原始数据；重建会用 LLM 把它们综合成一张主题地图，<strong>立即上线</strong>到 <a href="/wiki">/wiki</a>。
+        </p>
+      </header>
+
+      <section style="margin-block: 1.5rem; display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+        <form method="POST" action="/api/admin/wiki/rebuild">
+          <button type="submit" class="btn btn--primary">重建导览 · Rebuild</button>
+        </form>
+        {wiki ? (
+          <span class="t-code text-muted-soft">
+            生成于 {generated} · {wiki.picks_count} 篇 · {wiki.topics.length} 个主题 · {wiki.model ?? "?"}
+          </span>
+        ) : (
+          <span class="t-code text-muted-soft">尚未生成 · not built yet — 点击重建。重建是异步的，几秒后刷新本页。</span>
+        )}
+      </section>
+
+      {wiki && (
+        <section style="margin-block: 1.5rem">
+          <h2 style="font-size: 1rem; margin-bottom: 8px">主题预览 · Topics</h2>
+          <p style="opacity: 0.8; margin-bottom: 12px">{wiki.intro_en}</p>
+          {wiki.topics.map((t) => (
+            <div style="margin-bottom: 14px">
+              <strong>{t.title_en}</strong> <span class="text-muted-soft">/ {t.title_zh}</span>
+              <span class="t-code text-muted-soft"> · {t.pick_slugs.length} picks</span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <section style="margin-block: 1.5rem">
+        <h2 style="font-size: 1rem; margin-bottom: 8px">
+          Lint {findings.length > 0 ? `· ${findings.length} 项` : "· ✓ clean"}
+        </h2>
+        {findings.length === 0 ? (
+          <p class="text-muted-soft">没有发现问题。No corpus or wiki issues.</p>
+        ) : (
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem">
+            <thead>
+              <tr style="text-align: left; border-bottom: 1px solid var(--hairline, #ddd)">
+                <th style="padding: 6px 8px">check</th>
+                <th style="padding: 6px 8px">slug</th>
+                <th style="padding: 6px 8px">detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {findings.map((f) => (
+                <tr style="border-bottom: 1px solid var(--hairline, #eee)">
+                  <td style="padding: 6px 8px"><code>{f.check}</code></td>
+                  <td style="padding: 6px 8px">{f.slug ?? "—"}</td>
+                  <td style="padding: 6px 8px">{f.detail}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </div>
+  </main>
+</Admin>
