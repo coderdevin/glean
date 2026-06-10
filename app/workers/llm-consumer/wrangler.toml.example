@@ -2,6 +2,10 @@ name = "glean-llm"
 main = "src/index.ts"
 compatibility_date = "2026-04-01"
 compatibility_flags = ["nodejs_compat"]
+# The fetch handler (POST /process) is a DEV-ONLY entry point (Pages proxies
+# to localhost). Never expose it on workers.dev in prod — it is unauthenticated
+# and triggers real LLM/extract runs.
+workers_dev = false
 
 # Shares D1 + R2 with the extract worker (and the Pages app).
 [[d1_databases]]
