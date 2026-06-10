@@ -179,6 +179,7 @@ const overCap = totalPublished > MAX_PICKS;
                 <th style="padding: 6px 8px">check</th>
                 <th style="padding: 6px 8px">slug</th>
                 <th style="padding: 6px 8px">detail</th>
+                <th style="padding: 6px 8px">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -187,6 +188,31 @@ const overCap = totalPublished > MAX_PICKS;
                   <td style="padding: 6px 8px"><code>{f.check}</code></td>
                   <td style="padding: 6px 8px">{f.slug ?? "—"}</td>
                   <td style="padding: 6px 8px">{f.detail}</td>
+                  <td style="padding: 6px 8px; white-space: nowrap">
+                    {f.check === "orphan-tag" && f.slug && (
+                      <form method="POST" action="/api/admin/tags/delete" style="display: inline">
+                        <input type="hidden" name="slug" value={f.slug} />
+                        <button type="submit" class="btn" style="font-size: 0.78rem; padding: 2px 10px">删除标签</button>
+                      </form>
+                    )}
+                    {f.check === "duplicate" && (f.slugs ?? []).map((s) => (
+                      <form method="POST" action="/api/admin/picks/unpublish" style="display: inline; margin-right: 6px">
+                        <input type="hidden" name="slug" value={s} />
+                        <input type="hidden" name="back" value="/admin/wiki" />
+                        <button type="submit" class="btn" style="font-size: 0.78rem; padding: 2px 10px" title={s}>下架 …{s.slice(-6)}</button>
+                      </form>
+                    ))}
+                    {(f.check === "wiki-gap" || f.check === "wiki-stale") && (
+                      <span class="t-code text-muted-soft" style="font-size: 0.78rem">点上方「增量更新」</span>
+                    )}
+                    {f.check === "wiki-dead-link" && f.slug && (
+                      <form method="POST" action="/api/admin/picks/unpublish" style="display: inline">
+                        <input type="hidden" name="slug" value={f.slug} />
+                        <input type="hidden" name="back" value="/admin/wiki" />
+                        <button type="submit" class="btn" style="font-size: 0.78rem; padding: 2px 10px" title="从导览移除该链接（pick 已非发布态时仅修导览）">修复链接</button>
+                      </form>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

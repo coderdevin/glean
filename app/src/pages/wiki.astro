@@ -54,9 +54,11 @@ const intro = wiki ? (lang === "en" ? wiki.intro_en : wiki.intro_zh) : "";
               {lang === "en" ? t.blurb_en : t.blurb_zh}
             </p>
             <ul style="margin: 0; padding-left: 1.1em; line-height: 1.9">
-              {t.pick_slugs.map((slug) => (
+              {/* No title means not a published pick (a stale cross-link) — skip
+                  rather than render a bare slug that 404s. Lint reports it. */}
+              {t.pick_slugs.filter((slug) => titleBySlug.has(slug)).map((slug) => (
                 <li>
-                  <a href={L(`/a/${slug}`)}>{titleBySlug.get(slug) ?? slug}</a>
+                  <a href={L(`/a/${slug}`)}>{titleBySlug.get(slug)}</a>
                 </li>
               ))}
             </ul>

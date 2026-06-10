@@ -10,6 +10,9 @@ export interface LintFinding {
   check: string;
   slug?: string;
   detail: string;
+  /** duplicate only: every slug in the group, so the admin UI can offer a
+   *  per-slug unpublish action (the editor decides which copy survives). */
+  slugs?: string[];
 }
 
 interface LintPick {
@@ -59,7 +62,12 @@ export function checkDupes(picks: LintPick[]): LintFinding[] {
   const out: LintFinding[] = [];
   for (const [key, slugs] of groups) {
     if (slugs.length > 1) {
-      out.push({ check: "duplicate", slug: slugs[0], detail: `${slugs.length} picks share host+title (${key.split("|")[0]}): ${slugs.join(", ")}` });
+      out.push({
+        check: "duplicate",
+        slug: slugs[0],
+        slugs,
+        detail: `${slugs.length} picks share host+title (${key.split("|")[0]}): ${slugs.join(", ")}`,
+      });
     }
   }
   return out;

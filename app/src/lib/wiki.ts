@@ -280,6 +280,32 @@ function parseWikiJson(raw: string): unknown {
 // reason). The rebuild endpoint logs the initial queue/queued under the same id.
 export const WIKI_EVENT_ID = "wiki";
 
+/** Drop slugs from the live wiki map (e.g. after unpublishing a pick) by
+ *  inserting a corrected copy as the new live version — deterministic, no LLM.
+ *  Returns false when the live map doesn't reference any of the slugs. */
+export async function removeFromWikiIndex(d1: D1Database, slugs: string[]): Promise<boolean> {
+  const db = makeDb(d1);
+  const wiki = await currentWikiIndex(db);
+  if (!wiki) return false;
+  const dead = new Set(slugs);
+  if (!wiki.topics.some((t) => t.pick_slugs.some((s) => dead.has(s)))) return false;
+  const topics = wiki.topics
+    .map((t) => ({ ...t, pick_slugs: t.pick_slugs.filter((s) => !dead.has(s)) }))
+    .filter((t) => t.pick_slugs.length > 0);
+  const now = new Date();
+  await db.insert(wikiIndex).values({
+    id: ulid(),
+    introZh: wiki.intro_zh,
+    introEn: wiki.intro_en,
+    topicsJson: JSON.stringify(topics),
+    model: wiki.model,
+    picksCount: Math.max(0, wiki.picks_count - slugs.length),
+    generatedAt: now,
+    createdAt: now,
+  });
+  return true;
+}
+
 function wikiProvider(env: IngestEnv): LlmProvider {
   // Use WIKI_MODEL if set (a deliberate, provider-agnostic choice — point the
   // wiki at a FAST non-reasoning model, e.g. ModelScope V4-Flash, so clustering
