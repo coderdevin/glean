@@ -56,7 +56,8 @@ const overCap = totalPublished > MAX_PICKS;
       <header class="q2-header">
         <h1>导览 · Wiki</h1>
         <p class="q2-header__sub">
-          已发布的精选是原始数据；构建会用 LLM 把它们综合成一张主题地图，<strong>立即上线</strong>到 <a href="/wiki">/wiki</a>。
+          已发布的精选是原始数据；构建会用 LLM 把它们综合成一张主题索引——<strong>不对外展示</strong>，
+          供 <code>glean query</code> / <a href="/api/wiki">/api/wiki</a> 检索使用，构建后立即生效。
           每日自动发布后会自动增量折入当天的新文章。
         </p>
       </header>

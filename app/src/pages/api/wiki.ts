@@ -4,8 +4,9 @@ import { currentWikiIndex } from "~/lib/queries";
 
 export const prerender = false;
 
-// Public, read-only live wiki index (the LLM-synthesized map of the corpus).
-// Powers the CLI `query` (wiki topics) and is the JSON twin of the /wiki page.
+// Read-only live wiki index (the LLM-synthesized map of the corpus). The wiki
+// is a RETRIEVAL index, not a reader-facing page — this endpoint is its only
+// public surface, powering the CLI `query` (wiki topics) and agent consumers.
 // CDN-cached with a short s-maxage (same posture as /api/picks); a rebuild is
 // reflected within the cache window.
 const CACHE = "public, max-age=60, s-maxage=300, stale-while-revalidate=600";
