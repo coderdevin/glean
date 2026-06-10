@@ -17,12 +17,20 @@ const [wiki, picks, tags, ev] = await Promise.all([
 const findings = lintAll(picks, tags, wiki);
 const generated = wiki?.generated_at ? new Date(wiki.generated_at).toISOString().replace("T", " ").slice(0, 16) : null;
 
-// Live build state from the latest "wiki" lifecycle event.
-const building = ev?.status === "queued" || ev?.status === "started";
+// Live build state from the latest "wiki" lifecycle event. A queued/started
+// event with no terminal event for >8 min means the worker died mid-build
+// (timeout/eviction) — show it as stuck so the page stops claiming "building…"
+// forever and the editor can retry.
+const STALE_MS = 8 * 60 * 1000;
+const inFlight = ev?.status === "queued" || ev?.status === "started";
+const evAgeMs = ev?.created_at ? Date.now() - new Date(ev.created_at).getTime() : Infinity;
+const stale = inFlight && evAgeMs > STALE_MS;
+const building = inFlight && !stale;
 const failed = ev?.status === "failed";
 const evTime = ev?.created_at ? new Date(ev.created_at).toISOString().replace("T", " ").slice(0, 16) : null;
 const stateLabel =
-  ev?.status === "queued" ? "已请求，排队中 · queued"
+  stale ? "似乎卡住了 · stuck — worker 超时/被回收，请重试"
+  : ev?.status === "queued" ? "已请求，排队中 · queued"
   : ev?.status === "started" ? "正在生成 · building…"
   : ev?.status === "failed" ? "上次重建失败 · failed"
   : ev?.status === "ok" ? "已生成 · done"
@@ -48,15 +56,18 @@ Astro.response.headers.set("Cache-Control", "no-store");
           {building && (
             <span class="t-code" style="color: #b8860b">● {stateLabel}{evTime ? ` · ${evTime}` : ""} — 本页每 4 秒自动刷新</span>
           )}
-          {!building && failed && (
+          {stale && (
+            <span class="t-code" style="color: #c0392b">⚠ {stateLabel}{evTime ? ` · 始于 ${evTime}` : ""}</span>
+          )}
+          {!inFlight && failed && (
             <span class="t-code" style="color: #c0392b">✕ {stateLabel}{evTime ? ` · ${evTime}` : ""}</span>
           )}
-          {!building && !failed && wiki && (
+          {!inFlight && !failed && wiki && (
             <span class="t-code text-muted-soft">
               ✓ 生成于 {generated} · {wiki.picks_count} 篇 · {wiki.topics.length} 个主题 · {wiki.model ?? "?"}
             </span>
           )}
-          {!building && !failed && !wiki && (
+          {!inFlight && !failed && !wiki && (
             <span class="t-code text-muted-soft">尚未生成 · 点击重建（异步，几秒后自动刷新）</span>
           )}
         </div>

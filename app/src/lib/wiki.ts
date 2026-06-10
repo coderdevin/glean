@@ -18,13 +18,17 @@
 import { z } from "zod";
 import { db as makeDb } from "~/db/client";
 import { wikiIndex } from "~/db/schema";
-import { pickProvider, type LlmProvider } from "./llm";
+import { pickProvider, resolveProviderSpec, type LlmProvider } from "./llm";
 import { searchPicks } from "./queries";
 import { logEvent, type IngestEnv } from "./ingest";
 import { ulid } from "./ulid";
 
 const MAX_PICKS = 200; // newest N folded in; corpus is small. picks_count records the snapshot.
-const CALL_TIMEOUT_MS = 90_000;
+const SUMMARY_CAP = 120; // chars per pick — clustering needs a hint, not the whole summary.
+// Generous: the call streams a reasoning model over the whole catalog. Must stay
+// under the worker's wall-time ceiling (~15 min) but long enough not to abort a
+// legitimately-running build (90s was cutting real runs off).
+const CALL_TIMEOUT_MS = 240_000;
 
 export interface WikiTopic {
   title_zh: string;
@@ -75,11 +79,13 @@ object of this exact shape:
 function buildWikiUserMessage(
   picks: { slug: string; title_en: string; title_zh: string; summary_en: string; category: string; tags: { slug: string }[] }[],
 ): string {
+  // Clustering only needs a hint per article, not the full summary — trimming
+  // keeps the prompt small (and the reasoning model fast) over a large corpus.
   const catalog = picks
-    .map(
-      (p) =>
-        `- ${p.slug} :: ${p.title_en} / ${p.title_zh} — ${p.summary_en} [${p.category}; ${p.tags.map((t) => t.slug).join(", ")}]`,
-    )
+    .map((p) => {
+      const hint = p.summary_en.length > SUMMARY_CAP ? p.summary_en.slice(0, SUMMARY_CAP) + "…" : p.summary_en;
+      return `- ${p.slug} :: ${p.title_en} / ${p.title_zh} — ${hint} [${p.category}; ${p.tags.map((t) => t.slug).join(", ")}]`;
+    })
     .join("\n");
   return `Catalog (${picks.length} articles):\n${catalog}`;
 }
@@ -192,9 +198,12 @@ export async function runWikiBuild(
       return { ok: false, topics: 0, picks: 0, reason };
     }
 
-    // NO fallback: use exactly the configured provider, so a provider error
-    // (e.g. ModelScope 429 quota) surfaces verbatim instead of being papered over.
-    const provider = pickProvider(env);
+    // Use WIKI_MODEL if set (a deliberate, provider-agnostic choice — point the
+    // wiki at a FAST non-reasoning model, e.g. "deepseek-v4-flash", so clustering
+    // 77 articles doesn't burn minutes of reasoning tokens). Else the configured
+    // default provider. NO fallback: a provider error surfaces verbatim.
+    const wikiModel = (env as { WIKI_MODEL?: string }).WIKI_MODEL?.trim();
+    const provider = wikiModel ? resolveProviderSpec(env, wikiModel) : pickProvider(env);
     const content = await callWikiLlm(
       provider,
       WIKI_SYSTEM_PROMPT,

@@ -21,3 +21,4 @@ dist/
 # Misc scratch
 uploads/
 .thumbnail
+.local/

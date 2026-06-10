@@ -32,6 +32,10 @@ LLM_PROVIDER = "modelscope"
 # DeepSeek V4-Pro. The "deepseek-" prefix routes this spec to the DeepSeek
 # provider (baseUrl + DEEPSEEK_API_KEY), not just a model-name swap.
 LLM_FALLBACK_MODEL = "deepseek-v4-pro"
+# Wiki rebuild only: clustering the catalog needs a fast non-reasoning model.
+# V4-Pro streams minutes of reasoning tokens and trips the wiki call timeout
+# (every build before this var existed died with "The operation was aborted").
+WIKI_MODEL = "modelscope:deepseek-ai/DeepSeek-V4-Flash"
 
 # Cron triggers (all fire scheduled() in src/index.ts; it branches on cron):
 #   */5 * * * *  reaper — sweep submissions/weeklies stranded past the 15-min
