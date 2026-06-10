@@ -12,21 +12,10 @@ export default defineConfig({
   adapter: cloudflare({
     platformProxy: { enabled: true },
     imageService: "passthrough",
-    // Route the exact-match SSR pages' trailing-slash variants to the worker
-    // so the middleware 301-redirect can fire (wildcard routes like /tag/*
-    // already match /tag/foo/). Without this, /about/ etc. miss every include
-    // pattern and Cloudflare serves a static 404 (and _redirects is ignored
-    // whenever a _worker.js is present).
-    routes: {
-      extend: {
-        include: [
-          { pattern: "/about/" },
-          { pattern: "/standards/" },
-          { pattern: "/design-system/" },
-          { pattern: "/wiki/" },
-        ],
-      },
-    },
+    // No routes.extend needed: with 404.astro SSR (the only non-prerendered
+    // page left was the 404), the adapter emits a catch-all "/*" include, so
+    // every path — including /about/ trailing-slash variants — reaches the
+    // worker and the middleware's canonicalization 301 can fire.
   }),
   integrations: [],
   // No vite overrides needed: the heavy AI/extract deps live in the

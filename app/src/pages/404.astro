@@ -1,4 +1,10 @@
 ---
+// SSR, not prerendered: the /en/* middleware rewrite falls through to this
+// route for any path with no matching template. A prerendered 404 can't be
+// rendered by the worker on demand, so every /en/<missing> 500'd with
+// "module.page is not a function" instead of 404ing. (Same trap as the
+// top-level public pages — see CLAUDE.md "i18n + routing model".)
+export const prerender = false;
 import Site from "~/layouts/Site.astro";
 import NotFound from "~/components/NotFound.astro";
 ---
