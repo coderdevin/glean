@@ -9,8 +9,9 @@ import {
   latestWikiEvent,
   publishedPickCount,
   recentWikiIndexes,
+  titlesBySlugs,
 } from "~/lib/queries";
-import { lintAll } from "~/lib/lint";
+import { lintAll, type LintFinding } from "~/lib/lint";
 import { MAX_PICKS } from "~/lib/wiki";
 
 const env = Astro.locals.runtime.env;
@@ -24,8 +25,26 @@ const [wiki, picks, tags, ev, totalPublished, versions] = await Promise.all([
   recentWikiIndexes(drizzleDb, 10),
 ]);
 
+// slug → title for the topic article lists (the editor audits the clustering).
+const referenced = wiki ? [...new Set(wiki.topics.flatMap((t) => t.pick_slugs))] : [];
+const titles = await titlesBySlugs(drizzleDb, referenced);
+
 const findings = lintAll(picks, tags, wiki);
-const generated = wiki?.generated_at ? new Date(wiki.generated_at).toISOString().replace("T", " ").slice(0, 16) : null;
+
+// Editorial timezone — every timestamp on this page is for a human in
+// SITE_TZ; raw UTC ISO strings read as "the build ran at 3am".
+const tz = (env as { SITE_TZ?: string }).SITE_TZ || "Asia/Shanghai";
+const fmtT = (d: Date | string | number): string =>
+  new Intl.DateTimeFormat("zh-CN", {
+    timeZone: tz,
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .format(new Date(d))
+    .replace(/\//g, "-");
 
 // Live build state from the latest "wiki" lifecycle event. A queued/started
 // event with no terminal event for >8 min means the worker died mid-build
@@ -36,19 +55,40 @@ const inFlight = ev?.status === "queued" || ev?.status === "started";
 const evAgeMs = ev?.created_at ? Date.now() - new Date(ev.created_at).getTime() : Infinity;
 const stale = inFlight && evAgeMs > STALE_MS;
 const building = inFlight && !stale;
-const failed = ev?.status === "failed";
-const evTime = ev?.created_at ? new Date(ev.created_at).toISOString().replace("T", " ").slice(0, 16) : null;
-const stateLabel =
-  stale ? "似乎卡住了 · stuck — worker 超时/被回收，请重试"
-  : ev?.status === "queued" ? "已请求，排队中 · queued"
-  : ev?.status === "started" ? "正在生成 · building…"
-  : ev?.status === "failed" ? "上次重建失败 · failed"
-  : ev?.status === "ok" ? "已生成 · done"
-  : "尚未生成 · not built yet";
+const failed = !inFlight && ev?.status === "failed";
+const evTime = ev?.created_at ? fmtT(ev.created_at) : null;
 
-// Coverage: how much of the published corpus the live map references.
-const coveredCount = wiki ? new Set(wiki.topics.flatMap((t) => t.pick_slugs)).size : 0;
+// Covered = referenced ∩ published. Counting raw references would overcount
+// dead links (a wiki slug whose pick was unpublished) and can exceed the total.
+const coveredCount = titles.size;
 const overCap = totalPublished > MAX_PICKS;
+
+// History rows annotated with the picks-count delta vs the previous (older)
+// version — the cheapest honest hint of what each build did (+10 folded in,
+// -2 unpublished, ±0 restructure).
+const history = versions.map((v, i) => {
+  const prev = versions[i + 1];
+  return { ...v, delta: prev ? v.picks_count - prev.picks_count : null };
+});
+
+// Lint checks, named for editors and ordered by how urgently they need a human.
+const CHECK_META: Record<string, { label: string; cls: string }> = {
+  duplicate: { label: "重复收录", cls: "is-red" },
+  "wiki-dead-link": { label: "死链", cls: "is-red" },
+  translation: { label: "翻译缺失", cls: "is-amber" },
+  "unknown-tag": { label: "未知标签", cls: "is-amber" },
+  "wiki-gap": { label: "未覆盖", cls: "is-amber" },
+  "wiki-stale": { label: "待折入", cls: "is-quiet" },
+  "orphan-tag": { label: "孤儿标签", cls: "is-quiet" },
+  wiki: { label: "导览", cls: "is-amber" },
+};
+const checkOrder = Object.keys(CHECK_META);
+const sortedFindings = [...findings].sort(
+  (a, b) => checkOrder.indexOf(a.check) - checkOrder.indexOf(b.check),
+);
+const meta = (f: LintFinding) => CHECK_META[f.check] ?? { label: f.check, cls: "is-quiet" };
+
+Astro.response.headers.set("Cache-Control", "no-store");
 ---
 <Admin title="导览 · Wiki">
   <main id="main" class="q2">
@@ -56,107 +96,142 @@ const overCap = totalPublished > MAX_PICKS;
       <header class="q2-header">
         <h1>导览 · Wiki</h1>
         <p class="q2-header__sub">
-          已发布的精选是原始数据；构建会用 LLM 把它们综合成一张主题索引——<strong>不对外展示</strong>，
-          供 <code>glean query</code> / <a href="/api/wiki">/api/wiki</a> 检索使用，构建后立即生效。
-          每日自动发布后会自动增量折入当天的新文章。
+          LLM 把已发布的精选编译成一张主题索引，供 <code>glean query</code> / <a href="/api/wiki">/api/wiki</a> 检索，不对外展示。
+          每日自动发布后会自动增量折入；构建完成即生效。
         </p>
       </header>
 
-      <section style="margin-block: 1.5rem">
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
-          <form method="POST" action="/api/admin/wiki/rebuild">
-            <input type="hidden" name="mode" value="incremental" />
-            <button type="submit" class="btn btn--primary" disabled={building}>增量更新 · Update</button>
-          </form>
-          <form method="POST" action="/api/admin/wiki/rebuild">
-            <input type="hidden" name="mode" value="full" />
-            <button type="submit" class="btn" disabled={building} title="从最新文章全量重组主题结构（耗时更长）">全量重建 · Rebuild</button>
-          </form>
-          {building && (
-            <span class="t-code" style="color: #b8860b">● {stateLabel}{evTime ? ` · ${evTime}` : ""} — 本页每 4 秒自动刷新</span>
-          )}
-          {stale && (
-            <span class="t-code" style="color: #c0392b">⚠ {stateLabel}{evTime ? ` · 始于 ${evTime}` : ""}</span>
-          )}
-          {!inFlight && failed && (
-            <span class="t-code" style="color: #c0392b">✕ {stateLabel}{evTime ? ` · ${evTime}` : ""}</span>
-          )}
-          {!inFlight && !failed && ev?.status === "ok" && (
-            <span class="t-code text-muted-soft">✓ {ev.message}{evTime ? ` · ${evTime}` : ""}</span>
-          )}
-          {!inFlight && !failed && ev?.status !== "ok" && wiki && (
-            <span class="t-code text-muted-soft">
-              ✓ 生成于 {generated} · {wiki.picks_count} 篇 · {wiki.topics.length} 个主题 · {wiki.model ?? "?"}
-            </span>
-          )}
-          {!inFlight && !failed && !wiki && (
-            <span class="t-code text-muted-soft">尚未生成 · 点击构建（异步，几秒后自动刷新）</span>
-          )}
-        </div>
-
-        {wiki && (
-          <p class="t-code text-muted-soft" style="margin-top: 10px">
-            覆盖 {coveredCount} / {totalPublished} 篇已发布 · {wiki.topics.length} 个主题
-            {coveredCount < totalPublished && " — 增量更新会折入未覆盖的文章"}
+      {/* ── 当前索引 ─────────────────────────────── */}
+      <section class="wk-block" aria-labelledby="wk-now">
+        <h2 id="wk-now" class="wk-h">当前索引</h2>
+        {wiki ? (
+          <p class="wk-status">
+            <span class="status-pill status-published">线上</span>
+            <strong>{wiki.topics.length}</strong> 个主题 ·
+            覆盖 <strong>{coveredCount} / {totalPublished}</strong> 篇已发布 ·
+            <span class="t-code">{wiki.model ?? "?"}</span> ·
+            生成于 {wiki.generated_at ? fmtT(wiki.generated_at) : "—"}
           </p>
+        ) : (
+          <p class="wk-status">
+            <span class="status-pill status-pending">未生成</span>
+            还没有索引——点「全量重建」生成第一版（约 1–2 分钟，本页会自动刷新）。
+          </p>
+        )}
+        {wiki && coveredCount < totalPublished && (
+          <p class="wk-note">有 {totalPublished - coveredCount} 篇未覆盖——点「增量更新」折入。</p>
         )}
         {overCap && (
-          <p class="t-code" style="margin-top: 6px; color: #b8860b">
-            ⚠ 已发布 {totalPublished} 篇，超过全量重建窗口（最新 {MAX_PICKS} 篇）——全量重建只会重组最新 {MAX_PICKS} 篇，其余由增量更新补齐。
+          <p class="wk-note">
+            已发布 {totalPublished} 篇，超过全量重建窗口（最新 {MAX_PICKS} 篇）；窗口外的由增量更新补齐。
           </p>
         )}
 
-        {failed && ev?.message && (
-          <pre style="margin-top: 12px; padding: 12px; background: #fdecea; color: #611a15; border-radius: 6px; white-space: pre-wrap; word-break: break-word; font-size: 0.82rem; line-height: 1.5">失败原因 · reason:
-{ev.message}</pre>
+        <div class="wk-actions">
+          <div class="wk-action">
+            <form method="POST" action="/api/admin/wiki/rebuild">
+              <input type="hidden" name="mode" value="incremental" />
+              <button type="submit" class="btn btn-primary" disabled={building}>增量更新 · Update</button>
+            </form>
+            <span class="wk-action__hint">把未覆盖的新文章折入现有主题 · 日常操作，约半分钟</span>
+          </div>
+          <div class="wk-action">
+            <form method="POST" action="/api/admin/wiki/rebuild" data-confirm="确认重组全部主题？">
+              <input type="hidden" name="mode" value="full" />
+              <button type="submit" class="btn btn-secondary" disabled={building}>全量重建 · Rebuild</button>
+            </form>
+            <span class="wk-action__hint">从头重组主题结构 · 主题走样时用，约 1–2 分钟</span>
+          </div>
+        </div>
+
+        {building && (
+          <p class="wk-build is-amber" role="status">
+            ● 正在生成{ev?.status === "queued" ? "（排队中）" : "…"}{evTime ? ` · 始于 ${evTime}` : ""} — 本页每 4 秒自动刷新
+          </p>
+        )}
+        {stale && (
+          <p class="wk-build is-red" role="status">
+            ⚠ 上次构建似乎卡住了（worker 超时/被回收）{evTime ? ` · 始于 ${evTime}` : ""}——可直接重试
+          </p>
+        )}
+        {failed && (
+          <div class="wk-fail" role="alert">
+            <p>✕ 上次构建失败{evTime ? ` · ${evTime}` : ""}</p>
+            {ev?.message && <pre>{ev.message}</pre>}
+          </div>
+        )}
+        {!inFlight && !failed && ev?.status === "ok" && ev.message && (
+          <p class="wk-build is-quiet">上次构建 · {ev.message}{evTime ? ` · ${evTime}` : ""}</p>
         )}
       </section>
 
-      {building && <script is:inline>{`setTimeout(function(){location.reload()},4000)`}</script>}
-
+      {/* ── 主题索引（本体，可展开审查） ──────────── */}
       {wiki && (
-        <section style="margin-block: 1.5rem">
-          <h2 style="font-size: 1rem; margin-bottom: 8px">主题预览 · Topics</h2>
-          <p style="opacity: 0.8; margin-bottom: 12px">{wiki.intro_en}</p>
-          {wiki.topics.map((t) => (
-            <div style="margin-bottom: 14px">
-              <strong>{t.title_en}</strong> <span class="text-muted-soft">/ {t.title_zh}</span>
-              <span class="t-code text-muted-soft"> · {t.pick_slugs.length} picks</span>
-            </div>
-          ))}
+        <section class="wk-block" aria-labelledby="wk-topics">
+          <h2 id="wk-topics" class="wk-h">主题索引 <span class="wk-h__n">{wiki.topics.length}</span></h2>
+          <p class="wk-intro">{wiki.intro_zh || wiki.intro_en}</p>
+          <div class="wk-topics">
+            {wiki.topics.map((t) => (
+              <details class="wk-topic">
+                <summary>
+                  <span class="wk-topic__zh">{t.title_zh || t.title_en}</span>
+                  {t.title_zh && t.title_en && <span class="wk-topic__en">{t.title_en}</span>}
+                  <span class="wk-topic__n">{t.pick_slugs.length} 篇</span>
+                </summary>
+                {(t.blurb_zh || t.blurb_en) && <p class="wk-topic__blurb">{t.blurb_zh || t.blurb_en}</p>}
+                <ul class="wk-topic__list">
+                  {t.pick_slugs.map((slug) => {
+                    const title = titles.get(slug);
+                    return title ? (
+                      <li><a href={`/a/${slug}`} target="_blank" rel="noopener">{title.title_zh || title.title_en}</a></li>
+                    ) : (
+                      <li class="is-dead"><span class="t-code">{slug}</span> — 非发布态（见 Lint 死链）</li>
+                    );
+                  })}
+                </ul>
+              </details>
+            ))}
+          </div>
         </section>
       )}
 
-      {versions.length > 1 && (
-        <section style="margin-block: 1.5rem">
-          <h2 style="font-size: 1rem; margin-bottom: 8px">历史版本 · History</h2>
-          <p class="text-muted-soft" style="font-size: 0.85rem; margin-bottom: 10px">
-            最新版本即线上版本。回滚会把旧版本复制为新的线上版本（非破坏式，可再回滚）。
-          </p>
-          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem">
+      {building && <script is:inline>{`setTimeout(function(){location.reload()},4000)`}</script>}
+
+      {/* ── 历史版本 ─────────────────────────────── */}
+      {history.length > 1 && (
+        <section class="wk-block" aria-labelledby="wk-history">
+          <h2 id="wk-history" class="wk-h">历史版本 <span class="wk-h__n">{history.length}</span></h2>
+          <table class="wk-table">
             <thead>
-              <tr style="text-align: left; border-bottom: 1px solid var(--hairline, #ddd)">
-                <th style="padding: 6px 8px">生成时间</th>
-                <th style="padding: 6px 8px">主题</th>
-                <th style="padding: 6px 8px">篇数</th>
-                <th style="padding: 6px 8px">model</th>
-                <th style="padding: 6px 8px"></th>
+              <tr>
+                <th>生成时间</th>
+                <th>主题</th>
+                <th>篇数</th>
+                <th>model</th>
+                <th><span class="visually-hidden">操作</span></th>
               </tr>
             </thead>
             <tbody>
-              {versions.map((v, i) => (
-                <tr style="border-bottom: 1px solid var(--hairline, #eee)">
-                  <td style="padding: 6px 8px" class="t-code">{new Date(v.generated_at).toISOString().replace("T", " ").slice(0, 16)}</td>
-                  <td style="padding: 6px 8px">{v.topics_count}</td>
-                  <td style="padding: 6px 8px">{v.picks_count}</td>
-                  <td style="padding: 6px 8px" class="t-code">{v.model ?? "?"}</td>
-                  <td style="padding: 6px 8px">
+              {history.map((v, i) => (
+                <tr>
+                  <td class="t-code">{fmtT(v.generated_at)}</td>
+                  <td>{v.topics_count}</td>
+                  <td>
+                    {v.picks_count}
+                    {v.delta != null && v.delta !== 0 && (
+                      <span class={`wk-delta ${v.delta > 0 ? "is-up" : "is-down"}`}>
+                        {v.delta > 0 ? `+${v.delta}` : v.delta}
+                      </span>
+                    )}
+                  </td>
+                  <td class="t-code wk-model">{v.model ?? "?"}</td>
+                  <td>
                     {i === 0 ? (
-                      <span class="t-code text-muted-soft">线上 · live</span>
+                      <span class="status-pill status-published">线上</span>
                     ) : (
-                      <form method="POST" action="/api/admin/wiki/rollback" style="display: inline">
+                      <form method="POST" action="/api/admin/wiki/rollback" data-confirm="确认回滚？" style="display:inline">
                         <input type="hidden" name="id" value={v.id} />
-                        <button type="submit" class="btn" style="font-size: 0.8rem; padding: 2px 10px">回滚 · restore</button>
+                        <button type="submit" class="btn-text wk-rowbtn">回滚到此版</button>
                       </form>
                     )}
                   </td>
@@ -164,54 +239,54 @@ const overCap = totalPublished > MAX_PICKS;
               ))}
             </tbody>
           </table>
+          <p class="wk-note">回滚＝把旧版复制为新的线上版本，历史完整保留，可再回滚。</p>
         </section>
       )}
 
-      <section style="margin-block: 1.5rem">
-        <h2 style="font-size: 1rem; margin-bottom: 8px">
-          Lint {findings.length > 0 ? `· ${findings.length} 项` : "· ✓ clean"}
-        </h2>
+      {/* ── Lint ────────────────────────────────── */}
+      <section class="wk-block" aria-labelledby="wk-lint">
+        <h2 id="wk-lint" class="wk-h">Lint {findings.length > 0 ? <span class="wk-h__n">{findings.length}</span> : <span class="wk-h__ok">✓ clean</span>}</h2>
         {findings.length === 0 ? (
-          <p class="text-muted-soft">没有发现问题。No corpus or wiki issues.</p>
+          <p class="wk-note">语料与索引都没有发现问题。</p>
         ) : (
-          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem">
+          <table class="wk-table">
             <thead>
-              <tr style="text-align: left; border-bottom: 1px solid var(--hairline, #ddd)">
-                <th style="padding: 6px 8px">check</th>
-                <th style="padding: 6px 8px">slug</th>
-                <th style="padding: 6px 8px">detail</th>
-                <th style="padding: 6px 8px">操作</th>
+              <tr>
+                <th>问题</th>
+                <th>slug</th>
+                <th>详情</th>
+                <th><span class="visually-hidden">操作</span></th>
               </tr>
             </thead>
             <tbody>
-              {findings.map((f) => (
-                <tr style="border-bottom: 1px solid var(--hairline, #eee)">
-                  <td style="padding: 6px 8px"><code>{f.check}</code></td>
-                  <td style="padding: 6px 8px">{f.slug ?? "—"}</td>
-                  <td style="padding: 6px 8px">{f.detail}</td>
-                  <td style="padding: 6px 8px; white-space: nowrap">
+              {sortedFindings.map((f) => (
+                <tr>
+                  <td><span class={`wk-check ${meta(f).cls}`}>{meta(f).label}</span></td>
+                  <td class="t-code wk-slug">{f.slug ?? "—"}</td>
+                  <td class="wk-detail">{f.detail}</td>
+                  <td class="wk-ops">
                     {f.check === "orphan-tag" && f.slug && (
-                      <form method="POST" action="/api/admin/tags/delete" style="display: inline">
+                      <form method="POST" action="/api/admin/tags/delete" data-confirm="确认删除？" style="display:inline">
                         <input type="hidden" name="slug" value={f.slug} />
-                        <button type="submit" class="btn" style="font-size: 0.78rem; padding: 2px 10px">删除标签</button>
+                        <button type="submit" class="btn-text wk-rowbtn is-danger">删除标签</button>
                       </form>
                     )}
                     {f.check === "duplicate" && (f.slugs ?? []).map((s) => (
-                      <form method="POST" action="/api/admin/picks/unpublish" style="display: inline; margin-right: 6px">
+                      <form method="POST" action="/api/admin/picks/unpublish" data-confirm="确认下架？" style="display:inline">
                         <input type="hidden" name="slug" value={s} />
                         <input type="hidden" name="back" value="/admin/wiki" />
-                        <button type="submit" class="btn" style="font-size: 0.78rem; padding: 2px 10px" title={s}>下架 …{s.slice(-6)}</button>
+                        <button type="submit" class="btn-text wk-rowbtn is-danger" title={s}>下架 …{s.slice(-6)}</button>
                       </form>
                     ))}
-                    {(f.check === "wiki-gap" || f.check === "wiki-stale") && (
-                      <span class="t-code text-muted-soft" style="font-size: 0.78rem">点上方「增量更新」</span>
-                    )}
                     {f.check === "wiki-dead-link" && f.slug && (
-                      <form method="POST" action="/api/admin/picks/unpublish" style="display: inline">
+                      <form method="POST" action="/api/admin/picks/unpublish" data-confirm="确认移除？" style="display:inline">
                         <input type="hidden" name="slug" value={f.slug} />
                         <input type="hidden" name="back" value="/admin/wiki" />
-                        <button type="submit" class="btn" style="font-size: 0.78rem; padding: 2px 10px" title="从导览移除该链接（pick 已非发布态时仅修导览）">修复链接</button>
+                        <button type="submit" class="btn-text wk-rowbtn">从索引移除</button>
                       </form>
+                    )}
+                    {(f.check === "wiki-gap" || f.check === "wiki-stale") && (
+                      <span class="wk-action__hint">「增量更新」会折入</span>
                     )}
                   </td>
                 </tr>
@@ -222,4 +297,133 @@ const overCap = totalPublished > MAX_PICKS;
       </section>
     </div>
   </main>
+
+  {/* Two-step confirm for destructive / structure-changing actions: first
+      click arms the button (label swaps to the form's data-confirm text),
+      second click within 4s submits. No native confirm() dialogs. */}
+  <script is:inline>{`
+    document.querySelectorAll("form[data-confirm]").forEach(function (form) {
+      var btn = form.querySelector("button[type=submit]");
+      if (!btn) return;
+      var label = btn.textContent, timer = null;
+      form.addEventListener("submit", function (e) {
+        if (btn.classList.contains("is-armed")) return;
+        e.preventDefault();
+        btn.classList.add("is-armed");
+        btn.textContent = form.getAttribute("data-confirm");
+        timer = setTimeout(function () {
+          btn.classList.remove("is-armed");
+          btn.textContent = label;
+        }, 4000);
+      });
+    });
+  `}</script>
+
+  <style>
+    .wk-block { margin-block: 2rem; }
+    .wk-h {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.6rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--hairline, #e3ddd2);
+    }
+    .wk-h__n {
+      font-family: var(--f-mono);
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--c-muted, #8a8276);
+      margin-left: 6px;
+    }
+    .wk-h__ok { font-size: 0.8rem; font-weight: 400; color: var(--c-text-green-dark, #2e7d32); margin-left: 6px; }
+
+    .wk-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .wk-status .t-code { font-size: 0.8rem; }
+    .wk-note { font-size: 0.82rem; color: var(--c-muted, #8a8276); margin-top: 8px; }
+
+    .wk-actions { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; }
+    .wk-action { display: flex; flex-direction: column; gap: 5px; }
+    .wk-action__hint { font-size: 0.75rem; color: var(--c-muted-soft, #a39a8c); }
+
+    .wk-build { font-family: var(--f-mono); font-size: 0.78rem; margin-top: 14px; }
+    .wk-build.is-amber { color: var(--c-text-amber-dark, #8a6d1a); }
+    .wk-build.is-red { color: var(--c-error, #b3382c); }
+    .wk-build.is-quiet { color: var(--c-muted-soft, #a39a8c); }
+    .wk-fail { margin-top: 14px; }
+    .wk-fail p { color: var(--c-error, #b3382c); font-size: 0.85rem; margin-bottom: 6px; }
+    .wk-fail pre {
+      padding: 10px 12px;
+      background: var(--red-tint, #fbeae8);
+      color: var(--c-error, #b3382c);
+      border-radius: 6px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+
+    .wk-intro { max-width: 70ch; font-size: 0.9rem; margin-bottom: 12px; }
+    .wk-topic { border-bottom: 1px solid var(--hairline, #eee9df); }
+    .wk-topic summary {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 9px 2px;
+      cursor: pointer;
+      list-style: none;
+    }
+    .wk-topic summary::before { content: "▸"; font-size: 0.7rem; color: var(--c-muted-soft, #a39a8c); }
+    .wk-topic[open] summary::before { content: "▾"; }
+    .wk-topic summary::-webkit-details-marker { display: none; }
+    .wk-topic summary:hover { background: var(--c-surface-soft, #f4f0e8); }
+    .wk-topic__zh { font-weight: 600; }
+    .wk-topic__en { color: var(--c-muted, #8a8276); font-size: 0.85rem; }
+    .wk-topic__n { margin-left: auto; font-family: var(--f-mono); font-size: 0.75rem; color: var(--c-muted, #8a8276); white-space: nowrap; }
+    .wk-topic__blurb { font-size: 0.85rem; color: var(--c-muted, #8a8276); margin: 2px 0 8px 20px; max-width: 70ch; }
+    .wk-topic__list { margin: 0 0 12px 20px; padding-left: 1.1em; line-height: 1.85; font-size: 0.9rem; }
+    .wk-topic__list .is-dead { color: var(--c-error, #b3382c); font-size: 0.8rem; }
+
+    .wk-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .wk-table th {
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--c-muted, #8a8276);
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--hairline, #e3ddd2);
+    }
+    .wk-table td { padding: 8px 10px; border-bottom: 1px solid var(--hairline, #eee9df); vertical-align: baseline; }
+    .wk-table .t-code { font-size: 0.78rem; }
+    .wk-model { max-width: 26ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wk-delta { font-family: var(--f-mono); font-size: 0.72rem; margin-left: 6px; }
+    .wk-delta.is-up { color: var(--c-text-green-dark, #2e7d32); }
+    .wk-delta.is-down { color: var(--c-error, #b3382c); }
+
+    .wk-check {
+      display: inline-block;
+      font-size: 0.74rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .wk-check.is-red { background: var(--red-tint, #fbeae8); color: var(--c-error, #b3382c); }
+    .wk-check.is-amber { background: var(--amber-tint, #f7eed7); color: var(--c-text-amber-dark, #8a6d1a); }
+    .wk-check.is-quiet { background: var(--c-surface-cream-strong, #efe9dd); color: var(--c-muted, #8a8276); }
+    .wk-slug { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .wk-detail { color: var(--c-muted, #6f675c); font-size: 0.82rem; max-width: 46ch; }
+    .wk-ops { white-space: nowrap; }
+    .wk-rowbtn { font-size: 0.78rem; padding: 2px 6px; margin-right: 8px; }
+    .wk-rowbtn.is-danger:hover { color: var(--c-error, #b3382c); }
+    .wk-rowbtn.is-armed, .btn.is-armed {
+      color: #fff;
+      background: var(--c-error, #b3382c);
+      border-radius: 4px;
+    }
+
+    @media (max-width: 640px) {
+      .wk-actions { gap: 14px; }
+      .wk-table .wk-model, .wk-table .wk-detail { display: none; }
+      .wk-topic__en { display: none; }
+    }
+  </style>
 </Admin>

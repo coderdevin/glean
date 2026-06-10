@@ -596,6 +596,29 @@ export async function publishedPickCount(db: DB): Promise<number> {
   return r[0]?.n ?? 0;
 }
 
+/** slug → bilingual title for an arbitrary slug list. /admin/wiki expands each
+ *  topic into its article list so the editor can audit the LLM's clustering —
+ *  a windowed pick query can't resolve slugs older than its window. */
+export async function titlesBySlugs(
+  db: DB,
+  slugs: string[],
+): Promise<Map<string, { title_zh: string; title_en: string }>> {
+  const out = new Map<string, { title_zh: string; title_en: string }>();
+  if (slugs.length === 0) return out;
+  const rows = (
+    await Promise.all(
+      chunk(slugs, D1_IN_CHUNK).map((s) =>
+        db
+          .select({ slug: picks.slug, title_zh: picks.titleZh, title_en: picks.titleEn })
+          .from(picks)
+          .where(and(eq(picks.status, "published"), inArray(picks.slug, s))),
+      ),
+    )
+  ).flat();
+  for (const r of rows) out.set(r.slug, { title_zh: r.title_zh, title_en: r.title_en });
+  return out;
+}
+
 /** Recent wiki index versions for the admin history list (newest first). */
 export interface WikiVersionSummary {
   id: string;
