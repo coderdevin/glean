@@ -4,20 +4,22 @@ import Site from "~/layouts/Site.astro";
 import Lang from "~/components/Lang.astro";
 import { localizedPath } from "~/lib/i18n";
 import { db } from "~/db/client";
-import { currentWikiIndex, searchPicks } from "~/lib/queries";
+import { currentWikiIndex, titlesBySlugs } from "~/lib/queries";
 
 const lang = Astro.locals.lang ?? "zh";
 const L = (p: string): string => localizedPath(p, lang);
 
 const env = Astro.locals.runtime.env;
 const drizzleDb = db(env.DB);
-const [wiki, allPicks] = await Promise.all([
-  currentWikiIndex(drizzleDb),
-  searchPicks(drizzleDb, { limit: 200 }),
-]);
+const wiki = await currentWikiIndex(drizzleDb);
 
-// slug → title, so topic cross-links show the article title (the wiki stores slugs).
-const titleBySlug = new Map(allPicks.map((p) => [p.slug, lang === "en" ? p.title_en : p.title_zh]));
+// slug → title for exactly the slugs the wiki references — a windowed pick
+// query would render bare slugs for anything older than its window.
+const referenced = wiki ? [...new Set(wiki.topics.flatMap((t) => t.pick_slugs))] : [];
+const titles = await titlesBySlugs(drizzleDb, referenced);
+const titleBySlug = new Map(
+  [...titles].map(([slug, t]) => [slug, lang === "en" ? t.title_en : t.title_zh]),
+);
 
 Astro.response.headers.set(
   "Cache-Control",

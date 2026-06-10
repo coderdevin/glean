@@ -2,16 +2,26 @@
 export const prerender = false;
 import Admin from "~/layouts/Admin.astro";
 import { db } from "~/db/client";
-import { currentWikiIndex, searchPicks, allTagsWithCounts, latestWikiEvent } from "~/lib/queries";
+import {
+  currentWikiIndex,
+  searchPicks,
+  allTagsWithCounts,
+  latestWikiEvent,
+  publishedPickCount,
+  recentWikiIndexes,
+} from "~/lib/queries";
 import { lintAll } from "~/lib/lint";
+import { MAX_PICKS } from "~/lib/wiki";
 
 const env = Astro.locals.runtime.env;
 const drizzleDb = db(env.DB);
-const [wiki, picks, tags, ev] = await Promise.all([
+const [wiki, picks, tags, ev, totalPublished, versions] = await Promise.all([
   currentWikiIndex(drizzleDb),
   searchPicks(drizzleDb, { limit: 200 }),
   allTagsWithCounts(drizzleDb),
   latestWikiEvent(drizzleDb),
+  publishedPickCount(drizzleDb),
+  recentWikiIndexes(drizzleDb, 10),
 ]);
 
 const findings = lintAll(picks, tags, wiki);
@@ -36,7 +46,9 @@ const stateLabel =
   : ev?.status === "ok" ? "已生成 · done"
   : "尚未生成 · not built yet";
 
-Astro.response.headers.set("Cache-Control", "no-store");
+// Coverage: how much of the published corpus the live map references.
+const coveredCount = wiki ? new Set(wiki.topics.flatMap((t) => t.pick_slugs)).size : 0;
+const overCap = totalPublished > MAX_PICKS;
 ---
 <Admin title="导览 · Wiki">
   <main id="main" class="q2">
@@ -44,14 +56,20 @@ Astro.response.headers.set("Cache-Control", "no-store");
       <header class="q2-header">
         <h1>导览 · Wiki</h1>
         <p class="q2-header__sub">
-          已发布的精选是原始数据；重建会用 LLM 把它们综合成一张主题地图，<strong>立即上线</strong>到 <a href="/wiki">/wiki</a>。
+          已发布的精选是原始数据；构建会用 LLM 把它们综合成一张主题地图，<strong>立即上线</strong>到 <a href="/wiki">/wiki</a>。
+          每日自动发布后会自动增量折入当天的新文章。
         </p>
       </header>
 
       <section style="margin-block: 1.5rem">
-        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
           <form method="POST" action="/api/admin/wiki/rebuild">
-            <button type="submit" class="btn btn--primary">重建导览 · Rebuild</button>
+            <input type="hidden" name="mode" value="incremental" />
+            <button type="submit" class="btn btn--primary" disabled={building}>增量更新 · Update</button>
+          </form>
+          <form method="POST" action="/api/admin/wiki/rebuild">
+            <input type="hidden" name="mode" value="full" />
+            <button type="submit" class="btn" disabled={building} title="从最新文章全量重组主题结构（耗时更长）">全量重建 · Rebuild</button>
           </form>
           {building && (
             <span class="t-code" style="color: #b8860b">● {stateLabel}{evTime ? ` · ${evTime}` : ""} — 本页每 4 秒自动刷新</span>
@@ -62,15 +80,30 @@ Astro.response.headers.set("Cache-Control", "no-store");
           {!inFlight && failed && (
             <span class="t-code" style="color: #c0392b">✕ {stateLabel}{evTime ? ` · ${evTime}` : ""}</span>
           )}
-          {!inFlight && !failed && wiki && (
+          {!inFlight && !failed && ev?.status === "ok" && (
+            <span class="t-code text-muted-soft">✓ {ev.message}{evTime ? ` · ${evTime}` : ""}</span>
+          )}
+          {!inFlight && !failed && ev?.status !== "ok" && wiki && (
             <span class="t-code text-muted-soft">
               ✓ 生成于 {generated} · {wiki.picks_count} 篇 · {wiki.topics.length} 个主题 · {wiki.model ?? "?"}
             </span>
           )}
           {!inFlight && !failed && !wiki && (
-            <span class="t-code text-muted-soft">尚未生成 · 点击重建（异步，几秒后自动刷新）</span>
+            <span class="t-code text-muted-soft">尚未生成 · 点击构建（异步，几秒后自动刷新）</span>
           )}
         </div>
+
+        {wiki && (
+          <p class="t-code text-muted-soft" style="margin-top: 10px">
+            覆盖 {coveredCount} / {totalPublished} 篇已发布 · {wiki.topics.length} 个主题
+            {coveredCount < totalPublished && " — 增量更新会折入未覆盖的文章"}
+          </p>
+        )}
+        {overCap && (
+          <p class="t-code" style="margin-top: 6px; color: #b8860b">
+            ⚠ 已发布 {totalPublished} 篇，超过全量重建窗口（最新 {MAX_PICKS} 篇）——全量重建只会重组最新 {MAX_PICKS} 篇，其余由增量更新补齐。
+          </p>
+        )}
 
         {failed && ev?.message && (
           <pre style="margin-top: 12px; padding: 12px; background: #fdecea; color: #611a15; border-radius: 6px; white-space: pre-wrap; word-break: break-word; font-size: 0.82rem; line-height: 1.5">失败原因 · reason:
@@ -90,6 +123,46 @@ Astro.response.headers.set("Cache-Control", "no-store");
               <span class="t-code text-muted-soft"> · {t.pick_slugs.length} picks</span>
             </div>
           ))}
+        </section>
+      )}
+
+      {versions.length > 1 && (
+        <section style="margin-block: 1.5rem">
+          <h2 style="font-size: 1rem; margin-bottom: 8px">历史版本 · History</h2>
+          <p class="text-muted-soft" style="font-size: 0.85rem; margin-bottom: 10px">
+            最新版本即线上版本。回滚会把旧版本复制为新的线上版本（非破坏式，可再回滚）。
+          </p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem">
+            <thead>
+              <tr style="text-align: left; border-bottom: 1px solid var(--hairline, #ddd)">
+                <th style="padding: 6px 8px">生成时间</th>
+                <th style="padding: 6px 8px">主题</th>
+                <th style="padding: 6px 8px">篇数</th>
+                <th style="padding: 6px 8px">model</th>
+                <th style="padding: 6px 8px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {versions.map((v, i) => (
+                <tr style="border-bottom: 1px solid var(--hairline, #eee)">
+                  <td style="padding: 6px 8px" class="t-code">{new Date(v.generated_at).toISOString().replace("T", " ").slice(0, 16)}</td>
+                  <td style="padding: 6px 8px">{v.topics_count}</td>
+                  <td style="padding: 6px 8px">{v.picks_count}</td>
+                  <td style="padding: 6px 8px" class="t-code">{v.model ?? "?"}</td>
+                  <td style="padding: 6px 8px">
+                    {i === 0 ? (
+                      <span class="t-code text-muted-soft">线上 · live</span>
+                    ) : (
+                      <form method="POST" action="/api/admin/wiki/rollback" style="display: inline">
+                        <input type="hidden" name="id" value={v.id} />
+                        <button type="submit" class="btn" style="font-size: 0.8rem; padding: 2px 10px">回滚 · restore</button>
+                      </form>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       )}
 

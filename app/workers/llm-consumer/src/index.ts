@@ -59,6 +59,7 @@ function parseMessage(raw: string): {
   modelOverride?: string;
   phase?: "sections";
   kind?: "weekly" | "wiki";
+  mode?: "full" | "incremental";
 } {
   const pipeIdx = raw.indexOf("|");
   const id = pipeIdx >= 0 ? raw.slice(0, pipeIdx) : raw;
@@ -66,16 +67,21 @@ function parseMessage(raw: string): {
   const modelMatch = tail.match(/(?:^|&)model=([^&]+)/);
   const phaseMatch = tail.match(/(?:^|&)phase=([^&]+)/);
   const kindMatch = tail.match(/(?:^|&)kind=([^&]+)/);
+  const modeMatch = tail.match(/(?:^|&)mode=([^&]+)/);
   // Trim before truthy-check so whitespace-only values (`model=%20`) fall
   // through to the env default instead of producing an invalid model name.
   const trimmed = modelMatch ? decodeURIComponent(modelMatch[1]!).trim() : "";
   const phaseRaw = phaseMatch ? decodeURIComponent(phaseMatch[1]!).trim() : "";
   const kindRaw = kindMatch ? decodeURIComponent(kindMatch[1]!).trim() : "";
+  const modeRaw = modeMatch ? decodeURIComponent(modeMatch[1]!).trim() : "";
   return {
     id,
     modelOverride: trimmed || undefined,
     phase: phaseRaw === "sections" ? "sections" : undefined,
     kind: kindRaw === "weekly" ? "weekly" : kindRaw === "wiki" ? "wiki" : undefined,
+    // Wiki-only. Unknown/absent → "full" at the call site (back-compat with
+    // messages already in flight when this deployed).
+    mode: modeRaw === "incremental" ? "incremental" : modeRaw === "full" ? "full" : undefined,
   };
 }
 
@@ -145,13 +151,13 @@ export default {
     // DeepSeek without a redeploy). Per-message model overrides still win.
     const env = withLlmProviderSetting(rawEnv, await getLlmProviderSetting(rawEnv.DB));
     for (const msg of batch.messages) {
-      const { id, modelOverride, phase, kind } = parseMessage(msg.body);
+      const { id, modelOverride, phase, kind, mode } = parseMessage(msg.body);
 
       // Wiki index rebuild. runWikiBuild is non-throwing and writes its own
       // wiki_index row (rebuild publishes live), so we just ack regardless.
       if (kind === "wiki") {
         try {
-          const result = await runWikiBuild(env);
+          const result = await runWikiBuild(env, { mode: mode ?? "full" });
           console.log("wiki build", result);
         } catch (err) {
           const reason = (err as Error).message ?? "unknown wiki build error";
@@ -259,6 +265,23 @@ export default {
     if (controller.cron === DAILY_PUBLISH_CRON) {
       const r = await autoPublishReady(env, DAILY_PUBLISH_COUNT);
       console.log(`auto-publish: published ${r.published.length}, skipped ${r.skipped}`);
+
+      // Fold the day's newly published picks into the wiki so /wiki never
+      // lags the corpus. Incremental sweeps everything the current map does
+      // not cover, so it also mops up picks published by hand since the last
+      // build. A failed enqueue must not fail the publish cron — log and go.
+      if (r.published.length > 0) {
+        try {
+          await logEvent(env, "wiki", "queue", "queued", {
+            message: `auto wiki update after daily publish (+${r.published.length} picks)`,
+            meta: { target: "glean-llm", source: "daily-cron", kind: "wiki", mode: "incremental" },
+          });
+          await env.INGEST_LLM.send("wiki|kind=wiki&mode=incremental");
+          console.log("auto-publish: enqueued incremental wiki update");
+        } catch (err) {
+          console.error("auto-publish: wiki enqueue failed", (err as Error).message);
+        }
+      }
     }
   },
 
@@ -275,7 +298,8 @@ export default {
 
       // Wiki rebuild (dev): no id needed — runWikiBuild reads all published picks.
       if (kind === "wiki") {
-        const result = await runWikiBuild(env);
+        const modeRaw = url.searchParams.get("mode");
+        const result = await runWikiBuild(env, { mode: modeRaw === "incremental" ? "incremental" : "full" });
         return json({ ok: result.ok, stage: "wiki", result });
       }
 

@@ -813,6 +813,37 @@ const WEEKLY_SYSTEM_PROMPT = `你是一名有 10 年经验的双语技术编辑�
 
 输出必须是英文 key 的 JSON 对象，符合给定 schema。`;
 
+// Moved verbatim from wiki.ts so it joins the editable-prompt registry; the
+// wiki build (full rebuild) reads it via getPrompt(env, "wiki").
+const WIKI_SYSTEM_PROMPT = `You are the curator of a bilingual (Chinese + English) tech-article wiki.
+You are given the full catalog of published articles (slug :: title — summary [category, tags]).
+Synthesize them into a concise "map of the collection":
+
+- A short bilingual intro (1–2 sentences each) describing what the collection covers.
+- 4–8 coherent themes. For each theme: a bilingual title, a 1–2 sentence bilingual blurb,
+  and the list of slugs that belong to it (use ONLY slugs from the catalog; every article
+  should appear in at least one theme; an article may appear in more than one if it fits).
+
+Write naturally in both languages — don't translate word-for-word. Respond with ONLY a JSON
+object of this exact shape:
+{"intro_zh":"...","intro_en":"...","topics":[{"title_zh":"...","title_en":"...","blurb_zh":"...","blurb_en":"...","pick_slugs":["..."]}]}`;
+
+// Incremental fold-in: assign NEW articles to existing themes (by number) and
+// only mint new themes when nothing fits. Returns a small delta — the code
+// merges it deterministically so existing topics can never be mangled or lose
+// slugs to a model rewrite.
+const WIKI_INCREMENTAL_SYSTEM_PROMPT = `You are the curator of a bilingual (Chinese + English) tech-article wiki.
+The wiki already has a set of themes, given to you as a NUMBERED list. You are also given
+NEW articles (slug :: title — summary [category, tags]) that are not on the map yet.
+
+For each new article, assign it to one or more existing themes by their number. Only when an
+article genuinely fits none of the existing themes, group such articles into 1–3 NEW themes
+(bilingual title + 1–2 sentence bilingual blurb each). Use ONLY slugs from the new-articles
+list; every new article must be assigned or placed in a new theme.
+
+Respond with ONLY a JSON object of this exact shape:
+{"assignments":[{"slug":"...","topics":[0,2]}],"new_topics":[{"title_zh":"...","title_en":"...","blurb_zh":"...","blurb_en":"...","pick_slugs":["..."]}]}`;
+
 /* ============================================================
  * Editable prompts (admin-overridable — see settings.ts + /admin/settings)
  *
@@ -827,7 +858,9 @@ export type PromptKey =
   | "article_sections"
   | "github_analysis"
   | "github_sections"
-  | "weekly";
+  | "weekly"
+  | "wiki"
+  | "wiki_incremental";
 
 /** A runtime-editable system prompt: app_settings row `key`, display `label`,
  *  and the baked-in `default` shown when no override is stored. */
@@ -843,6 +876,8 @@ export const PROMPT_REGISTRY: PromptEntry[] = [
   { key: "github_analysis", label: "GitHub · 分析", default: GITHUB_ANALYSIS_SYSTEM_PROMPT },
   { key: "github_sections", label: "GitHub · 项目讲解文", default: GITHUB_SECTIONS_SYSTEM_PROMPT },
   { key: "weekly", label: "周刊 · 合辑", default: WEEKLY_SYSTEM_PROMPT },
+  { key: "wiki", label: "导览 · 全量重建", default: WIKI_SYSTEM_PROMPT },
+  { key: "wiki_incremental", label: "导览 · 增量折入", default: WIKI_INCREMENTAL_SYSTEM_PROMPT },
 ];
 
 const PROMPT_DEFAULTS = Object.fromEntries(
@@ -858,8 +893,9 @@ export function resolvePrompt(override: string | null | undefined, fallback: str
 
 /** Resolve a system prompt by key: admin override (app_settings) ?? default.
  *  Any DB miss / error falls back to the default — prompts must never break
- *  the pipeline. */
-async function getPrompt(env: LlmEnv, key: PromptKey): Promise<string> {
+ *  the pipeline. Exported for the wiki build (wiki.ts), which makes its own
+ *  LLM call but shares the editable-prompt registry. */
+export async function getPrompt(env: LlmEnv, key: PromptKey): Promise<string> {
   const fallback = PROMPT_DEFAULTS[key];
   if (!env.DB) return fallback;
   try {

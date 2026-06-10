@@ -81,22 +81,39 @@ function safeJson<T>(s: string | null | undefined): T {
   try { return JSON.parse(s) as T; } catch { return [] as unknown as T; }
 }
 
+// D1 allows at most ~100 bound parameters per statement, so every inArray()
+// over a caller-sized id list must be chunked or it starts throwing the moment
+// the corpus grows past the limit.
+const D1_IN_CHUNK = 90;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 async function attachTags(
   db: DB,
   pickIds: string[],
 ): Promise<Map<string, { slug: string; name_zh: string; name_en: string; family: string }[]>> {
   if (pickIds.length === 0) return new Map();
-  const rows = await db
-    .select({
-      pick_id: pickTags.pickId,
-      slug: tagsTable.slug,
-      name_zh: tagsTable.nameZh,
-      name_en: tagsTable.nameEn,
-      family: tagsTable.family,
-    })
-    .from(pickTags)
-    .innerJoin(tagsTable, eq(pickTags.tagSlug, tagsTable.slug))
-    .where(inArray(pickTags.pickId, pickIds));
+  const rows = (
+    await Promise.all(
+      chunk(pickIds, D1_IN_CHUNK).map((ids) =>
+        db
+          .select({
+            pick_id: pickTags.pickId,
+            slug: tagsTable.slug,
+            name_zh: tagsTable.nameZh,
+            name_en: tagsTable.nameEn,
+            family: tagsTable.family,
+          })
+          .from(pickTags)
+          .innerJoin(tagsTable, eq(pickTags.tagSlug, tagsTable.slug))
+          .where(inArray(pickTags.pickId, ids)),
+      ),
+    )
+  ).flat();
 
   const map = new Map<string, { slug: string; name_zh: string; name_en: string; family: string }[]>();
   for (const r of rows) {
@@ -530,6 +547,99 @@ export async function currentWikiIndex(db: DB): Promise<WikiIndexView | null> {
     model: row.model,
     generated_at: row.generatedAt,
   };
+}
+
+/** A lightweight catalog row for the wiki build (full + incremental). */
+export interface WikiCatalogPick {
+  slug: string;
+  title_zh: string;
+  title_en: string;
+  summary_en: string;
+  category: string;
+  tags: { slug: string }[];
+}
+
+/** Newest-first published picks shaped for the wiki build. Deliberately NOT
+ *  clamped to PICKS_MAX_LIMIT — the incremental sweep must see the whole
+ *  corpus to find picks the wiki doesn't cover yet. */
+export async function picksForWiki(db: DB, limit: number): Promise<WikiCatalogPick[]> {
+  const rows = await db
+    .select({
+      id: picks.id,
+      slug: picks.slug,
+      title_zh: picks.titleZh,
+      title_en: picks.titleEn,
+      summary_en: picks.summaryEn,
+      category: picks.category,
+    })
+    .from(picks)
+    .where(eq(picks.status, "published"))
+    .orderBy(desc(picks.publishedAt), desc(picks.positionInDay))
+    .limit(limit);
+  const tagMap = await attachTags(db, rows.map((r) => r.id));
+  return rows.map((r) => ({
+    slug: r.slug,
+    title_zh: r.title_zh,
+    title_en: r.title_en,
+    summary_en: r.summary_en,
+    category: r.category,
+    tags: (tagMap.get(r.id) ?? []).map((t) => ({ slug: t.slug })),
+  }));
+}
+
+/** Total published picks — coverage denominator + MAX_PICKS warning on /admin/wiki. */
+export async function publishedPickCount(db: DB): Promise<number> {
+  const r = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(picks)
+    .where(eq(picks.status, "published"));
+  return r[0]?.n ?? 0;
+}
+
+/** slug → bilingual title for an arbitrary slug list (wiki topic cross-links
+ *  can reference picks older than any windowed pick query returns). */
+export async function titlesBySlugs(
+  db: DB,
+  slugs: string[],
+): Promise<Map<string, { title_zh: string; title_en: string }>> {
+  const out = new Map<string, { title_zh: string; title_en: string }>();
+  if (slugs.length === 0) return out;
+  const rows = (
+    await Promise.all(
+      chunk(slugs, D1_IN_CHUNK).map((s) =>
+        db
+          .select({ slug: picks.slug, title_zh: picks.titleZh, title_en: picks.titleEn })
+          .from(picks)
+          .where(and(eq(picks.status, "published"), inArray(picks.slug, s))),
+      ),
+    )
+  ).flat();
+  for (const r of rows) out.set(r.slug, { title_zh: r.title_zh, title_en: r.title_en });
+  return out;
+}
+
+/** Recent wiki index versions for the admin history list (newest first). */
+export interface WikiVersionSummary {
+  id: string;
+  generated_at: Date;
+  topics_count: number;
+  picks_count: number;
+  model: string | null;
+}
+
+export async function recentWikiIndexes(db: DB, limit = 10): Promise<WikiVersionSummary[]> {
+  const rows = await db
+    .select()
+    .from(wikiIndex)
+    .orderBy(desc(wikiIndex.generatedAt))
+    .limit(limit);
+  return rows.map((row) => ({
+    id: row.id,
+    generated_at: row.generatedAt,
+    topics_count: (safeJson(row.topicsJson) as WikiTopic[]).length,
+    picks_count: row.picksCount,
+    model: row.model,
+  }));
 }
 
 /** Admin: all issues incl. drafts, newest first. */
