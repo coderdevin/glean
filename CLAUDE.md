@@ -78,6 +78,13 @@ submit → pending → [ingest-consumer: extract URL → R2]
 - **`glean-llm` queue** → `llm-consumer` worker → `processLlm()` then `runSectionsPhase()`: calls DeepSeek/OpenAI, writes `ai_*` fields onto the submission row.
 - Queues run with `max_retries=0` — any stage error calls `markFailed()` and acks. The human-driven "re-run" in admin is the retry, not the queue. Stalled rows are swept by the reapers in `ingest.ts` (`reapStalled*`).
 
+**When you touch the state machine or LLM phases (`ingest.ts`, `llm.ts`): states must not lie, failures must be visible.**
+
+- Keep AI failure (`failed`, retriable, with a populated `reject_reason`) distinct from human `rejected`. An LLM error or truncated JSON must never silently land in `rejected`.
+- A status must mean what it says — don't show `ready` while a later phase (composing/sections) is still running; use the in-progress status.
+- Log every phase boundary (call start + result). A missing log means the call never fired — that's the bug, not a quiet state.
+- Every failure and every reaped stall writes a human-readable reason the editor sees in `/admin`. A submission that hangs with no reason is a bug, not a pending state.
+
 ### Two tables, one copy step
 
 - **`submissions`** — the review queue. All AI output lands here in `ai_*` columns; nothing here is public.
