@@ -24,7 +24,9 @@
  * so the admin can edit them in /admin/settings like every other prompt; the
  * call itself stays here with its OWN streaming plumbing. NO provider
  * fallback — if the configured provider fails (e.g. a ModelScope 429 quota
- * error), that exact error is logged and surfaced on /admin/wiki.
+ * error), that exact error is logged and surfaced on /admin/wiki. The only
+ * retry is withModelScopeQuotaRetry: a same-provider re-attempt on
+ * ModelScope's transient 429 insufficient_quota.
  *
  * runWikiBuild is non-throwing (it logs + returns a summary) — same contract
  * as runWeeklyDraft, so the queue consumer just acks.
@@ -32,7 +34,7 @@
 import { z } from "zod";
 import { db as makeDb } from "~/db/client";
 import { wikiIndex } from "~/db/schema";
-import { pickProvider, resolveProviderSpec, getPrompt, type LlmProvider } from "./llm";
+import { pickProvider, resolveProviderSpec, getPrompt, withModelScopeQuotaRetry, type LlmProvider } from "./llm";
 import { picksForWiki, currentWikiIndex, type WikiCatalogPick } from "./queries";
 import { logEvent, type IngestEnv } from "./ingest";
 import { ulid } from "./ulid";
@@ -349,10 +351,9 @@ export async function runWikiBuild(
       const batch = uncovered.slice(0, INCREMENT_CAP);
       const dropped = uncovered.length - batch.length;
       const provider = wikiProvider(env);
-      const content = await callWikiLlm(
-        provider,
-        await getPrompt(env, "wiki_incremental"),
-        buildIncrementalUserMessage(existing.topics, batch),
+      const incrementalPrompt = await getPrompt(env, "wiki_incremental");
+      const content = await withModelScopeQuotaRetry("wiki", () =>
+        callWikiLlm(provider, incrementalPrompt, buildIncrementalUserMessage(existing.topics, batch)),
       );
       const delta = WikiDeltaSchema.parse(parseWikiJson(content));
       const allowed = new Set(batch.map((p) => p.slug));
@@ -393,7 +394,10 @@ export async function runWikiBuild(
     }
 
     const provider = wikiProvider(env);
-    const content = await callWikiLlm(provider, await getPrompt(env, "wiki"), buildWikiUserMessage(picks));
+    const wikiPrompt = await getPrompt(env, "wiki");
+    const content = await withModelScopeQuotaRetry("wiki", () =>
+      callWikiLlm(provider, wikiPrompt, buildWikiUserMessage(picks)),
+    );
     const parsed = WikiResponseSchema.parse(parseWikiJson(content));
 
     const known = new Set(picks.map((p) => p.slug));

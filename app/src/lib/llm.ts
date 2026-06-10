@@ -1124,7 +1124,9 @@ interface PhaseConfig<S extends z.ZodTypeAny> {
 }
 
 /**
- * Top-level wrapper. Tries once; on transient failures (429, 5xx, timeout,
+ * Top-level wrapper. Tries the primary (with a same-provider retry on
+ * ModelScope's transient 429 insufficient_quota — see
+ * withModelScopeQuotaRetry); on transient failures (429, 5xx, timeout,
  * fetch error) AND if `LLM_FALLBACK_MODEL` is set AND the caller did not
  * pass `modelOverride`, retries once with the fallback model. Any other
  * error (schema, auth, malformed) propagates immediately.
@@ -1135,7 +1137,7 @@ async function callWithFallback<S extends z.ZodTypeAny>(
   cfg: PhaseConfig<S>,
 ): Promise<LlmCallResult<z.infer<S>>> {
   try {
-    return await callOnce(env, args, cfg, args.modelOverride);
+    return await withModelScopeQuotaRetry(cfg.phase, () => callOnce(env, args, cfg, args.modelOverride));
   } catch (err) {
     const e = err as Error;
     // Fallback only on the AUTO path (no explicit per-run provider/model). An
@@ -1150,10 +1152,52 @@ async function callWithFallback<S extends z.ZodTypeAny>(
       console.warn(
         `LLM ${cfg.phase} primary failed (${e.message.slice(0, 120)}); falling back to ${env.LLM_FALLBACK_MODEL}`,
       );
-      return await callOnce(env, args, cfg, env.LLM_FALLBACK_MODEL);
+      return await withModelScopeQuotaRetry(cfg.phase, () => callOnce(env, args, cfg, env.LLM_FALLBACK_MODEL));
     }
     throw err;
   }
+}
+
+/** ModelScope's free tier meters tokens per-minute and reports a burst as
+ *  429 `insufficient_quota` even when the daily allowance remains, so the
+ *  same call often succeeds seconds later. */
+export const MODELSCOPE_QUOTA_RETRIES = 3;
+const MODELSCOPE_QUOTA_RETRY_BASE_MS = 2_000;
+
+export function isModelScopeQuotaError(err: unknown): boolean {
+  const m = err instanceof Error ? err.message : String(err);
+  return m.includes("modelscope 429") && m.includes("insufficient_quota");
+}
+
+/**
+ * Run `fn`; on a ModelScope 429 insufficient_quota, retry the SAME call up to
+ * MODELSCOPE_QUOTA_RETRIES times (2s/4s/6s backoff). This is a same-provider
+ * retry, so it's safe on explicit-override paths and on wiki's no-fallback
+ * path. Any other error propagates immediately; the final quota error
+ * propagates unchanged so /admin shows the provider's real state.
+ */
+export async function withModelScopeQuotaRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  baseDelayMs: number = MODELSCOPE_QUOTA_RETRY_BASE_MS,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= MODELSCOPE_QUOTA_RETRIES; attempt++) {
+    if (attempt > 0) {
+      const delayMs = baseDelayMs * attempt;
+      console.warn(
+        `LLM ${label}: modelscope insufficient_quota — retry ${attempt}/${MODELSCOPE_QUOTA_RETRIES} in ${delayMs}ms`,
+      );
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+    try {
+      return await fn();
+    } catch (err) {
+      if (!isModelScopeQuotaError(err)) throw err;
+      lastErr = err;
+    }
+  }
+  throw lastErr;
 }
 
 function isTransientError(err: Error): boolean {
