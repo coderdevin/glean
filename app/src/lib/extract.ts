@@ -9,11 +9,12 @@ import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import { isXUrl, extractFromX } from "./extract-x";
 import { isGithubRepoUrl, extractFromGithub } from "./extract-github";
+import { isWeixinUrl, extractFromWechat } from "./extract-wechat";
 import { extractViaJina } from "./extract-jina";
 import { detectLang } from "./lang";
 
 const FETCH_TIMEOUT_MS = 25_000;
-const MAX_BODY_BYTES = 200_000;
+export const MAX_BODY_BYTES = 200_000;
 
 export interface ExtractResult {
   title: string;
@@ -36,6 +37,26 @@ export async function extractFromUrl(
 ): Promise<ExtractResult> {
   if (isXUrl(url)) {
     return extractFromX(url);
+  }
+
+  // WeChat (mp.weixin.qq.com) needs its own path: the article lives in a
+  // `visibility:hidden` #js_content that Readability strips, leaving only page
+  // furniture (~300 chars) that still clears the 200-char floor — so the
+  // generic Tier-2 path would return junk as "success" and never reach Jina.
+  // On failure we therefore skip Tier 2 entirely and fall straight to Jina.
+  if (isWeixinUrl(url)) {
+    try {
+      return await extractFromWechat(url);
+    } catch (wechatErr) {
+      try {
+        return await extractViaJina(url, opts?.jinaApiKey ? { JINA_API_KEY: opts.jinaApiKey } : undefined);
+      } catch (jinaErr) {
+        throw new Error(
+          `wechat extract failed — wechat: ${(wechatErr as Error).message}; ` +
+            `jina: ${(jinaErr as Error).message}`,
+        );
+      }
+    }
   }
 
   // GitHub repos go through the API extractor first, but on failure (404 on a
@@ -129,7 +150,7 @@ async function extractViaReadability(url: string, baseUrl: string): Promise<Extr
  * Anything else collapses to inline text. Image URLs are absolutized against
  * the source URL so relative `src="/img/foo.png"` survives.
  */
-function htmlToTextWithImages(html: string, baseUrl: string): string {
+export function htmlToTextWithImages(html: string, baseUrl: string): string {
   // linkedom is fussy about fragment wrapping — `<!doctype html><body>X</body>`
   // produces a malformed tree with `<body>` empty and X as a sibling. The
   // full `<html><body>` envelope works reliably.
@@ -204,7 +225,7 @@ function manualExtract(doc: Document, baseUrl: string): ManualArticle | null {
   return body ? { title, body } : null;
 }
 
-async function fetchWithTimeout(url: string, ms: number): Promise<string> {
+export async function fetchWithTimeout(url: string, ms: number): Promise<string> {
   // Retry once on 429/5xx after a short backoff — Cloudflare-fronted sites
   // (including blog.cloudflare.com itself) occasionally throttle bursty
   // worker egress; a single 2s wait usually clears it before we fall to
