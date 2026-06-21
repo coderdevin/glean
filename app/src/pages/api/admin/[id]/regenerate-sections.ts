@@ -37,10 +37,11 @@ const LLM_WORKER_URL = "http://localhost:8788";
 // resolveProviderSpec (llm.ts): bare "deepseek-*" → DeepSeek API; "modelscope:…"
 // → ModelScope (free quota). Flash = fast/cheap; Pro = reasoning model, slower
 // but higher quality (e.g. GitHub project explainers read better on Pro).
+// ModelScope only serves Flash — V4-Pro 400s there ("no provider supported"),
+// so Pro is offered via the paid DeepSeek API only.
 const SECTIONS_MODEL_SPECS = new Set([
   "deepseek-v4-pro",
   "deepseek-v4-flash",
-  "modelscope:deepseek-ai/DeepSeek-V4-Pro",
   "modelscope:deepseek-ai/DeepSeek-V4-Flash",
 ]);
 

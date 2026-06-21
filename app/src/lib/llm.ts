@@ -120,12 +120,15 @@ export interface LlmProvider {
 
 // Canonical per-provider endpoints + default models. ModelScope and DeepSeek
 // both serve OpenAI-compatible Chat Completions, so only the base URL + key +
-// model id differ. ModelScope ships DeepSeek-V4-Pro under a namespaced id.
+// model id differ. ModelScope serves DeepSeek under namespaced ids — but only
+// V4-Flash has an inference provider behind it; V4-Pro 400s with "Model id …
+// has no provider supported". So Flash is the ModelScope default for BOTH
+// phases. V4-Pro reasoning is still reachable via the paid DeepSeek API.
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1/chat/completions";
 const OPENAI_BASE_URL = "https://api.openai.com/v1/chat/completions";
 export const MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1/chat/completions";
 export const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
-export const MODELSCOPE_DEFAULT_MODEL = "deepseek-ai/DeepSeek-V4-Pro";
+export const MODELSCOPE_DEFAULT_MODEL = "deepseek-ai/DeepSeek-V4-Flash";
 
 /** Build the full config for one named provider, or null if its key is unset.
  *  Each provider has a fixed canonical base URL; LLM_MODEL only overrides the
@@ -199,7 +202,7 @@ export function pickProvider(env: LlmEnv): LlmProvider {
  *
  *   ""  / undefined                       → env default provider
  *   "modelscope"                          → ModelScope, default model
- *   "modelscope:deepseek-ai/DeepSeek-V4-Pro" → ModelScope, explicit model
+ *   "modelscope:deepseek-ai/DeepSeek-V4-Flash" → ModelScope, explicit model
  *   "deepseek-v4-pro" / "deepseek-v4-flash"  → DeepSeek, that model
  *   "openai" / "gpt-4o-mini"              → OpenAI
  *   anything else                         → treated as a model name on the

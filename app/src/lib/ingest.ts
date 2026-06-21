@@ -105,8 +105,9 @@ export interface ProcessLlmOptions {
 
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 const DEFAULT_DEEPSEEK_SECTIONS_MODEL = "deepseek-v4-flash";
-// ModelScope ships Flash under a namespaced id (mirrors MODELSCOPE_DEFAULT_MODEL
-// = "deepseek-ai/DeepSeek-V4-Pro"). Provider-qualified ("modelscope:…") so
+// ModelScope ships Flash under a namespaced id (matches MODELSCOPE_DEFAULT_MODEL
+// = "deepseek-ai/DeepSeek-V4-Flash" — Flash is the only model with a provider
+// behind it on ModelScope). Provider-qualified ("modelscope:…") so
 // resolveProviderSpec routes it to the ModelScope endpoint — the bare
 // "deepseek-ai/…" id would otherwise trip the "deepseek-" heuristic and hit
 // the DeepSeek API, which only knows "deepseek-v4-flash".

@@ -28,7 +28,7 @@ id = "REPLACE_WITH_CACHE_KV_ID"
 # Editorial timezone — the daily auto-publish cron assigns picks to "today" in
 # this zone (06:00 Beijing must land on the new local day, not yesterday UTC).
 SITE_TZ = "Asia/Shanghai"
-# Default provider for the auto pipeline. ModelScope (DeepSeek-V4-Pro) has a
+# Default provider for the auto pipeline. ModelScope (DeepSeek-V4-Flash) has a
 # free daily quota; runtime-switchable from /admin (app_settings.llm_provider).
 LLM_PROVIDER = "modelscope"
 # Cross-provider fallback: when the ModelScope call fails (429 / quota gone /
@@ -80,7 +80,7 @@ queue = "glean-llm"
 port = 8788
 
 # Secrets to set with `wrangler secret put <NAME> -c workers/llm-consumer/wrangler.toml`:
-#   MODELSCOPE_API_KEY   — default LLM (ms-...; DeepSeek-V4-Pro, free daily quota)
+#   MODELSCOPE_API_KEY   — default LLM (ms-...; DeepSeek-V4-Flash, free daily quota)
 #   DEEPSEEK_API_KEY     — fallback provider (deepseek-v4-pro reasoning model)
 #   OPENAI_API_KEY       — alternative, or for any OpenAI-compatible endpoint
 #   LLM_PROVIDER         — optional, "modelscope" | "deepseek" | "openai"
