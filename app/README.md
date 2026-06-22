@@ -22,6 +22,8 @@ app/               this project — deployable
   workers/
     ingest-consumer/  Worker — Queue consumer, URL → R2 (Readability + Jina)
     llm-consumer/     Worker — Queue consumer, R2 → DeepSeek/OpenAI → D1
+    discovery-consumer/ Worker — cron (2x daily): RSS/HN/arXiv → dedup → gate-1
+                        prescore → enqueue to glean-ingest (auto-discovery)
   migrations/      D1 migrations
   seed/initial.sql tag taxonomy only — no demo content
   public/styles.css copy of prototype/styles.css
@@ -94,7 +96,7 @@ works when `import.meta.env.DEV` is true.
 
 ## Deploy
 
-Three deployable surfaces, all from `app/`. Run only the ones your change
+Four deployable surfaces, all from `app/`. Run only the ones your change
 touches.
 
 ```sh
@@ -108,9 +110,13 @@ pnpm wrangler deploy -c workers/ingest-consumer/wrangler.toml
 
 # llm-consumer worker (R2 → LLM → D1).
 pnpm wrangler deploy -c workers/llm-consumer/wrangler.toml
+
+# discovery worker (cron source watcher → enqueue to glean-ingest).
+pnpm wrangler deploy -c workers/discovery-consumer/wrangler.toml
 ```
 
-`src/lib/ingest.ts` is imported by both workers — touch it, deploy both.
+`src/lib/ingest.ts` is imported by all three workers — touch it, deploy all
+three (ingest, llm, and discovery, which imports `discovery.ts` → `ingest.ts`).
 
 ### Deploy gotchas
 

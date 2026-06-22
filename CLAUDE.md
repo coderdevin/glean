@@ -41,7 +41,7 @@ for f in scripts/*.test.ts; do pnpm exec tsx "$f" || break; done   # all
 
 A test that prints its "passed" line and exits 0 passed; a thrown assertion exits non-zero.
 
-### Deploy — three independent surfaces
+### Deploy — four independent surfaces
 
 Deploy only the surface your change touches:
 
@@ -49,9 +49,14 @@ Deploy only the surface your change touches:
 pnpm build && pnpm wrangler pages deploy ./dist                    # Pages: src/pages, components, layouts, most of src/lib
 pnpm wrangler deploy -c workers/ingest-consumer/wrangler.toml      # extract stage: extract*.ts, ingest.ts (processExtract)
 pnpm wrangler deploy -c workers/llm-consumer/wrangler.toml         # LLM stage: llm.ts, ingest.ts (processLlm/runSectionsPhase)
+pnpm wrangler deploy -c workers/discovery-consumer/wrangler.toml   # discovery (cron 2x daily): discovery.ts, sources.ts, the worker
 ```
 
-`src/lib/ingest.ts` is imported by **both** workers — if you touch it, deploy both.
+`src/lib/ingest.ts` is imported by **all three** workers — if you touch it,
+deploy all three. The discovery worker imports `src/lib/discovery.ts`, which in
+turn imports `ingest.ts`, so redeploy it alongside ingest/llm whenever
+`ingest.ts` changes (and on its own when only `discovery.ts`/`sources.ts`/the
+worker change).
 
 Gotchas: `pnpm deploy` is intercepted by pnpm 9 as a builtin (use `pnpm run deploy`
 or call wrangler directly). Always `pnpm exec wrangler …`, never bare `wrangler`.
