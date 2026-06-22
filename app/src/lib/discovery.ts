@@ -109,3 +109,141 @@ export function parseArxivXml(xml: string): Candidate[] {
   }
   return out;
 }
+
+import { drizzle } from "drizzle-orm/d1";
+import { inArray } from "drizzle-orm";
+import { submissions, picks, discoverySeen } from "~/db/schema";
+import { normalizeUrl } from "~/lib/normalize-url";
+import { ulid } from "~/lib/ulid";
+import { logEvent } from "~/lib/ingest";
+import { callLlmPrescore, type LlmEnv } from "~/lib/llm";
+
+/** Gate-1 floor: candidates the prescore rates below this are dropped before
+ *  any fetch/extract spend. The real 7-dim gate (0.7) happens later in
+ *  processLlm; this is only a cheap firehose-reducer. */
+export const PRESCORE_FLOOR = 0.4;
+
+export interface DiscoveryEnv extends LlmEnv {
+  DB: D1Database;
+  /** Producer binding to the glean-ingest queue (same queue /api/submit uses). */
+  INGEST: Queue<string>;
+}
+
+/** Pure: drop candidates whose normalized URL is already known or repeats
+ *  within the batch. `norm` is injected so tests don't need the real
+ *  normalizeUrl. Returns the fresh candidates + their normalized keys. */
+export function partitionUnseen(
+  candidates: Candidate[],
+  known: Set<string>,
+  norm: (u: string) => string,
+): { fresh: Candidate[]; freshKeys: string[] } {
+  const seenInBatch = new Set<string>();
+  const fresh: Candidate[] = [];
+  const freshKeys: string[] = [];
+  for (const cand of candidates) {
+    let key: string;
+    try { key = norm(cand.url); } catch { continue; }
+    if (!key || known.has(key) || seenInBatch.has(key)) continue;
+    seenInBatch.add(key);
+    fresh.push(cand);
+    freshKeys.push(key);
+  }
+  return { fresh, freshKeys };
+}
+
+/** Insert one auto candidate as a submission and enqueue it to glean-ingest —
+ *  the same path /api/submit takes, minus Turnstile/rate-limit (internal). */
+async function enqueueCandidate(env: DiscoveryEnv, cand: Candidate, normalizedUrl: string): Promise<void> {
+  const id = ulid();
+  const db = drizzle(env.DB);
+  await db.insert(submissions).values({
+    id,
+    url: normalizedUrl,
+    note: null,
+    submitterName: null,
+    submitterIpHash: null,
+    source: cand.source,
+    status: "pending",
+    processingStartedAt: new Date(),
+    processingModel: "extract",
+    createdAt: new Date(),
+  });
+  await env.INGEST.send(id);
+  await logEvent(env as never, id, "queue", "queued", {
+    message: "auto-discovered submission",
+    meta: { target: "glean-ingest", source: cand.source },
+  });
+}
+
+export interface DiscoveryRunResult {
+  fetched: number;
+  fresh: number;
+  passedGate1: number;
+  enqueued: number;
+}
+
+/**
+ * One discovery run: collect from all provided adapter thunks, dedup against
+ * discovery_seen + submissions + picks, record every fresh URL as seen, gate-1
+ * prescore, enqueue survivors. Each adapter is awaited under its own try/catch
+ * by the caller (see the worker) so one bad source can't sink the run.
+ */
+export async function runDiscovery(
+  env: DiscoveryEnv,
+  candidates: Candidate[],
+): Promise<DiscoveryRunResult> {
+  const db = drizzle(env.DB);
+  const fetched = candidates.length;
+  if (fetched === 0) return { fetched: 0, fresh: 0, passedGate1: 0, enqueued: 0 };
+
+  // Build the `known` set: discovery_seen ∪ existing submissions ∪ picks, all
+  // keyed by normalized URL. Query only the URLs in this batch.
+  const keys = candidates.map((c) => { try { return normalizeUrl(c.url); } catch { return ""; } }).filter(Boolean);
+  const known = new Set<string>();
+  if (keys.length) {
+    const seenRows = await db.select({ u: discoverySeen.urlNormalized }).from(discoverySeen).where(inArray(discoverySeen.urlNormalized, keys));
+    for (const r of seenRows) known.add(r.u);
+    const subRows = await db.select({ u: submissions.url }).from(submissions).where(inArray(submissions.url, keys));
+    for (const r of subRows) known.add(r.u);
+    const pickRows = await db.select({ u: picks.sourceUrl }).from(picks).where(inArray(picks.sourceUrl, keys));
+    for (const r of pickRows) known.add(r.u);
+  }
+
+  const { fresh, freshKeys } = partitionUnseen(candidates, known, normalizeUrl);
+  if (fresh.length === 0) {
+    console.log(`discovery: fetched=${fetched} fresh=0 (all known)`);
+    return { fetched, fresh: 0, passedGate1: 0, enqueued: 0 };
+  }
+
+  // Record every fresh URL as seen NOW — even ones gate 1 will drop — so we
+  // never re-score them on the next tick.
+  await db.insert(discoverySeen)
+    .values(fresh.map((c, i) => ({ urlNormalized: freshKeys[i]!, source: c.source })))
+    .onConflictDoNothing();
+
+  // Gate 1: cheap prescore. On error, fail-open (treat all as passing) so a
+  // prescore outage doesn't stall discovery — gate 2 still protects spend.
+  let scores: number[];
+  try {
+    scores = await callLlmPrescore(env, fresh.map((c) => ({ title: c.title, snippet: c.snippet })));
+  } catch (err) {
+    console.warn("discovery: prescore failed, passing all", (err as Error).message);
+    scores = fresh.map(() => 1);
+  }
+  const passed = fresh.filter((_, i) => (scores[i] ?? 0) >= PRESCORE_FLOOR);
+
+  let enqueued = 0;
+  for (let i = 0; i < fresh.length; i++) {
+    if ((scores[i] ?? 0) < PRESCORE_FLOOR) continue;
+    try {
+      await enqueueCandidate(env, fresh[i]!, freshKeys[i]!);
+      enqueued++;
+    } catch (err) {
+      console.error("discovery: enqueue failed", fresh[i]!.url, (err as Error).message);
+    }
+  }
+
+  const result = { fetched, fresh: fresh.length, passedGate1: passed.length, enqueued };
+  console.log(`discovery run: ${JSON.stringify(result)}`);
+  return result;
+}
