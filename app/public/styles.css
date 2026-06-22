@@ -667,13 +667,22 @@ button {
 .brand:hover {
   text-decoration: none;
 }
+/* Coral "拾" badge — the single brand mark, matching the favicon. */
 .brand__mark {
-  width: 30px;
-  height: 24px;
-  flex: 0 0 30px;
-}
-.brand__mark-pick {
-  fill: var(--c-primary);
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-primary);
+  color: #faf9f6;
+  border-radius: 7px;
+  font-family: "Songti SC", STSong, "PingFang SC", serif;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1;
+  user-select: none;
 }
 
 /* Two-line masthead wordmark:
@@ -1198,9 +1207,6 @@ button {
   gap: 10px;
   color: var(--c-on-dark);
   font-weight: 500;
-}
-.footer__brand .brand__mark {
-  color: var(--c-on-dark);
 }
 .footer__blurb {
   margin-top: 12px;
