@@ -192,9 +192,10 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
     </div>
 
     <!-- AI self-review → editor edits 改进方向 → feedback-guided re-draft.
-         Draft-only: refine rewrites the same row the public page serves, so the
-         panel is hidden once published (unpublish to re-draft). -->
-    {isDraft && !draftFailed && (
+         Review is read-only, so it's shown for published issues too; only the
+         refine ("按建议重做") is draft-only, since it rewrites the same row the
+         public page serves (unpublish to re-draft). -->
+    {!draftFailed && (
       <section class="card card--canvas wk-review">
         <div class="wk-review__head">
           <h2 class="wk-review__title">AI 自我评审 · Review</h2>
@@ -243,13 +244,23 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
                   </div>
                 )}
 
-                <form method="POST" action={`/api/admin/weekly/${id}/refine`} class="wk-review__refine" id="refine-form">
-                  <label class="admin-field">
-                    <span>改进方向 · 可编辑后按建议重做</span>
-                    <textarea class="textarea" name="feedback" rows="6">{feedbackValue}</textarea>
-                  </label>
-                  <button class="btn btn-primary" type="submit">按建议重做 · Refine</button>
-                </form>
+                {isDraft ? (
+                  <form method="POST" action={`/api/admin/weekly/${id}/refine`} class="wk-review__refine" id="refine-form">
+                    <label class="admin-field">
+                      <span>改进方向 · 可编辑后按建议重做</span>
+                      <textarea class="textarea" name="feedback" rows="6">{feedbackValue}</textarea>
+                    </label>
+                    <button class="btn btn-primary" type="submit">按建议重做 · Refine</button>
+                  </form>
+                ) : (
+                  <div class="wk-review__refine">
+                    <label class="admin-field">
+                      <span>改进方向（本期已发布，只读）</span>
+                      <textarea class="textarea" rows="6" readonly>{feedbackValue}</textarea>
+                    </label>
+                    <p class="wk-review__hint">已发布的周刊不能直接重做——「按建议重做」会改写线上内容。要重做请先取消发布。</p>
+                  </div>
+                )}
               </div>
             )}
           </Fragment>
