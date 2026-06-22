@@ -1471,6 +1471,17 @@ button {
 .status-published { background: var(--green-tint); color: var(--c-text-green-dark); }
 .status-rejected  { background: var(--c-surface-cream-strong); color: var(--c-muted); }
 .status-failed    { background: var(--red-tint); color: var(--c-error); }
+.status-screened  { background: var(--amber-tint-2); color: var(--c-text-amber-dark); }
+
+/* Auto-discovery origin badge on admin rows (source = "auto:<src>"). */
+.src-badge {
+  font-size: 11px;
+  color: var(--c-muted);
+  border: 1px solid var(--c-hairline);
+  border-radius: 4px;
+  padding: 0 4px;
+  margin-right: 6px;
+}
 
 /* Page banner used on admin / submit */
 .page-banner {

@@ -9,15 +9,16 @@ import { formatDateISO, formatTimeHM, siteTz, todayInSiteTz } from "~/lib/dateti
 
 const env = Astro.locals.runtime.env;
 const filterParam = Astro.url.searchParams.get("status");
-type FilterKey = "active" | "ready" | "pending" | "published" | "rejected" | "failed" | "all";
-const FILTERS: Record<FilterKey, ("pending"|"analyzing"|"composing"|"ready"|"published"|"rejected"|"failed")[]> = {
+type FilterKey = "active" | "ready" | "pending" | "published" | "rejected" | "failed" | "screened" | "all";
+const FILTERS: Record<FilterKey, ("pending"|"analyzing"|"composing"|"ready"|"published"|"rejected"|"failed"|"screened")[]> = {
   active:    ["pending", "analyzing", "composing", "ready"],
   ready:     ["ready"],
   pending:   ["pending", "analyzing", "composing"],
   published: ["published"],
   rejected:  ["rejected"],
   failed:    ["failed"],
-  all:       ["pending", "analyzing", "composing", "ready", "published", "rejected", "failed"],
+  screened:  ["screened"],
+  all:       ["pending", "analyzing", "composing", "ready", "published", "rejected", "failed", "screened"],
 };
 const filterKey: FilterKey = (() => {
   if (!filterParam) return "active";
@@ -201,6 +202,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
             <a href="/admin?status=published" class={filterKey === "published" ? "is-active" : ""}>Published <span class="q2-filters__n">{tabCount("published")}</span></a>
             <a href="/admin?status=rejected" class={filterKey === "rejected" ? "is-active" : ""}>Rejected <span class="q2-filters__n">{tabCount("rejected")}</span></a>
             <a href="/admin?status=failed" class={filterKey === "failed" ? "is-active" : ""}>Failed <span class="q2-filters__n">{tabCount("failed")}</span></a>
+            <a href="/admin?status=screened" class={filterKey === "screened" ? "is-active" : ""}>Screened <span class="q2-filters__n">{tabCount("screened")}</span></a>
             <a href="/admin?status=all" class={filterKey === "all" ? "is-active" : ""}>All <span class="q2-filters__n">{tabCount("all")}</span></a>
           </nav>
         </div>
@@ -401,6 +403,9 @@ Astro.response.headers.set("Cache-Control", "no-store");
                   </span>
                   <span class="q2-row__meta">
                     {filterKey === "all" && <StatusPill status={r.status} />}
+                    {r.source?.startsWith("auto:") && (
+                      <span class="src-badge" title={r.source}>via {r.source.replace(/^auto:/, "")}</span>
+                    )}
                     <span>{host(r.url)}</span>
                   </span>
                   <span class={`q2-row__score${scoreClass(r.aiScore)}`} title={scoreTitle(r.aiSubscoresJson)}>
