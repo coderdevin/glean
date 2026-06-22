@@ -182,6 +182,15 @@ export interface DiscoveryRunResult {
   enqueued: number;
 }
 
+/** D1/SQLite caps bound variables per statement (~100). Split arrays so the
+ *  `inArray(...)` lookups and the batch insert never exceed that ceiling — a
+ *  live feed batch routinely has hundreds of fresh URLs. */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 /**
  * One discovery run: collect from all provided adapter thunks, dedup against
  * discovery_seen + submissions + picks, record every fresh URL as seen, gate-1
@@ -200,12 +209,12 @@ export async function runDiscovery(
   // keyed by normalized URL. Query only the URLs in this batch.
   const keys = candidates.map((c) => { try { return normalizeUrl(c.url); } catch { return ""; } }).filter(Boolean);
   const known = new Set<string>();
-  if (keys.length) {
-    const seenRows = await db.select({ u: discoverySeen.urlNormalized }).from(discoverySeen).where(inArray(discoverySeen.urlNormalized, keys));
+  for (const part of chunk(keys, 90)) {
+    const seenRows = await db.select({ u: discoverySeen.urlNormalized }).from(discoverySeen).where(inArray(discoverySeen.urlNormalized, part));
     for (const r of seenRows) known.add(r.u);
-    const subRows = await db.select({ u: submissions.url }).from(submissions).where(inArray(submissions.url, keys));
+    const subRows = await db.select({ u: submissions.url }).from(submissions).where(inArray(submissions.url, part));
     for (const r of subRows) known.add(r.u);
-    const pickRows = await db.select({ u: picks.sourceUrl }).from(picks).where(inArray(picks.sourceUrl, keys));
+    const pickRows = await db.select({ u: picks.sourceUrl }).from(picks).where(inArray(picks.sourceUrl, part));
     for (const r of pickRows) known.add(r.u);
   }
 
@@ -216,10 +225,13 @@ export async function runDiscovery(
   }
 
   // Record every fresh URL as seen NOW — even ones gate 1 will drop — so we
-  // never re-score them on the next tick.
-  await db.insert(discoverySeen)
-    .values(fresh.map((c, i) => ({ urlNormalized: freshKeys[i]!, source: c.source })))
-    .onConflictDoNothing();
+  // never re-score them on the next tick. Each row binds 3 columns
+  // (url_normalized, source, first_seen_at), and D1 caps a statement at 100
+  // bound variables — so chunk at 30 rows (90 binds) to stay safely under it.
+  const seenValues = fresh.map((c, i) => ({ urlNormalized: freshKeys[i]!, source: c.source }));
+  for (const part of chunk(seenValues, 30)) {
+    await db.insert(discoverySeen).values(part).onConflictDoNothing();
+  }
 
   // Gate 1: cheap prescore. On error, fail-open (treat all as passing) so a
   // prescore outage doesn't stall discovery — gate 2 still protects spend.
