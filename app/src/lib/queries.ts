@@ -712,6 +712,31 @@ export async function confirmedSubscribers(db: DB): Promise<Recipient[]> {
     .where(and(isNotNull(subscribers.confirmedAt), isNull(subscribers.unsubscribedAt)));
 }
 
+export interface SubscriberRow {
+  email: string;
+  langPref: "zh" | "en";
+  source: string;
+  confirmedAt: Date | null;
+  unsubscribedAt: Date | null;
+  createdAt: Date;
+}
+
+/** Every subscriber (all statuses), newest first — for the admin list page.
+ *  Status is derived in the view: unsubscribed > confirmed > pending. */
+export async function listSubscribers(db: DB): Promise<SubscriberRow[]> {
+  return db
+    .select({
+      email: subscribers.email,
+      langPref: subscribers.langPref,
+      source: subscribers.source,
+      confirmedAt: subscribers.confirmedAt,
+      unsubscribedAt: subscribers.unsubscribedAt,
+      createdAt: subscribers.createdAt,
+    })
+    .from(subscribers)
+    .orderBy(desc(subscribers.createdAt));
+}
+
 /** Count of the weekly blast audience (for the admin editor). */
 export async function confirmedSubscriberCount(db: DB): Promise<number> {
   const r = await db

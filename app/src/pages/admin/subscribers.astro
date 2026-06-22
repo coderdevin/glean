@@ -1,0 +1,124 @@
+---
+export const prerender = false;
+import Admin from "~/layouts/Admin.astro";
+import { db } from "~/db/client";
+import { listSubscribers } from "~/lib/queries";
+import { siteTz, formatDateISO } from "~/lib/datetime";
+
+const env = Astro.locals.runtime.env;
+const tz = siteTz(env);
+const rows = await listSubscribers(db(env.DB));
+
+type Status = "confirmed" | "pending" | "unsubscribed";
+function statusOf(r: { confirmedAt: Date | null; unsubscribedAt: Date | null }): Status {
+  if (r.unsubscribedAt) return "unsubscribed";
+  if (r.confirmedAt) return "confirmed";
+  return "pending";
+}
+const STATUS_LABEL: Record<Status, string> = {
+  confirmed: "已确认",
+  pending: "待确认",
+  unsubscribed: "已退订",
+};
+
+const decorated = rows.map((r) => ({ ...r, status: statusOf(r) }));
+const counts = {
+  confirmed: decorated.filter((r) => r.status === "confirmed").length,
+  pending: decorated.filter((r) => r.status === "pending").length,
+  unsubscribed: decorated.filter((r) => r.status === "unsubscribed").length,
+};
+---
+<Admin title="订阅者 · Subscribers">
+  <div class="subs container">
+    <header class="subs-head">
+      <div>
+        <div class="subs-eyebrow">编辑台 · Editor</div>
+        <h1 class="subs-title">订阅者 · Subscribers</h1>
+      </div>
+      <div class="subs-counts">
+        <span class="subs-pill subs-pill--confirmed">已确认 {counts.confirmed}</span>
+        <span class="subs-pill subs-pill--pending">待确认 {counts.pending}</span>
+        <span class="subs-pill subs-pill--unsub">已退订 {counts.unsubscribed}</span>
+      </div>
+    </header>
+
+    <p class="subs-note">
+      只有「已确认」的订阅者会收到周刊（{counts.confirmed} 人）。待确认 = 已提交但还没点确认邮件里的链接。
+    </p>
+
+    {decorated.length === 0 ? (
+      <p class="subs-empty">还没有订阅者。</p>
+    ) : (
+      <div class="subs-tablewrap">
+        <table class="subs-table">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>状态</th>
+              <th>语言</th>
+              <th>来源</th>
+              <th>订阅时间</th>
+              <th>确认 / 退订</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decorated.map((r) => (
+              <tr class={r.status === "unsubscribed" ? "subs-row--muted" : undefined}>
+                <td class="subs-email t-code">{r.email}</td>
+                <td><span class={`subs-badge subs-badge--${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
+                <td>{r.langPref === "en" ? "EN" : "中文"}</td>
+                <td class="subs-source">{r.source}</td>
+                <td>{formatDateISO(r.createdAt, tz)}</td>
+                <td>
+                  {r.unsubscribedAt
+                    ? `退订 ${formatDateISO(r.unsubscribedAt, tz)}`
+                    : r.confirmedAt
+                    ? `确认 ${formatDateISO(r.confirmedAt, tz)}`
+                    : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+</Admin>
+
+<style>
+  .subs { max-width: 980px; padding: var(--s-lg) 0 var(--s-xxl); }
+  .subs-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    flex-wrap: wrap; gap: var(--s-md); margin-bottom: var(--s-md);
+  }
+  .subs-eyebrow { color: var(--c-muted); font-size: 13px; }
+  .subs-title { margin: var(--s-xxs) 0 0; }
+  .subs-counts { display: flex; gap: var(--s-xs); flex-wrap: wrap; }
+  .subs-pill {
+    font-size: 13px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--c-hairline);
+  }
+  .subs-pill--confirmed { background: var(--c-primary); color: #fff; border-color: transparent; }
+  .subs-note { color: var(--c-muted); font-size: 14px; margin: 0 0 var(--s-lg); }
+  .subs-empty { color: var(--c-muted); margin-top: var(--s-xl); }
+
+  .subs-tablewrap { overflow-x: auto; }
+  .subs-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .subs-table th, .subs-table td {
+    text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--c-hairline);
+    white-space: nowrap;
+  }
+  .subs-table th { font-weight: 600; color: var(--c-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .subs-email { white-space: normal; word-break: break-all; }
+  .subs-source { color: var(--c-muted); }
+  .subs-row--muted td { opacity: 0.55; }
+
+  .subs-badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--c-hairline); }
+  .subs-badge--confirmed { background: rgba(60, 140, 90, 0.14); border-color: transparent; }
+  .subs-badge--pending { background: rgba(200, 150, 40, 0.16); border-color: transparent; }
+  .subs-badge--unsubscribed { background: var(--c-hairline); }
+
+  @media (max-width: 600px) {
+    .subs-table th, .subs-table td { padding: 8px; }
+  }
+</style>
