@@ -233,7 +233,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
       {(filterKey === "active" || filterKey === "ready") && (
         <>
           {upNext ? (
-            <a href={`/admin/${upNext.id}`} class="q2-hero" id="q2-upnext">
+            <a href={`/admin/${upNext.id}?from=${filterKey}`} class="q2-hero" id="q2-upnext">
               <div style="min-width: 0">
                 <div class="q2-hero__eyebrow">
                   <span><strong>Up next</strong> · oldest ready</span>
@@ -268,7 +268,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
           </header>
           <div class="q2-section__list">
             {restReady.map((r) => (
-              <a href={`/admin/${r.id}`} class="q2-row">
+              <a href={`/admin/${r.id}?from=${filterKey}`} class="q2-row">
                 <span class="q2-row__titlewrap">
                   <span class="q2-row__title">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
                   {r.originalTitle && <span class="q2-row__orig" title={r.originalTitle}>{r.originalTitle}</span>}
@@ -306,7 +306,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
                 : stage === "sections" ? "Sections 生成中"
                 : "AI 分析中";
               return (
-                <a href={`/admin/${r.id}`} class={`q2-row${stalled ? " q2-row--stalled" : ""}`}>
+                <a href={`/admin/${r.id}?from=${filterKey}`} class={`q2-row${stalled ? " q2-row--stalled" : ""}`}>
                   <span class="q2-row__title">
                     ⏳ {stageLabel} · {host(r.url)}
                   </span>
@@ -329,7 +329,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
           </summary>
           <div class="q2-section__list" style="margin-top: 12px">
             {published.map((r) => (
-              <a href={`/admin/${r.id}`} class="q2-row">
+              <a href={`/admin/${r.id}?from=${filterKey}`} class="q2-row">
                 <span class="q2-row__title" style="color: var(--c-muted)">{r.aiTitleZh || r.aiTitleEn || r.url}</span>
                 <span class="q2-row__meta">{host(r.url)}</span>
                 <span class="q2-row__score" title={scoreTitle(r.aiSubscoresJson)}>{r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}</span>
@@ -347,7 +347,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
           </summary>
           <div class="q2-section__list" style="margin-top: 12px">
             {rejected.map((r) => (
-              <a href={`/admin/${r.id}`} class="q2-row">
+              <a href={`/admin/${r.id}?from=${filterKey}`} class="q2-row">
                 <span class="q2-row__title" style="color: var(--c-muted); text-decoration: line-through; text-decoration-color: var(--c-muted-soft)">
                   {r.aiTitleZh || r.aiTitleEn || r.url}
                 </span>
@@ -367,7 +367,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
           </summary>
           <div class="q2-section__list" style="margin-top: 12px">
             {failed.map((r) => (
-              <a href={`/admin/${r.id}`} class="q2-row">
+              <a href={`/admin/${r.id}?from=${filterKey}`} class="q2-row">
                 <span class="q2-row__title" style="color: var(--c-muted)">
                   {r.aiTitleZh || r.aiTitleEn || r.url}
                 </span>
@@ -392,9 +392,9 @@ Astro.response.headers.set("Cache-Control", "no-store");
             {rows.map((r) => {
               const title = r.aiTitleZh || r.aiTitleEn || r.url;
               return (
-                <div class="q2-row q2-row--browse" data-href={`/admin/${r.id}`}>
+                <div class="q2-row q2-row--browse" data-href={`/admin/${r.id}?from=${filterKey}`}>
                   <span class="q2-row__titlewrap">
-                    <a class="q2-row__title" href={`/admin/${r.id}`} title={title}>{title}</a>
+                    <a class="q2-row__title" href={`/admin/${r.id}?from=${filterKey}`} title={title}>{title}</a>
                     {r.originalTitle && (
                       <span class="q2-row__orig" title={r.originalTitle}>{r.originalTitle}</span>
                     )}

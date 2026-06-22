@@ -29,6 +29,12 @@ export const POST: APIRoute = async (ctx) => {
   // Read both, with form body taking precedence (more explicit).
   let explicitId = url.searchParams.get("id");
   let modelOverride = url.searchParams.get("model");
+  // Where to send the browser after queueing. When the detail page was opened
+  // from a filtered list it passes ?from=<status>, so a re-run returns to that
+  // list (e.g. the Failed list) instead of stranding the editor on the detail
+  // of an item that just left the list. Absent → fall back to the detail page.
+  const from = url.searchParams.get("from");
+  const backToList = from ? (from === "active" ? "/admin" : `/admin?status=${encodeURIComponent(from)}`) : null;
   if (ctx.request.headers.get("content-type")?.includes("form")) {
     try {
       const fd = await ctx.request.clone().formData();
@@ -85,7 +91,7 @@ export const POST: APIRoute = async (ctx) => {
       const res = await fetch(proxyUrl.toString(), { method: "POST" });
       const body = await res.text();
       if (res.ok && ctx.request.headers.get("accept")?.includes("text/html")) {
-        return new Response(null, { status: 303, headers: { Location: `/admin/${targetId}` } });
+        return new Response(null, { status: 303, headers: { Location: backToList ?? `/admin/${targetId}` } });
       }
       return new Response(body, {
         status: res.status,
@@ -118,6 +124,7 @@ export const POST: APIRoute = async (ctx) => {
   // Accept: text/html) still get JSON. `?queued=<model>` lets the page show
   // a "just enqueued" flash banner above the processing card.
   if (ctx.request.headers.get("accept")?.includes("text/html")) {
+    if (backToList) return new Response(null, { status: 303, headers: { Location: backToList } });
     const q = encodeURIComponent(modelOverride || "enqueued");
     return new Response(null, { status: 303, headers: { Location: `/admin/${targetId}?queued=${q}` } });
   }

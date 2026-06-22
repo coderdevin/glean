@@ -23,6 +23,15 @@ if (!row) return new Response("Not found", { status: 404 });
 // can pick an existing slug or type a new one).
 const cats = await allCategories(drizzle);
 
+// Origin list filter (passed as ?from=<status> by the list links). Lets the
+// "← Queue" back link and the re-run action return to the list the editor came
+// from (e.g. Failed) instead of the bare /admin queue.
+const fromList = Astro.url.searchParams.get("from");
+const backHref = fromList && fromList !== "active" ? `/admin?status=${fromList}` : "/admin";
+const processAction = fromList
+  ? `/api/admin/process?from=${encodeURIComponent(fromList)}`
+  : "/api/admin/process";
+
 // Position inside the "ready" queue, so J/K (prev/next) can wire up.
 // Only computed when the current row is itself ready — for other statuses
 // the strip just shows the status without a queue counter.
@@ -250,7 +259,7 @@ const sectionsTotalChars = aiSections.reduce(
 
   <form id="ar-form" action={`/api/admin/${row.id}/save`} method="post" autocomplete="off">
     <header class="r2-strip">
-      <a href="/admin" class="r2-strip__back">← Queue</a>
+      <a href={backHref} class="r2-strip__back">← Queue</a>
       {queueContext && (
         <span class="r2-strip__pos">
           Ready <strong>{queueContext.index + 1}</strong> / {queueContext.total}
@@ -847,15 +856,15 @@ const sectionsTotalChars = aiSections.reduce(
             {row.extractedLang && <>detected lang: <span class="t-code">{row.extractedLang}</span></>}
           </div>
           <div class="row" style="gap: 8px; margin-top: 12px; flex-wrap: wrap">
-            <form action="/api/admin/process" method="post" style="display: inline">
+            <form action={processAction} method="post" style="display: inline">
               <input type="hidden" name="id" value={row.id} />
               <button class="btn btn-secondary" type="submit" name="model" value="deepseek-v4-pro">Re-run V4-Pro</button>
             </form>
-            <form action="/api/admin/process" method="post" style="display: inline">
+            <form action={processAction} method="post" style="display: inline">
               <input type="hidden" name="id" value={row.id} />
               <button class="btn btn-secondary" type="submit" name="model" value="deepseek-v4-flash">Re-run V4-Flash</button>
             </form>
-            <form action="/api/admin/process" method="post" style="display: inline">
+            <form action={processAction} method="post" style="display: inline">
               <input type="hidden" name="id" value={row.id} />
               <button class="btn btn-secondary" type="submit" name="model" value="modelscope" title="ModelScope · DeepSeek-V4-Flash（免费额度）">Re-run ModelScope</button>
             </form>
@@ -867,11 +876,11 @@ const sectionsTotalChars = aiSections.reduce(
 
   {/* Hidden helper forms triggered from the ⋯ menu */}
   <form id="op-refetch" action={`/api/admin/${row.id}/refetch`} method="post" hidden></form>
-  <form id="op-rerun-pro" action="/api/admin/process" method="post" hidden>
+  <form id="op-rerun-pro" action={processAction} method="post" hidden>
     <input type="hidden" name="id" value={row.id} />
     <input type="hidden" name="model" value="deepseek-v4-pro" />
   </form>
-  <form id="op-rerun-flash" action="/api/admin/process" method="post" hidden>
+  <form id="op-rerun-flash" action={processAction} method="post" hidden>
     <input type="hidden" name="id" value={row.id} />
     <input type="hidden" name="model" value="deepseek-v4-flash" />
   </form>
