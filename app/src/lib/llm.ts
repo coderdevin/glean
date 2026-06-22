@@ -38,6 +38,9 @@ export interface LlmEnv {
   MODELSCOPE_API_KEY?: string;
   LLM_PROVIDER?: string;
   LLM_MODEL?: string;
+  /** Optional cheap model spec for gate-1 discovery prescore (title+snippet).
+   *  Defaults to the env default provider/model when unset. */
+  LLM_PRESCORE_MODEL?: string;
   LLM_BASE_URL?: string;
   /** When set, automatically retry once with this model/provider spec on
    *  429 / 5xx / timeout. Skipped if the caller passed an explicit
@@ -1191,6 +1194,69 @@ export async function callLlmWeeklyReview(
         draft: args.draft,
       }),
   });
+}
+
+/** Parse a gate-1 prescore response into exactly `n` clamped [0,1] scores.
+ *  Fail-open: any shape mismatch yields a neutral 0.5 for every item so a
+ *  flaky prescore never silently discards the whole batch. */
+export function parsePrescoreScores(content: string, n: number): number[] {
+  const neutral = () => Array.from({ length: n }, () => 0.5);
+  let arr: unknown;
+  try {
+    const parsed = JSON.parse(content.trim());
+    arr = Array.isArray(parsed) ? parsed : (parsed as { scores?: unknown }).scores;
+  } catch {
+    return neutral();
+  }
+  if (!Array.isArray(arr) || arr.length !== n) return neutral();
+  return arr.map((v) => {
+    const x = typeof v === "number" ? v : Number(v);
+    if (!Number.isFinite(x)) return 0.5;
+    return Math.max(0, Math.min(1, x));
+  });
+}
+
+/** Gate 1: cheaply rank candidates by title+snippet only (no body fetch).
+ *  One non-streaming chat call; returns a score in [0,1] per item, in order.
+ *  Uses LLM_PRESCORE_MODEL if set, else the env default provider/model. */
+export async function callLlmPrescore(
+  env: LlmEnv,
+  items: { title: string; snippet: string }[],
+): Promise<number[]> {
+  if (items.length === 0) return [];
+  const provider = resolveProviderSpec(env, env.LLM_PRESCORE_MODEL);
+  const list = items
+    .map((it, i) => `${i + 1}. ${it.title}\n   ${it.snippet.slice(0, 200)}`)
+    .join("\n");
+  const system =
+    "你是技术内容预筛器。只看标题和摘要，判断每条是否值得深入处理。" +
+    "高质量=一线第一手技术报告/有数据有代码/有新论断；低质量=列表水文、PR、营销、AI 二次拼贴。" +
+    `严格输出 JSON：{"scores":[...]}，数组长度必须等于 ${items.length}，每个值是 0-1 的小数。`;
+  const res = await fetch(provider.baseUrl, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${provider.apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: provider.model,
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      max_tokens: 1000,
+      stream: false,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: list },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`prescore ${provider.name} ${res.status}: ${t.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const content = data.choices?.[0]?.message?.content ?? "";
+  return parsePrescoreScores(content, items.length);
 }
 
 /* ============================================================
