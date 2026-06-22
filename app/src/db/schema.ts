@@ -15,6 +15,7 @@ export const SUBMISSION_STATUSES = [
   "published",
   "rejected",   // editor decision (human)
   "failed",     // AI failed at some stage (retriable)
+  "screened",   // auto-discovered, phase-1 score < threshold — held for human, never auto-published
 ] as const;
 export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
 
@@ -179,6 +180,11 @@ export const submissions = sqliteTable(
     note: text("note"),
     submitterName: text("submitter_name"),
     submitterIpHash: text("submitter_ip_hash"),
+    /** Submission origin. "manual" = the public /submit form; "auto:<src>"
+     *  (e.g. "auto:hn", "auto:rss:simonwillison", "auto:arxiv") = the
+     *  discovery worker. Gate 2 in processLlm screens auto rows that score
+     *  below AUTO_PUBLISH_SCORE_THRESHOLD; manual rows always run full. */
+    source: text("source").notNull().default("manual"),
 
     status: text("status", { enum: SUBMISSION_STATUSES })
       .notNull()
@@ -366,6 +372,20 @@ export const articleAnnotations = sqliteTable(
     pickIdx: index("annotations_pick_idx").on(t.pickId, t.position),
   }),
 );
+
+/** URLs the discovery worker has already evaluated, so it never re-scores the
+ *  same HN/RSS/arXiv item on a later cron tick. Keyed by the normalized URL
+ *  (src/lib/normalize-url.ts). A row is written the first time a candidate is
+ *  seen, regardless of whether it later passes gate 1. */
+export const discoverySeen = sqliteTable("discovery_seen", {
+  urlNormalized: text("url_normalized").primaryKey(),
+  source: text("source").notNull(),
+  firstSeenAt: integer("first_seen_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type DiscoverySeen = typeof discoverySeen.$inferSelect;
 
 /** Generic key/value store for runtime-tunable app settings that must be
  *  shared between the Pages app (admin writes) and the queue workers (read) —

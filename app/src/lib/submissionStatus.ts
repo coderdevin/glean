@@ -13,6 +13,7 @@ export const STATUS_META: Record<SubmissionStatus, { zh: string; en: string; ton
   published: { zh: "已发布",     en: "Published", tone: "green" },
   rejected:  { zh: "已否",       en: "Rejected",  tone: "neutral" },
   failed:    { zh: "处理失败",   en: "Failed",    tone: "red" },
+  screened:  { zh: "已筛除",     en: "Screened",  tone: "amber2" },
 };
 
 /** The submit/success view model. Shared by the SSR page render and the
