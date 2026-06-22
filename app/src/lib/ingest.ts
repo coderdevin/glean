@@ -84,7 +84,7 @@ export interface ExtractResult {
 
 export interface LlmStageResult {
   id: string;
-  status: "ready" | "composing";
+  status: "ready" | "composing" | "screened";
   provider: string;
   model: string;
   latencyMs: number;
@@ -273,6 +273,22 @@ export async function processExtract(env: IngestEnv, id: string): Promise<Extrac
  * parse, write ai_* fields and flip status to 'ready'. Throws if rawR2Key
  * is missing — caller should ensure extract ran first.
  */
+/** Auto-discovered submissions whose phase-1 score is below this are not worth
+ *  the expensive phase-2 (bilingual sections) run. They are held at status
+ *  'screened' (visible in /admin, never auto-published) instead. Manual /submit
+ *  rows are exempt — a human chose to submit them, so they always run full. */
+export const AUTO_PUBLISH_SCORE_THRESHOLD = 0.7;
+
+/** True when a row came from the discovery worker AND scored below the
+ *  auto-publish threshold — i.e. should be screened out of phase 2. */
+export function shouldScreenAuto(
+  source: string | null | undefined,
+  score: number,
+  threshold: number = AUTO_PUBLISH_SCORE_THRESHOLD,
+): boolean {
+  return (source ?? "manual").startsWith("auto:") && score < threshold;
+}
+
 export async function processLlm(
   env: IngestEnv,
   id: string,
@@ -421,10 +437,12 @@ export async function processLlm(
   }
   const tagsKept = proposedTags.map((t) => t.slug);
 
+  const screened = shouldScreenAuto(row.source, analysis.output.score);
+
   await db
     .update(submissions)
     .set({
-      status: "composing",
+      status: screened ? "screened" : "composing",
       aiTitleZh: analysis.output.title_zh,
       aiTitleEn: analysis.output.title_en,
       aiSummaryZh: analysis.output.summary_zh,
@@ -446,7 +464,9 @@ export async function processLlm(
       aiTokens: analysis.totalTokens,
       processingModel: null,
       processedAt: new Date(),
-      rejectReason: null,
+      rejectReason: screened
+        ? `auto-screened: phase-1 score ${analysis.output.score.toFixed(2)} < ${AUTO_PUBLISH_SCORE_THRESHOLD}`
+        : null,
     })
     .where(eq(submissions.id, id));
   await logEvent(env, id, "llm", "ok", {
@@ -462,6 +482,13 @@ export async function processLlm(
     },
   });
 
+  if (screened) {
+    await logEvent(env, id, "pipeline", "skipped", {
+      message: `screened: score ${analysis.output.score.toFixed(2)} < ${AUTO_PUBLISH_SCORE_THRESHOLD} — phase 2 not run`,
+      meta: { phase: "gate2", source: row.source, score: analysis.output.score },
+    });
+  }
+
   // Phase 2 (sections) runs in its OWN queue invocation, NOT inline here.
   // Analysis + sections in a single worker can exceed Cloudflare's 15-minute
   // queue-consumer wall-time ceiling (sections alone budgets up to 14min); the
@@ -471,7 +498,7 @@ export async function processLlm(
   // enqueue a `phase=sections` message, giving sections a fresh 15-min budget.
   return {
     id,
-    status: "composing",
+    status: screened ? "screened" : "composing",
     provider: analysis.provider.name,
     model: analysis.provider.model,
     latencyMs: analysis.latencyMs,
@@ -479,7 +506,7 @@ export async function processLlm(
     reasoningChars: analysis.reasoningChars,
     tagsKept,
     tagsDropped,
-    needsSections: true,
+    needsSections: !screened,
   };
 }
 
