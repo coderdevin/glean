@@ -99,6 +99,16 @@ export const weeklyIssues = sqliteTable("weekly_issues", {
   draftError: text("draft_error"),
   draftStartedAt: integer("draft_started_at", { mode: "timestamp" }),
 
+  // On-demand editorial self-review (see migration 0018). The LLM critiques the
+  // current draft; the editor edits `reviewFeedback` and triggers a feedback-
+  // guided re-draft (kind=weekly-refine). reviewStatus is INDEPENDENT of
+  // draftStatus — generating a review never un-readies a published-ready draft.
+  reviewJson: text("review_json"),                  // {strengths[], weaknesses[], suggestions}
+  reviewStatus: text("review_status"),              // null | 'reviewing' | 'ready' | 'failed'
+  reviewError: text("review_error"),
+  reviewFeedback: text("review_feedback"),          // editor-editable 改进方向, consumed by refine
+  reviewStartedAt: integer("review_started_at", { mode: "timestamp" }),
+
   emailSentAt: integer("email_sent_at", { mode: "timestamp" }),
 
   publishedAt: integer("published_at", { mode: "timestamp" }),

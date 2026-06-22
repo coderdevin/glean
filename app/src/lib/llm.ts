@@ -68,7 +68,7 @@ export interface LlmEnv {
  */
 export const NO_RETRY_MARKER = "[no-retry]";
 
-export type LlmPhase = "analysis" | "sections" | "weekly";
+export type LlmPhase = "analysis" | "sections" | "weekly" | "weekly_review";
 
 /** Best-effort dump of the raw LLM stream output to R2. */
 async function dumpLlmFailure(
@@ -335,6 +335,16 @@ const WeeklyResponseSchema = z.object({
     .default([]),
 });
 export type LlmWeeklyOutput = z.infer<typeof WeeklyResponseSchema>;
+
+// Editorial self-review of a weekly draft. Internal tool for the (Chinese)
+// editor — kept Chinese-only, not bilingual. `suggestions` is the actionable
+// 改进方向 that seeds the editable feedback box and drives the refine re-draft.
+const WeeklyReviewSchema = z.object({
+  strengths: z.array(z.string()).default([]),
+  weaknesses: z.array(z.string()).default([]),
+  suggestions: z.string().default(""),
+});
+export type LlmWeeklyReviewOutput = z.infer<typeof WeeklyReviewSchema>;
 
 export type LlmAnalysisOutput = z.infer<typeof AnalysisResponseSchema>;
 export type LlmSectionsOutput = z.infer<typeof SectionsResponseSchema>;
@@ -816,6 +826,21 @@ const WEEKLY_SYSTEM_PROMPT = `你是一名有 10 年经验的双语技术编辑�
 
 输出必须是英文 key 的 JSON 对象，符合给定 schema。`;
 
+// PLACEHOLDER — 措辞交编辑定稿。这是周刊「自我评审」的提示词：让模型以资深双语
+// 技术编辑的视角，审视一份已经起草好的周刊（标题/导语/分章），指出做得好的地方、
+// 做得不好的地方、以及具体的改进方向。改进方向会被编辑修改后用于「按建议重做」。
+const WEEKLY_REVIEW_SYSTEM_PROMPT = `你是一名有 10 年经验的双语技术编辑，现在要审阅一份**已经起草好的** Glean / 拾遗 周刊合辑（含中英标题、导语、以及按主题分好的章节）。
+
+你会收到：本期的篇目清单（id / 中英标题 / 中英摘要 / 分类），以及当前这一版草稿（标题、导语、各章节小标题与所含 pick_ids）。
+
+请像一个有品味、敢说真话的主编那样评审这一版草稿，输出三部分：
+
+1. strengths：做得好的地方（数组，每条一句话，具体到标题/导语/分章/叙事）。
+2. weaknesses：做得不好或偏弱的地方（数组，每条一句话，指出问题，别泛泛而谈）。
+3. suggestions：改进方向（一段话，可分点）。聚焦**这一版能改的东西**——标题更准、导语更有观点、章节重组或小标题更贴切、叙事顺序更顺。注意：篇目集合是固定的，不要建议增删 picks，也不要改写篇目摘要本身。
+
+只评审、不重写。输出必须是英文 key 的 JSON 对象：{"strengths":[...],"weaknesses":[...],"suggestions":"..."}，全部用中文写。`;
+
 // Moved verbatim from wiki.ts so it joins the editable-prompt registry; the
 // wiki build (full rebuild) reads it via getPrompt(env, "wiki").
 const WIKI_SYSTEM_PROMPT = `You are the curator of a bilingual (Chinese + English) tech-article wiki.
@@ -862,6 +887,7 @@ export type PromptKey =
   | "github_analysis"
   | "github_sections"
   | "weekly"
+  | "weekly_review"
   | "wiki"
   | "wiki_incremental";
 
@@ -879,6 +905,7 @@ export const PROMPT_REGISTRY: PromptEntry[] = [
   { key: "github_analysis", label: "GitHub · 分析", default: GITHUB_ANALYSIS_SYSTEM_PROMPT },
   { key: "github_sections", label: "GitHub · 项目讲解文", default: GITHUB_SECTIONS_SYSTEM_PROMPT },
   { key: "weekly", label: "周刊 · 合辑", default: WEEKLY_SYSTEM_PROMPT },
+  { key: "weekly_review", label: "周刊 · 自我评审", default: WEEKLY_REVIEW_SYSTEM_PROMPT },
   { key: "wiki", label: "导览 · 全量重建", default: WIKI_SYSTEM_PROMPT },
   { key: "wiki_incremental", label: "导览 · 增量折入", default: WIKI_INCREMENTAL_SYSTEM_PROMPT },
 ];
@@ -1021,10 +1048,35 @@ export function toWeeklyPickInput(p: {
   };
 }
 
+/** A snapshot of an existing weekly draft (title/intro/sections), used both as
+ *  the thing the review critiques and as the prior version a refine revises. */
+export interface WeeklyDraftSnapshot {
+  title_zh: string;
+  title_en: string;
+  intro_zh: string;
+  intro_en: string;
+  sections: { heading_zh: string; heading_en: string; pick_ids: string[] }[];
+}
+
 export interface CallLlmWeeklyArgs extends CallLlmArgs {
   picks: WeeklyPickInput[];
   dateStart: string;
   dateEnd: string;
+  /** Feedback-guided re-draft ("按建议重做"): the prior draft + the editor's
+   *  改进方向. When both are set, the weekly call appends a revise-this block to
+   *  the user message and keeps the SAME picks. Absent on a fresh draft. */
+  priorDraft?: WeeklyDraftSnapshot;
+  feedback?: string;
+}
+
+/** Review a drafted weekly issue: the LLM critiques the given snapshot against
+ *  the linked picks. Same picks/date inputs as the draft, plus the draft to
+ *  critique. */
+export interface CallLlmWeeklyReviewArgs extends CallLlmArgs {
+  picks: WeeklyPickInput[];
+  dateStart: string;
+  dateEnd: string;
+  draft: WeeklyDraftSnapshot;
 }
 
 /**
@@ -1111,6 +1163,32 @@ export async function callLlmWeekly(
         picks: args.picks,
         dateStart: args.dateStart,
         dateEnd: args.dateEnd,
+        priorDraft: args.priorDraft,
+        feedback: args.feedback,
+      }),
+  });
+}
+
+/**
+ * Weekly self-review: critique an existing draft. Same plumbing as the draft
+ * call; small JSON output (strengths/weaknesses/suggestions). Read-only — never
+ * mutates the draft itself.
+ */
+export async function callLlmWeeklyReview(
+  env: LlmEnv,
+  args: CallLlmWeeklyReviewArgs,
+): Promise<LlmCallResult<LlmWeeklyReviewOutput>> {
+  const systemPrompt = await getPrompt(env, "weekly_review");
+  return callWithFallback(env, args, {
+    phase: "weekly_review",
+    schema: WeeklyReviewSchema,
+    systemPrompt,
+    buildMessage: () =>
+      buildWeeklyReviewUserMessage({
+        picks: args.picks,
+        dateStart: args.dateStart,
+        dateEnd: args.dateEnd,
+        draft: args.draft,
       }),
   });
 }
@@ -1261,6 +1339,15 @@ async function callOnce<S extends z.ZodTypeAny>(
         picks: (args as CallLlmWeeklyArgs).picks,
         dateStart: (args as CallLlmWeeklyArgs).dateStart,
         dateEnd: (args as CallLlmWeeklyArgs).dateEnd,
+        priorDraft: (args as CallLlmWeeklyArgs).priorDraft,
+        feedback: (args as CallLlmWeeklyArgs).feedback,
+      })
+    : cfg.phase === "weekly_review"
+    ? buildWeeklyReviewUserMessage({
+        picks: (args as CallLlmWeeklyReviewArgs).picks,
+        dateStart: (args as CallLlmWeeklyReviewArgs).dateStart,
+        dateEnd: (args as CallLlmWeeklyReviewArgs).dateEnd,
+        draft: (args as CallLlmWeeklyReviewArgs).draft,
       })
     : buildSectionsUserMessage({
         title: args.title,
@@ -1612,14 +1699,54 @@ function buildSectionsUserMessage(args: {
  * the window with its id + bilingual title/summary + category, so the model
  * can theme them into sections. The route layer repairs pick_ids afterwards.
  */
+function weeklyPickLines(picks: WeeklyPickInput[]): string {
+  return picks
+    .map(
+      (p) =>
+        `- id: ${p.id}\n  分类: ${p.category}\n  标题(zh): ${p.title_zh}\n  标题(en): ${p.title_en}\n  摘要(zh): ${p.summary_zh}\n  摘要(en): ${p.summary_en}`,
+    )
+    .join("\n");
+}
+
+/** Render an existing draft (title/intro/sections) as readable text for the
+ *  model — used by both the review prompt and the feedback re-draft. */
+function renderWeeklyDraftSnapshot(draft: WeeklyDraftSnapshot): string {
+  const sections = draft.sections
+    .map(
+      (s, i) =>
+        `  ${i + 1}. ${s.heading_zh} / ${s.heading_en}\n     pick_ids: ${s.pick_ids.join(", ")}`,
+    )
+    .join("\n");
+  return [
+    `标题(zh): ${draft.title_zh}`,
+    `标题(en): ${draft.title_en}`,
+    `导语(zh): ${draft.intro_zh}`,
+    `导语(en): ${draft.intro_en}`,
+    `章节：\n${sections}`,
+  ].join("\n");
+}
+
 function buildWeeklyUserMessage(args: {
   picks: WeeklyPickInput[];
   dateStart: string;
   dateEnd: string;
+  priorDraft?: WeeklyDraftSnapshot;
+  feedback?: string;
 }): string {
-  const lines = args.picks.map(
-    (p) =>
-      `- id: ${p.id}\n  分类: ${p.category}\n  标题(zh): ${p.title_zh}\n  标题(en): ${p.title_en}\n  摘要(zh): ${p.summary_zh}\n  摘要(en): ${p.summary_en}`,
-  );
-  return `本期范围：${args.dateStart} → ${args.dateEnd}\n本周已发布的 picks（共 ${args.picks.length} 篇）：\n${lines.join("\n")}`;
+  const base = `本期范围：${args.dateStart} → ${args.dateEnd}\n本周已发布的 picks（共 ${args.picks.length} 篇）：\n${weeklyPickLines(args.picks)}`;
+  // Feedback-guided re-draft: keep the same picks, revise per the editor's
+  // 改进方向. Only appended when BOTH a prior draft and feedback are present.
+  if (args.priorDraft && args.feedback?.trim()) {
+    return `${base}\n\n这是上一版草稿（同一批篇目，请在此基础上修订，不要增删 picks）：\n${renderWeeklyDraftSnapshot(args.priorDraft)}\n\n编辑给出的改进方向（请据此重做标题/导语/分章）：\n${args.feedback.trim()}`;
+  }
+  return base;
+}
+
+function buildWeeklyReviewUserMessage(args: {
+  picks: WeeklyPickInput[];
+  dateStart: string;
+  dateEnd: string;
+  draft: WeeklyDraftSnapshot;
+}): string {
+  return `本期范围：${args.dateStart} → ${args.dateEnd}\n本期篇目（共 ${args.picks.length} 篇）：\n${weeklyPickLines(args.picks)}\n\n待评审的当前草稿：\n${renderWeeklyDraftSnapshot(args.draft)}`;
 }

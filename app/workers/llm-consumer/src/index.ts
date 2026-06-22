@@ -25,10 +25,13 @@ import {
   processLlm,
   runSectionsPhase,
   runWeeklyDraft,
+  runWeeklyRefine,
+  runWeeklyReview,
   markFailed,
   reapStaleLlmQueueWait,
   reapStalledSubmissions,
   reapStalledWeeklyDrafts,
+  reapStalledWeeklyReviews,
   logEvent,
   type IngestEnv,
 } from "../../../src/lib/ingest";
@@ -54,11 +57,20 @@ export interface Env extends IngestEnv {
   INGEST_LLM: Queue<string>;
 }
 
+type WorkKind = "weekly" | "weekly-review" | "weekly-refine" | "wiki";
+
+/** Normalize a raw kind string to a known WorkKind (or undefined). Shared by
+ *  the queue parser and the dev /process handler so they can't drift. */
+function parseKind(kindRaw: string | null | undefined): WorkKind | undefined {
+  const k = (kindRaw ?? "").trim();
+  return k === "weekly" || k === "weekly-review" || k === "weekly-refine" || k === "wiki" ? k : undefined;
+}
+
 function parseMessage(raw: string): {
   id: string;
   modelOverride?: string;
   phase?: "sections";
-  kind?: "weekly" | "wiki";
+  kind?: WorkKind;
   mode?: "full" | "incremental";
 } {
   const pipeIdx = raw.indexOf("|");
@@ -78,7 +90,7 @@ function parseMessage(raw: string): {
     id,
     modelOverride: trimmed || undefined,
     phase: phaseRaw === "sections" ? "sections" : undefined,
-    kind: kindRaw === "weekly" ? "weekly" : kindRaw === "wiki" ? "wiki" : undefined,
+    kind: parseKind(kindRaw),
     // Wiki-only. Unknown/absent → "full" at the call site (back-compat with
     // messages already in flight when this deployed).
     mode: modeRaw === "incremental" ? "incremental" : modeRaw === "full" ? "full" : undefined,
@@ -171,21 +183,45 @@ export default {
         continue;
       }
 
-      // Weekly-issue draft. runWeeklyDraft is non-throwing and writes its own
-      // terminal state (draft_status = 'ready' | 'failed') onto the issue row,
-      // so we just ack regardless — same contract as the sections-only path.
-      if (kind === "weekly") {
+      // Weekly-issue draft / feedback-refine. Both are non-throwing and write
+      // their own terminal draft_status ('ready' | 'failed') onto the row, so
+      // we ack regardless — same contract as the sections-only path. A refine
+      // (kind=weekly-refine) revises the prior draft per the editor's saved
+      // 改进方向, keeping the same picks.
+      if (kind === "weekly" || kind === "weekly-refine") {
+        const refine = kind === "weekly-refine";
         try {
-          const result = await runWeeklyDraft(env, id);
-          console.log("weekly draft", { id, ...result });
+          const result = refine
+            ? await runWeeklyRefine(env, id)
+            : await runWeeklyDraft(env, id);
+          console.log(refine ? "weekly refine" : "weekly draft", { id, ...result });
         } catch (err) {
-          // Defensive — runWeeklyDraft shouldn't throw, but if loading the
-          // row blows up we still want to ack and log.
+          // Defensive — the run fns shouldn't throw, but if loading the row
+          // blows up we still want to ack and log.
           const reason = (err as Error).message ?? "unknown weekly draft error";
           console.error("weekly draft fail", { id, reason });
           await logEvent(env, id, "llm", "failed", {
             message: reason,
-            meta: { kind: "weekly", source: "weekly-throw" },
+            meta: { kind: "weekly", mode: refine ? "refine" : "draft", source: "weekly-throw" },
+          });
+        }
+        msg.ack();
+        continue;
+      }
+
+      // Weekly self-review. runWeeklyReview is non-throwing and writes its own
+      // review_status onto the row (independent of draft_status), so we ack
+      // regardless.
+      if (kind === "weekly-review") {
+        try {
+          const result = await runWeeklyReview(env, id);
+          console.log("weekly review", { id, ...result });
+        } catch (err) {
+          const reason = (err as Error).message ?? "unknown weekly review error";
+          console.error("weekly review fail", { id, reason });
+          await logEvent(env, id, "llm", "failed", {
+            message: reason,
+            meta: { kind: "weekly-review", source: "weekly-review-throw" },
           });
         }
         msg.ack();
@@ -259,6 +295,8 @@ export default {
     if (n > 0) console.log(`reaper: marked ${n} stalled submission(s) failed`);
     const w = await reapStalledWeeklyDrafts(env);
     if (w > 0) console.log(`reaper: marked ${w} stalled weekly draft(s) failed`);
+    const wr = await reapStalledWeeklyReviews(env);
+    if (wr > 0) console.log(`reaper: marked ${wr} stalled weekly review(s) failed`);
 
     // Daily-only: auto-publish the newest N 'ready' submissions. Gated on the
     // exact cron so it never fires on the */5 reaper tick.
@@ -293,8 +331,7 @@ export default {
       const explicitId = url.searchParams.get("id");
       const modelOverride = url.searchParams.get("model") || undefined;
       const phase = url.searchParams.get("phase") === "sections" ? "sections" : undefined;
-      const kindRaw = url.searchParams.get("kind");
-      const kind = kindRaw === "weekly" ? "weekly" : kindRaw === "wiki" ? "wiki" : undefined;
+      const kind = parseKind(url.searchParams.get("kind"));
 
       // Wiki rebuild (dev): no id needed — runWikiBuild reads all published picks.
       if (kind === "wiki") {
@@ -303,12 +340,20 @@ export default {
         return json({ ok: result.ok, stage: "wiki", result });
       }
 
-      // Weekly draft (dev): the Pages route proxies here with an explicit id so
-      // the draft fires without waiting for the dev queue poller.
-      if (kind === "weekly") {
-        if (!explicitId) return json({ ok: false, error: "kind=weekly requires id" }, 400);
-        const result = await runWeeklyDraft(env, explicitId);
-        return json({ ok: result.status === "ready", stage: "weekly", id: explicitId, result });
+      // Weekly draft / refine / review (dev): the Pages route proxies here with
+      // an explicit id so the work fires without waiting for the dev queue poller.
+      if (kind === "weekly" || kind === "weekly-refine") {
+        if (!explicitId) return json({ ok: false, error: `kind=${kind} requires id` }, 400);
+        const result =
+          kind === "weekly-refine"
+            ? await runWeeklyRefine(env, explicitId)
+            : await runWeeklyDraft(env, explicitId);
+        return json({ ok: result.status === "ready", stage: kind, id: explicitId, result });
+      }
+      if (kind === "weekly-review") {
+        if (!explicitId) return json({ ok: false, error: "kind=weekly-review requires id" }, 400);
+        const result = await runWeeklyReview(env, explicitId);
+        return json({ ok: result.status === "ready", stage: "weekly-review", id: explicitId, result });
       }
 
       let targetId = explicitId;

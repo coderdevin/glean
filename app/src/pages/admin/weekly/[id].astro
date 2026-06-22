@@ -26,6 +26,26 @@ const draftFailed = issue.draftStatus === "failed";
 const draftWaitedMin = issue.draftStartedAt
   ? Math.max(0, Math.floor((Date.now() - new Date(issue.draftStartedAt).getTime()) / 60_000))
   : 0;
+
+// On-demand editorial self-review (migration 0018). Independent of draftStatus.
+const isReviewing = issue.reviewStatus === "reviewing";
+const reviewFailed = issue.reviewStatus === "failed";
+type WeeklyReview = { strengths: string[]; weaknesses: string[]; suggestions: string };
+let review: WeeklyReview | null = null;
+if (issue.reviewJson) {
+  try {
+    const r = JSON.parse(issue.reviewJson);
+    review = {
+      strengths: Array.isArray(r?.strengths) ? r.strengths : [],
+      weaknesses: Array.isArray(r?.weaknesses) ? r.weaknesses : [],
+      suggestions: typeof r?.suggestions === "string" ? r.suggestions : "",
+    };
+  } catch {
+    review = null;
+  }
+}
+// Editable 改进方向: prefer the editor's saved edits, else the model's suggestions.
+const feedbackValue = issue.reviewFeedback ?? review?.suggestions ?? "";
 const subscriberCount = await confirmedSubscriberCount(drizzleDb);
 const sentDate = issue.emailSentAt ? formatDateISO(issue.emailSentAt, siteTz(env)) : null;
 
@@ -171,6 +191,72 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
       </form>
     </div>
 
+    <!-- AI self-review → editor edits 改进方向 → feedback-guided re-draft.
+         Draft-only: refine rewrites the same row the public page serves, so the
+         panel is hidden once published (unpublish to re-draft). -->
+    {isDraft && !draftFailed && (
+      <section class="card card--canvas wk-review">
+        <div class="wk-review__head">
+          <h2 class="wk-review__title">AI 自我评审 · Review</h2>
+          <span class="wk-review__hint">让 AI 点评这一版，挑出问题与改进方向；改完「改进方向」可一键按建议重做</span>
+        </div>
+
+        {isReviewing ? (
+          <div class="wk-review__pending">
+            <div class="wk-review__spinner" aria-hidden="true"></div>
+            <p>AI 评审中…本页每 4 秒自动刷新。</p>
+            {/* Recovery affordance: a worker eviction can strand 'reviewing'.
+                The cron watchdog reaps it after 20min, but offer a manual
+                re-trigger so the editor isn't stuck on a perpetual spinner. */}
+            <form method="POST" action={`/api/admin/weekly/${id}/review`} class="wk-review__recover">
+              <button class="btn btn-text" type="submit">卡住了？重新发起评审</button>
+            </form>
+          </div>
+        ) : (
+          <Fragment>
+            <form method="POST" action={`/api/admin/weekly/${id}/review`} class="wk-review__gen">
+              <button class="btn btn-secondary" type="submit">
+                {review ? "重新评审" : "生成 Review"}
+              </button>
+            </form>
+
+            {reviewFailed && (
+              <p class="wk-review__error">评审失败：{issue.reviewError ?? "未知错误，请重试。"}</p>
+            )}
+
+            {review && (
+              <div class="wk-review__body">
+                {review.strengths.length > 0 && (
+                  <div class="wk-review__col">
+                    <h3 class="wk-review__sub">✅ 做得好</h3>
+                    <ul class="wk-review__list">
+                      {review.strengths.map((s) => <li>{s}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {review.weaknesses.length > 0 && (
+                  <div class="wk-review__col">
+                    <h3 class="wk-review__sub">⚠️ 做得不好</h3>
+                    <ul class="wk-review__list">
+                      {review.weaknesses.map((s) => <li>{s}</li>)}
+                    </ul>
+                  </div>
+                )}
+
+                <form method="POST" action={`/api/admin/weekly/${id}/refine`} class="wk-review__refine" id="refine-form">
+                  <label class="admin-field">
+                    <span>改进方向 · 可编辑后按建议重做</span>
+                    <textarea class="textarea" name="feedback" rows="6">{feedbackValue}</textarea>
+                  </label>
+                  <button class="btn btn-primary" type="submit">按建议重做 · Refine</button>
+                </form>
+              </div>
+            )}
+          </Fragment>
+        )}
+      </section>
+    )}
+
     <!-- Email delivery -->
     <section class="card card--canvas wk-email">
       <div class="wk-email__head">
@@ -222,11 +308,21 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
     )}
   </div>
 
-  <script is:inline define:vars={{ isDrafting }}>
-    // While the AI is drafting, the editor form isn't rendered — just poll by
-    // reloading every 4s until draft_status flips to ready/failed.
-    if (isDrafting) {
+  <script is:inline define:vars={{ isDrafting, isReviewing }}>
+    // While the AI is drafting OR reviewing, poll by reloading every 4s until
+    // the relevant status flips to ready/failed.
+    if (isDrafting || isReviewing) {
       setTimeout(() => location.reload(), 4000);
+    }
+
+    // Confirm before a feedback-guided re-draft (keeps picks, re-shapes framing).
+    const refineForm = document.getElementById("refine-form");
+    if (refineForm) {
+      refineForm.addEventListener("submit", (e) => {
+        if (!confirm("按当前改进方向重做？将保持本期篇目不变，重塑标题、导语、分章。")) {
+          e.preventDefault();
+        }
+      });
     }
 
     // Serialize the visible section editor into the hidden layout_json field
@@ -504,6 +600,28 @@ const catLabel: Record<string, string> = { infra: "Infra", data: "Data", code: "
   .wk-export__note { margin: 0 0 var(--s-md); color: var(--c-body); font-size: 14px; line-height: 1.6; }
   .wk-export__btns { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-sm); }
   .wk-export__sep { flex: 1 1 auto; }
+
+  /* AI self-review panel */
+  .wk-review { margin-top: var(--s-lg); }
+  .wk-review__head { margin-bottom: var(--s-md); }
+  .wk-review__title { margin: 0 0 var(--s-xxs); font-size: 18px; }
+  .wk-review__hint { color: var(--c-muted); font-size: 13px; }
+  .wk-review__gen { margin-bottom: var(--s-md); }
+  .wk-review__pending { display: flex; align-items: center; gap: var(--s-sm); color: var(--c-muted); }
+  .wk-review__spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--c-hairline);
+    border-top-color: var(--c-primary);
+    border-radius: 50%;
+    animation: wk-spin 0.8s linear infinite;
+  }
+  .wk-review__error { color: var(--c-danger, #c0392b); font-size: 14px; margin: 0 0 var(--s-md); }
+  .wk-review__body { display: flex; flex-direction: column; gap: var(--s-md); }
+  .wk-review__sub { margin: 0 0 var(--s-xs); font-size: 14px; }
+  .wk-review__list { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: var(--s-xxs); }
+  .wk-review__list li { font-size: 14px; line-height: 1.5; }
+  .wk-review__refine { display: flex; flex-direction: column; gap: var(--s-sm); align-items: flex-start; }
+  .wk-review__refine .admin-field { width: 100%; }
 
   @media (max-width: 600px) {
     .wk-row2,

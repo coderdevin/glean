@@ -36,11 +36,13 @@ import {
   callLlmAnalysis,
   callLlmSections,
   callLlmWeekly,
+  callLlmWeeklyReview,
   toWeeklyPickInput,
   defaultProviderName,
   resolveProviderSpec,
   NO_RETRY_MARKER,
   type LlmEnv,
+  type WeeklyDraftSnapshot,
 } from "./llm";
 import { extractFromUrl } from "./extract";
 import { sanitizeProposedTags } from "./tags";
@@ -868,11 +870,51 @@ export async function markFailed(
  * repairWeeklyDraft against the currently-linked pick set — so an editor who
  * unlinked picks before re-drafting gets a layout over the remaining ones.
  */
+/** Snapshot an issue row's current draft (title/intro/sections) for review or
+ *  feedback-guided refine. layoutJson parses to the sections array; a bad/blank
+ *  value degrades to no sections rather than throwing. */
+function weeklyDraftSnapshot(issue: {
+  titleZh: string;
+  titleEn: string;
+  introZh: string;
+  introEn: string;
+  layoutJson: string | null;
+}): WeeklyDraftSnapshot {
+  let sections: WeeklyDraftSnapshot["sections"] = [];
+  if (issue.layoutJson) {
+    try {
+      const parsed = JSON.parse(issue.layoutJson);
+      if (Array.isArray(parsed)) {
+        // Coerce each element to the expected shape — a stale/partial/hand-
+        // edited layout missing pick_ids would otherwise crash the renderer
+        // (s.pick_ids.join) with a cryptic TypeError that surfaces as an
+        // unexplainable "failed" reason.
+        sections = parsed.map((s) => ({
+          heading_zh: typeof s?.heading_zh === "string" ? s.heading_zh : "",
+          heading_en: typeof s?.heading_en === "string" ? s.heading_en : "",
+          pick_ids: Array.isArray(s?.pick_ids) ? s.pick_ids.filter((x: unknown) => typeof x === "string") : [],
+        }));
+      }
+    } catch {
+      /* keep empty */
+    }
+  }
+  return {
+    title_zh: issue.titleZh,
+    title_en: issue.titleEn,
+    intro_zh: issue.introZh,
+    intro_en: issue.introEn,
+    sections,
+  };
+}
+
 export async function runWeeklyDraft(
   env: IngestEnv,
   issueId: string,
+  opts: { refine?: boolean } = {},
 ): Promise<{ status: "ready" | "failed"; reason?: string }> {
   const db = drizzle(env.DB, { schema });
+  const mode = opts.refine ? "refine" : "draft";
 
   const issRows = await db.select().from(weeklyIssues).where(eq(weeklyIssues.id, issueId)).limit(1);
   const issue = issRows[0];
@@ -896,17 +938,25 @@ export async function runWeeklyDraft(
   }
 
   await logEvent(env, issueId, "llm", "started", {
-    meta: { kind: "weekly", picks: linked.length },
+    meta: { kind: "weekly", mode, picks: linked.length },
   });
 
   try {
     const aiPicks = linked.map(toWeeklyPickInput);
+    // Refine: feed the prior draft + the editor's 改进方向 so the model revises
+    // (same picks) instead of drafting cold. A blank feedback degrades to a
+    // plain re-draft.
+    const refine = opts.refine
+      ? { priorDraft: weeklyDraftSnapshot(issue), feedback: issue.reviewFeedback ?? undefined }
+      : undefined;
     const res = await callLlmWeekly(env, {
       title: "",
       body: "",
       picks: aiPicks,
       dateStart: issue.dateStart,
       dateEnd: issue.dateEnd,
+      priorDraft: refine?.priorDraft,
+      feedback: refine?.feedback,
     });
     const ai = res.output;
     const layout = repairWeeklyDraft(ai, linked.map((p) => p.id));
@@ -921,6 +971,14 @@ export async function runWeeklyDraft(
         layoutJson: JSON.stringify(layout),
         draftStatus: "ready",
         draftError: null,
+        // The draft just changed, so any prior review now critiques a stale
+        // version. Clear it (incl. the consumed feedback) so the editor is
+        // never shown a v1 critique next to a v2 draft (states must not lie).
+        reviewJson: null,
+        reviewStatus: null,
+        reviewError: null,
+        reviewFeedback: null,
+        reviewStartedAt: null,
       })
       .where(eq(weeklyIssues.id, issueId));
 
@@ -929,6 +987,7 @@ export async function runWeeklyDraft(
     await logEvent(env, issueId, "llm", "ok", {
       meta: {
         kind: "weekly",
+        mode,
         model: res.provider.model,
         latencyMs: res.latencyMs,
         tokens: res.totalTokens,
@@ -944,7 +1003,105 @@ export async function runWeeklyDraft(
       .where(eq(weeklyIssues.id, issueId));
     await logEvent(env, issueId, "llm", "failed", {
       message: reason.slice(0, 500),
-      meta: { kind: "weekly" },
+      meta: { kind: "weekly", mode },
+    });
+    return { status: "failed", reason };
+  }
+}
+
+/**
+ * Feedback-guided re-draft ("按建议重做"). Same as runWeeklyDraft but feeds the
+ * prior draft + the editor's saved 改进方向 (review_feedback) to the model and
+ * keeps the SAME linked picks (the route, not this fn, owns the pick set).
+ */
+export async function runWeeklyRefine(
+  env: IngestEnv,
+  issueId: string,
+): Promise<{ status: "ready" | "failed"; reason?: string }> {
+  return runWeeklyDraft(env, issueId, { refine: true });
+}
+
+/**
+ * On-demand editorial self-review of a weekly draft. Writes review_json /
+ * review_status / review_error and seeds review_feedback with the model's
+ * suggestions. INDEPENDENT of draftStatus — never touches the draft itself, so
+ * a failed review leaves a ready issue ready. Non-throwing (mirrors
+ * runWeeklyDraft): writes its own terminal state and returns.
+ */
+export async function runWeeklyReview(
+  env: IngestEnv,
+  issueId: string,
+): Promise<{ status: "ready" | "failed"; reason?: string }> {
+  const db = drizzle(env.DB, { schema });
+
+  const issRows = await db.select().from(weeklyIssues).where(eq(weeklyIssues.id, issueId)).limit(1);
+  const issue = issRows[0];
+  if (!issue) {
+    await logEvent(env, issueId, "llm", "failed", {
+      message: `weekly issue ${issueId} not found`,
+      meta: { kind: "weekly-review" },
+    });
+    return { status: "failed", reason: "not found" };
+  }
+
+  const linked = await db.select().from(picks).where(eq(picks.weeklyIssueId, issueId));
+  if (linked.length === 0) {
+    const reason = "本期没有关联的篇目 · no picks linked to this issue";
+    await db
+      .update(weeklyIssues)
+      .set({ reviewStatus: "failed", reviewError: reason })
+      .where(eq(weeklyIssues.id, issueId));
+    await logEvent(env, issueId, "llm", "failed", { message: reason, meta: { kind: "weekly-review" } });
+    return { status: "failed", reason };
+  }
+
+  await logEvent(env, issueId, "llm", "started", {
+    meta: { kind: "weekly-review", picks: linked.length },
+  });
+
+  try {
+    const res = await callLlmWeeklyReview(env, {
+      title: "",
+      body: "",
+      picks: linked.map(toWeeklyPickInput),
+      dateStart: issue.dateStart,
+      dateEnd: issue.dateEnd,
+      draft: weeklyDraftSnapshot(issue),
+    });
+    const review = res.output;
+
+    await db
+      .update(weeklyIssues)
+      .set({
+        reviewJson: JSON.stringify(review),
+        reviewStatus: "ready",
+        reviewError: null,
+        // Seed the editable 改进方向 with the model's suggestions ONLY when the
+        // editor hasn't already typed their own — a re-review ("重新评审") must
+        // not silently destroy hand-written guidance. (refine clears feedback
+        // on success, so this is non-empty only across un-refined re-reviews.)
+        reviewFeedback: issue.reviewFeedback?.trim() ? issue.reviewFeedback : review.suggestions ?? "",
+      })
+      .where(eq(weeklyIssues.id, issueId));
+
+    await logEvent(env, issueId, "llm", "ok", {
+      meta: {
+        kind: "weekly-review",
+        model: res.provider.model,
+        latencyMs: res.latencyMs,
+        tokens: res.totalTokens,
+      },
+    });
+    return { status: "ready" };
+  } catch (err) {
+    const reason = (err as Error).message ?? "unknown weekly review error";
+    await db
+      .update(weeklyIssues)
+      .set({ reviewStatus: "failed", reviewError: reason.slice(0, 500) })
+      .where(eq(weeklyIssues.id, issueId));
+    await logEvent(env, issueId, "llm", "failed", {
+      message: reason.slice(0, 500),
+      meta: { kind: "weekly-review" },
     });
     return { status: "failed", reason };
   }
@@ -977,6 +1134,39 @@ export async function reapStalledWeeklyDrafts(
     await logEvent(env, r.id, "pipeline", "failed", {
       message,
       meta: { kind: "weekly", source: "weekly-draft-watchdog" },
+    });
+  }
+  return reaped.length;
+}
+
+/**
+ * Reap weekly reviews stranded in 'reviewing' past the wall-time ceiling — same
+ * eviction scenario as reapStalledWeeklyDrafts, but for the on-demand review.
+ * Independent of draftStatus, so this never touches a ready draft. Run from the
+ * worker's cron handler.
+ */
+export async function reapStalledWeeklyReviews(
+  env: { DB: D1Database },
+  now: Date = new Date(),
+): Promise<number> {
+  const db = drizzle(env.DB, { schema });
+  const cutoff = new Date(now.getTime() - STALL_WINDOW_MS);
+  const message = `weekly review exceeded ${STALL_WINDOW_MS / 60_000}min — 重新评审 from the admin UI`;
+  const reaped = await db
+    .update(weeklyIssues)
+    .set({ reviewStatus: "failed", reviewError: message })
+    .where(
+      and(
+        eq(weeklyIssues.reviewStatus, "reviewing"),
+        isNotNull(weeklyIssues.reviewStartedAt),
+        lt(weeklyIssues.reviewStartedAt, cutoff),
+      ),
+    )
+    .returning({ id: weeklyIssues.id });
+  for (const r of reaped) {
+    await logEvent(env, r.id, "pipeline", "failed", {
+      message,
+      meta: { kind: "weekly-review", source: "weekly-review-watchdog" },
     });
   }
   return reaped.length;
