@@ -6634,3 +6634,153 @@ mark.rn-hl--flash { animation: rn-flash 1.4s ease; }
 .rn-quote--yellow { box-shadow: inset 0 -0.55em 0 var(--rn-yellow); }
 .rn-quote--green  { box-shadow: inset 0 -0.55em 0 var(--rn-green); }
 .rn-quote--pink   { box-shadow: inset 0 -0.55em 0 var(--rn-pink); }
+
+/* =========================================================================
+   Global search — header trigger + ⌘K quick-jump palette
+   Trigger sits in .nav-right next to the lang toggle; the palette markup
+   and behaviour live in Site.astro (end of body / inline script).
+   ========================================================================= */
+.nav-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-xs);
+  padding: 5px 8px 5px 9px;
+  border-radius: var(--r-pill);
+  background: var(--c-surface-soft);
+  border: 1px solid var(--c-hairline);
+  color: var(--c-muted);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.nav-search:hover { color: var(--c-ink); border-color: var(--c-hairline); background: var(--c-canvas); }
+.nav-search:focus-visible { outline: 2px solid var(--c-accent-teal); outline-offset: 2px; }
+.nav-search__icon { flex: none; }
+.nav-search__label { font-weight: 500; }
+.nav-search__hint {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 5px;
+  border-radius: var(--r-xs);
+  background: var(--c-canvas);
+  border: 1px solid var(--c-hairline);
+  color: var(--c-muted-soft);
+}
+/* On narrow viewports the trigger collapses to just the icon. */
+@media (max-width: 640px) {
+  .nav-search__label, .nav-search__hint { display: none; }
+  .nav-search { padding: 6px; }
+}
+
+/* Palette overlay */
+.cmdk {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(48px, 12vh, 140px) var(--s-md) var(--s-md);
+}
+.cmdk[hidden] { display: none; }
+.cmdk__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklch, var(--c-ink) 45%, transparent);
+  backdrop-filter: blur(2px);
+}
+.cmdk__panel {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  background: var(--c-canvas);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-lg);
+  box-shadow: 0 12px 40px var(--shadow-ink-13), 0 2px 8px var(--shadow-ink-6);
+  overflow: hidden;
+  animation: cmdk-in 0.14s ease-out;
+}
+@keyframes cmdk-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmdk__panel { animation: none; }
+}
+.cmdk__field {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+  padding: 0 var(--s-md);
+  border-bottom: 1px solid var(--c-hairline-soft);
+}
+.cmdk__field-icon { flex: none; color: var(--c-muted); }
+.cmdk__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 16px 0;
+  font-family: inherit;
+  font-size: var(--text-md);
+  color: var(--c-ink);
+}
+.cmdk__input::placeholder { color: var(--c-muted-soft); }
+.cmdk__input:focus { outline: none; }
+/* Kill the native search clear affordance so it doesn't fight our Esc chip. */
+.cmdk__input::-webkit-search-decoration,
+.cmdk__input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.cmdk__esc {
+  flex: none;
+  font-family: var(--f-mono);
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: var(--r-xs);
+  background: var(--c-surface-soft);
+  border: 1px solid var(--c-hairline);
+  color: var(--c-muted-soft);
+}
+.cmdk__results {
+  list-style: none;
+  margin: 0;
+  padding: var(--s-xs);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cmdk__results:empty { padding: 0; }
+.cmdk__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.cmdk__item.is-active { background: var(--c-surface-soft); }
+.cmdk__item-title {
+  font-family: var(--f-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--c-ink);
+}
+.cmdk__item-sum {
+  font-size: var(--text-sm);
+  color: var(--c-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cmdk__note {
+  margin: 0;
+  padding: 12px var(--s-md) 16px;
+  font-size: var(--text-sm);
+  color: var(--c-muted-soft);
+  text-align: center;
+}
+.cmdk__note[hidden] { display: none; }

@@ -13,3 +13,7 @@ dist/
 # wrangler.toml.example → wrangler.toml and fill in their own resource IDs.
 wrangler.toml
 workers/*/wrangler.toml
+
+# Third-party agent skills installed via `skills add` — not part of the app.
+.agents/
+skills-lock.json

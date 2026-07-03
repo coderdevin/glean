@@ -185,6 +185,22 @@ const isActive = (prefix: string): boolean => {
         </button>
         <div class="nav-spacer"></div>
         <div class="nav-right">
+          {/* Global search — opens a ⌘K quick-jump palette (markup + script at
+              end of body). Hits /api/picks (title + summary). */}
+          <button
+            type="button"
+            class="nav-search"
+            data-search-open
+            aria-label={lang === "zh" ? "搜索" : "Search"}
+            aria-keyshortcuts="Meta+K Control+K"
+          >
+            <svg class="nav-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6" />
+              <line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+            <span class="nav-search__label"><Lang zh="搜索" en="Search" /></span>
+            <kbd class="nav-search__hint" aria-hidden="true">⌘K</kbd>
+          </button>
           {/* Language toggle is now real navigation between the two URL trees
               (was a CSS-only DOM toggle), so each language is a crawlable,
               shareable URL. rel=alternate + hreflang signals the pairing. */}
@@ -252,6 +268,38 @@ const isActive = (prefix: string): boolean => {
       </div>
     </footer>
 
+    {/* ⌘K quick-jump search palette. Hidden until opened via the header button,
+        ⌘K/Ctrl+K, or "/". Results come from /api/picks (title + summary). */}
+    <div class="cmdk" data-search-modal hidden>
+      <div class="cmdk__backdrop" data-search-close></div>
+      <div class="cmdk__panel" role="dialog" aria-modal="true"
+           aria-label={lang === "zh" ? "搜索文章" : "Search articles"}>
+        <div class="cmdk__field">
+          <svg class="cmdk__field-icon" width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6" />
+            <line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+          <input
+            type="search"
+            class="cmdk__input"
+            data-search-input
+            role="combobox"
+            aria-expanded="false"
+            aria-controls="cmdk-results"
+            aria-autocomplete="list"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+            enterkeyhint="go"
+            placeholder={lang === "zh" ? "搜索文章标题、摘要…" : "Search titles and summaries…"}
+          />
+          <kbd class="cmdk__esc">Esc</kbd>
+        </div>
+        <ul class="cmdk__results" id="cmdk-results" role="listbox" data-search-results></ul>
+        <p class="cmdk__note" data-search-note></p>
+      </div>
+    </div>
+
     <script is:inline>
       // Mobile nav toggle.
       (function () {
@@ -309,6 +357,165 @@ const isActive = (prefix: string): boolean => {
               if (btn) btn.disabled = false;
             }
           });
+        });
+      })();
+
+      // ⌘K quick-jump search palette. Debounced fetch to /api/picks (title +
+      // summary), keyboard-navigable listbox, Enter/click jumps to the article.
+      (function () {
+        const modal = document.querySelector("[data-search-modal]");
+        if (!modal) return;
+        const input = modal.querySelector("[data-search-input]");
+        const list = modal.querySelector("[data-search-results]");
+        const note = modal.querySelector("[data-search-note]");
+        const lang = document.body.getAttribute("data-lang") === "en" ? "en" : "zh";
+        const T = {
+          zh: { hint: "输入关键词搜索文章标题与摘要", empty: "没有匹配的文章", err: "搜索出错，请重试" },
+          en: { hint: "Search article titles and summaries", empty: "No matching articles", err: "Search failed — try again" },
+        }[lang];
+
+        let items = [];
+        let active = -1;
+        let seq = 0;
+        let debounce;
+
+        const href = (slug) => (lang === "en" ? "/en/a/" + slug : "/a/" + slug);
+        const esc = (s) =>
+          String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+        function open() {
+          if (!modal.hidden) return;
+          modal.hidden = false;
+          document.body.style.overflow = "hidden";
+          input.value = "";
+          render([]);
+          setNote(T.hint);
+          setTimeout(() => input.focus(), 0);
+        }
+        function close() {
+          modal.hidden = true;
+          document.body.style.overflow = "";
+          clearTimeout(debounce);
+          seq++;
+          items = [];
+          active = -1;
+        }
+        function setNote(msg) {
+          note.textContent = msg || "";
+          note.hidden = !msg;
+        }
+        function render(next) {
+          items = next;
+          active = next.length ? 0 : -1;
+          input.setAttribute("aria-expanded", next.length ? "true" : "false");
+          if (!next.length) {
+            list.innerHTML = "";
+            input.removeAttribute("aria-activedescendant");
+            return;
+          }
+          list.innerHTML = next
+            .map((it, i) => {
+              const title = lang === "en" ? it.title_en || it.title_zh : it.title_zh || it.title_en;
+              const sum = lang === "en" ? it.summary_en || it.summary_zh : it.summary_zh || it.summary_en;
+              return (
+                '<li role="option" id="cmdk-opt-' + i + '" class="cmdk__item" data-idx="' + i + '">' +
+                '<span class="cmdk__item-title">' + esc(title) + "</span>" +
+                '<span class="cmdk__item-sum">' + esc(sum) + "</span>" +
+                "</li>"
+              );
+            })
+            .join("");
+          list.querySelectorAll(".cmdk__item").forEach((el) => {
+            const i = Number(el.dataset.idx);
+            el.addEventListener("mousemove", () => setActive(i));
+            el.addEventListener("click", () => go(i));
+          });
+          syncActive();
+        }
+        function setActive(i) {
+          active = i;
+          syncActive();
+        }
+        function syncActive() {
+          const els = list.querySelectorAll(".cmdk__item");
+          els.forEach((el, i) => {
+            const on = i === active;
+            el.classList.toggle("is-active", on);
+            el.setAttribute("aria-selected", String(on));
+            if (on) {
+              input.setAttribute("aria-activedescendant", el.id);
+              el.scrollIntoView({ block: "nearest" });
+            }
+          });
+          if (active < 0) input.removeAttribute("aria-activedescendant");
+        }
+        function go(i) {
+          const it = items[i];
+          if (it) window.location.href = href(it.slug);
+        }
+        async function run(q) {
+          const my = ++seq;
+          try {
+            const res = await fetch("/api/picks?limit=8&q=" + encodeURIComponent(q));
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            if (my !== seq) return;
+            const rows = data.items || [];
+            render(rows);
+            setNote(rows.length ? "" : T.empty);
+          } catch (e) {
+            if (my !== seq) return;
+            render([]);
+            setNote(T.err);
+          }
+        }
+
+        input.addEventListener("input", () => {
+          clearTimeout(debounce);
+          const q = input.value.trim();
+          if (!q) {
+            render([]);
+            setNote(T.hint);
+            return;
+          }
+          debounce = setTimeout(() => run(q), 200);
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            if (items.length) setActive((active + 1) % items.length);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            if (items.length) setActive((active - 1 + items.length) % items.length);
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (active >= 0) go(active);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            close();
+          }
+        });
+
+        document.querySelectorAll("[data-search-open]").forEach((b) =>
+          b.addEventListener("click", open));
+        modal.querySelectorAll("[data-search-close]").forEach((b) =>
+          b.addEventListener("click", close));
+
+        document.addEventListener("keydown", (e) => {
+          if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+            e.preventDefault();
+            modal.hidden ? open() : close();
+          } else if (e.key === "Escape" && !modal.hidden) {
+            close();
+          } else if (e.key === "/" && modal.hidden) {
+            const t = e.target;
+            const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+            if (!typing) {
+              e.preventDefault();
+              open();
+            }
+          }
         });
       })();
     </script>
