@@ -3,8 +3,39 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { db } from "~/db/client";
 import { picks } from "~/db/schema";
 import { buildRss } from "~/lib/rss";
+import { renderMarkdown } from "~/lib/markdown";
 
 export const prerender = false;
+
+type Section = { heading_zh: string; heading_en: string; body_zh: string; body_en: string };
+
+/** HTML-escape a plain-text heading before interpolating it into markup. The
+ *  body is sanitized by markdown-it (`html:false`); the heading isn't rendered
+ *  through it, so escape it here to keep the same guard against raw markup. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/** Full article body for <content:encoded>, matching what /a/[slug] renders
+ *  (minus the reader chrome): each section's localized heading + markdown body. */
+function renderFullContent(sectionsJson: string | null, lang: "zh" | "en"): string {
+  let sections: Section[];
+  try {
+    sections = JSON.parse(sectionsJson ?? "[]");
+  } catch {
+    return "";
+  }
+  return sections
+    .map((s) => {
+      const heading = lang === "en" ? s.heading_en : s.heading_zh;
+      const body = lang === "en" ? s.body_en : s.body_zh;
+      return `<h2>${escapeHtml(heading)}</h2>\n${renderMarkdown(body)}`;
+    })
+    .join("\n");
+}
 
 export const GET: APIRoute = async (ctx) => {
   const env = ctx.locals.runtime.env;
@@ -34,6 +65,7 @@ export const GET: APIRoute = async (ctx) => {
       title: lang === "en" ? p.titleEn : p.titleZh,
       description: lang === "en" ? p.summaryEn : p.summaryZh,
       pubDate: p.publishedAt ?? p.createdAt ?? new Date(),
+      contentHtml: renderFullContent(p.sectionsJson, lang),
     })),
   });
 

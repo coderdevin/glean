@@ -7,16 +7,10 @@ import { db } from "~/db/client";
 import { pickBySlug, adjacentPicks } from "~/lib/queries";
 import { categoryBadge } from "~/lib/category";
 import { formatDateISO, formatTimeHM, siteTz } from "~/lib/datetime";
-import MarkdownIt from "markdown-it";
+import { renderMarkdown } from "~/lib/markdown";
 
 const lang = Astro.locals.lang ?? "zh";
 const L = (p: string): string => localizedPath(p, lang);
-
-// Single shared instance — markdown-it is stateless after construction.
-// html:false guards against raw <script>/<iframe> sneaking in from LLM
-// output. linkify auto-detects bare URLs so prompt templates with naked
-// links still render as clickable.
-const md = new MarkdownIt({ html: false, linkify: true, breaks: false });
 
 const slug = Astro.params.slug;
 if (!slug) return new Response("Not found", { status: 404 });
@@ -71,23 +65,6 @@ const labelEnBtn = {
   zh: sourceIsZh ? "英文译文" : "英文原文",
   en: sourceIsZh ? "English translation" : "English original",
 };
-
-/**
- * Render a section body as HTML. The LLM output contains real markdown:
- * fenced code blocks (```), headings (##), bold (**...**), lists, links,
- * inline images. Earlier we only recognised image markdown and dumped the
- * rest as plain text — that's why code fences and ## leaked through as
- * raw characters.
- *
- * markdown-it handles all of those; raw HTML is disabled so an LLM that
- * decides to emit `<script>` can't break the page. CSS in article.css
- * styles the resulting <pre>/<code>/<h3>/<ul> nodes inside .av2-orig and
- * .av2-trans.
- */
-function renderBody(text: string | null | undefined): string {
-  if (!text) return "";
-  return md.render(text);
-}
 
 // --- Structured data -------------------------------------------------------
 // A pick is a human-reviewed, bilingual write-up of a source article, so
@@ -266,8 +243,8 @@ const breadcrumbLd = {
                 ) : (
                   <span class="av2-row__num">§ {i + 1}</span>
                 )}
-                <div class="av2-orig av2-prose" lang="en" data-sec={i + 1} data-lang="en" set:html={renderBody(s.body_en)} />
-                <div class="av2-trans av2-prose" lang="zh" data-sec={i + 1} data-lang="zh" set:html={renderBody(s.body_zh)} />
+                <div class="av2-orig av2-prose" lang="en" data-sec={i + 1} data-lang="en" set:html={renderMarkdown(s.body_en)} />
+                <div class="av2-trans av2-prose" lang="zh" data-sec={i + 1} data-lang="zh" set:html={renderMarkdown(s.body_zh)} />
               </div>
             );
           })}
