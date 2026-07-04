@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, isNull } from "drizzle-orm";
 import { db } from "~/db/client";
 import { picks } from "~/db/schema";
 import { buildRss } from "~/lib/rss";
@@ -47,7 +47,9 @@ export const GET: APIRoute = async (ctx) => {
   const rows = await db(env.DB)
     .select()
     .from(picks)
-    .where(and(eq(picks.status, "published"), gte(picks.publishedAt, since)))
+    // isNull(albumId): album picks live only in their album, never the daily
+    // RSS stream (see docs/adr/0002).
+    .where(and(eq(picks.status, "published"), isNull(picks.albumId), gte(picks.publishedAt, since)))
     .orderBy(desc(picks.publishedAt))
     .limit(100);
 

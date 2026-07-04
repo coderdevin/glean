@@ -167,6 +167,9 @@ const isActive = (prefix: string): boolean => {
           <a class="nav-link" href={L("/daily")} aria-current={isActive("/daily") ? "page" : undefined}>
             <Lang zh="日刊" en="Daily" />
           </a>
+          <a class="nav-link" href={L("/album")} aria-current={isActive("/album") ? "page" : undefined}>
+            <Lang zh="专辑" en="Albums" />
+          </a>
           <a class="nav-link" href={L("/tag")} aria-current={isActive("/tag") || isActive("/a") ? "page" : undefined}>
             <Lang zh="标签" en="Tags" />
           </a>

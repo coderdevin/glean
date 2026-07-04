@@ -38,7 +38,7 @@ import {
 import { NO_RETRY_MARKER } from "../../../src/lib/llm";
 import { runWikiBuild } from "../../../src/lib/wiki";
 import { getLlmProviderSetting, withLlmProviderSetting } from "../../../src/lib/settings";
-import { autoPublishReady } from "../../../src/lib/publish";
+import { autoPublishReady, autoPublishAlbumSubmission, albumSlugFromSource } from "../../../src/lib/publish";
 
 /** Daily auto-publish cron: 22:00 UTC = 06:00 Asia/Shanghai. Publishes the
  *  newest 3 'ready' submissions (most recently added first) so the editor
@@ -234,6 +234,17 @@ export default {
       if (phase === "sections") {
         try {
           await runSectionsOnly(env, id, modelOverride);
+          // Album imports auto-publish into their album the moment sections
+          // finish (source "album:<slug>"). Daily submissions wait for the
+          // daily auto-publish cron instead. autoPublishAlbumSubmission is
+          // non-throwing and logs its own outcome.
+          const done = (
+            await drizzle(env.DB).select().from(submissions).where(eq(submissions.id, id)).limit(1)
+          )[0];
+          if (done && done.status === "ready" && albumSlugFromSource(done.source)) {
+            const outcome = await autoPublishAlbumSubmission(env, done);
+            console.log("album auto-publish", { id, outcome });
+          }
         } catch (err) {
           // Defensive — runSectionsPhase shouldn't throw, but if loading
           // the row / R2 blows up we still want to ack and log.

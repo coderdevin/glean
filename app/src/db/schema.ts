@@ -52,6 +52,12 @@ export const picks = sqliteTable(
     weeklyIssueId: text("weekly_issue_id"),
     positionInDay: integer("position_in_day").notNull().default(0),
 
+    // Album membership. A pick belongs to at most one album (single FK, like
+    // weeklyIssueId). Album picks are excluded from the daily/home/RSS streams
+    // (queries filter `album_id IS NULL`) and gated behind album publication.
+    albumId: text("album_id"),
+    positionInAlbum: integer("position_in_album").notNull().default(0),
+
     score: real("score").notNull().default(0),
     submitterName: text("submitter_name"),
 
@@ -73,6 +79,7 @@ export const picks = sqliteTable(
     dailyIdx: index("picks_daily_idx").on(t.dailyDate, t.positionInDay),
     weeklyIdx: index("picks_weekly_idx").on(t.weeklyIssueId),
     statusIdx: index("picks_status_idx").on(t.status, t.publishedAt),
+    albumIdx: index("picks_album_idx").on(t.albumId, t.positionInAlbum),
   }),
 );
 
@@ -117,6 +124,46 @@ export const weeklyIssues = sqliteTable("weekly_issues", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+export const ALBUM_STATUSES = ["draft", "published"] as const;
+export type AlbumStatus = (typeof ALBUM_STATUSES)[number];
+
+/**
+ * Albums (专辑) — persistent, theme/source-based collections of picks. Unlike a
+ * weekly issue (time-boxed, layout_json sections), an album is a flat ordered
+ * list: membership is `picks.album_id` + `picks.position_in_album`. An album
+ * carries a `feed_url` it can bulk-import from, and a draft/published lifecycle
+ * that gates its members' public visibility. See docs/adr/0001..0003.
+ */
+export const albums = sqliteTable("albums", {
+  id: text("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+
+  titleZh: text("title_zh").notNull(),
+  titleEn: text("title_en").notNull(),
+  introZh: text("intro_zh"),
+  introEn: text("intro_en"),
+
+  coverImageKey: text("cover_image_key"),
+  /** RSS/Atom URL this album bulk-imports from (album import). */
+  feedUrl: text("feed_url"),
+
+  status: text("status", { enum: ALBUM_STATUSES }).notNull().default("draft"),
+
+  // Async AI drafting of the bilingual title/intro, mirroring weekly_issues:
+  // 'drafting' | 'ready' | 'failed'. Null before the first draft run.
+  draftStatus: text("draft_status"),
+  draftError: text("draft_error"),
+  draftStartedAt: integer("draft_started_at", { mode: "timestamp" }),
+
+  publishedAt: integer("published_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type Album = typeof albums.$inferSelect;
+export type NewAlbum = typeof albums.$inferInsert;
 
 /**
  * Wiki index — the LLM-synthesized "map of the corpus" (see migration 0017).

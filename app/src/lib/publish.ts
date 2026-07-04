@@ -8,10 +8,10 @@
  * drift on slug shape, position assignment, read-time, tag linking, or the
  * submission write-back.
  */
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, notLike, sql } from "drizzle-orm";
 import { ulid } from "./ulid";
 import { db } from "~/db/client";
-import { pickTags, picks, submissions, tags, categories, type Submission } from "~/db/schema";
+import { pickTags, picks, submissions, tags, categories, albums, type Submission } from "~/db/schema";
 import { slugify } from "./adminForm";
 import { sanitizeCategory } from "./category";
 import { bustForPick } from "./cache";
@@ -52,9 +52,24 @@ export async function publishSubmission(
   env: PublishEnv,
   sub: Submission,
   fields: PublishFields,
+  opts?: { albumId?: string },
 ): Promise<{ pickId: string; slug: string }> {
   const drizzleDb = db(env.DB);
   const pickId = sub.linkedPickId ?? ulid();
+
+  // Album membership: append after the album's current last member. Only
+  // computed for a NEW pick — a re-publish keeps its existing position (the
+  // update branch below omits position_in_album). Album picks stay out of the
+  // daily/home/RSS streams via the `album_id IS NULL` query filter.
+  const albumId = opts?.albumId ?? null;
+  let positionInAlbum = 0;
+  if (albumId) {
+    const q = await drizzleDb
+      .select({ max: sql<number>`coalesce(max(position_in_album), -1)` })
+      .from(picks)
+      .where(eq(picks.albumId, albumId));
+    positionInAlbum = (q[0]?.max ?? -1) + 1;
+  }
   // Editorial "today" follows SITE_TZ — at 06:00 Beijing the cron must land
   // picks on the new local day, not yesterday in UTC.
   const today = todayInSiteTz(siteTz(env));
@@ -64,11 +79,17 @@ export async function publishSubmission(
   const slugSeed = fields.titleEn || fields.titleZh || sub.url;
   const slug = `${slugify(slugSeed)}-${pickId.slice(-6).toLowerCase()}`;
 
-  const posQuery = await drizzleDb
-    .select({ max: sql<number>`coalesce(max(position_in_day), -1)` })
-    .from(picks)
-    .where(eq(picks.dailyDate, today));
-  const position = (posQuery[0]?.max ?? -1) + 1;
+  // Non-album picks take the next daily-stream slot. Album picks get no daily
+  // placement (position 0, and album_id keeps them out of the stream) so they
+  // never consume or reshuffle the day's positions. See docs/adr/0002.
+  let position = 0;
+  if (!albumId) {
+    const posQuery = await drizzleDb
+      .select({ max: sql<number>`coalesce(max(position_in_day), -1)` })
+      .from(picks)
+      .where(and(eq(picks.dailyDate, today), isNull(picks.albumId)));
+    position = (posQuery[0]?.max ?? -1) + 1;
+  }
 
   // Reading time — measure the actual extracted body in R2 (~1000 chars/min
   // covers a ZH/EN mix). Min 1.
@@ -106,6 +127,8 @@ export async function publishSubmission(
       dailyDate: today,
       weeklyIssueId: null,
       positionInDay: position,
+      albumId,
+      positionInAlbum,
       score: fields.score,
       submitterName: fields.submitter,
       status: "published",
@@ -133,6 +156,7 @@ export async function publishSubmission(
         nextHintsJson: sub.aiNextHintsJson,
         sectionsJson: sub.aiSectionsJson,
         lang: sub.extractedLang,
+        albumId,
         status: "published",
         publishedAt: now,
       },
@@ -221,6 +245,60 @@ function parseTagsJson(raw: string | null | undefined): string[] {
   }
 }
 
+/** Parse the album slug out of an album-import submission's source tag
+ *  ("album:<slug>"), or null for any other origin. */
+export function albumSlugFromSource(source: string | null | undefined): string | null {
+  const s = source ?? "";
+  return s.startsWith("album:") ? s.slice("album:".length) || null : null;
+}
+
+/**
+ * Auto-publish a single album-import submission into its album from stored AI
+ * output — the album analog of the daily auto-publish, called by the
+ * llm-consumer as soon as an `album:<slug>` submission reaches 'ready'. The
+ * pick lands in the album (album_id set, out of the daily stream); the album's
+ * own draft/published status gates public visibility. Non-throwing: returns
+ * "published" | "skipped" | "not-album" and logs the outcome.
+ */
+export async function autoPublishAlbumSubmission(
+  env: PublishEnv,
+  sub: Submission,
+): Promise<"published" | "skipped" | "not-album"> {
+  const slug = albumSlugFromSource(sub.source);
+  if (!slug) return "not-album";
+  const drizzleDb = db(env.DB);
+  const albumRow = (await drizzleDb.select().from(albums).where(eq(albums.slug, slug)).limit(1))[0];
+  if (!albumRow) {
+    await logEvent(env, sub.id, "pipeline", "skipped", {
+      message: `album auto-publish skipped: album '${slug}' not found`,
+      meta: { source: "album-publish", slug },
+    });
+    return "skipped";
+  }
+  const fields = publishFieldsFromAi(sub);
+  if (!fields) {
+    await logEvent(env, sub.id, "pipeline", "skipped", {
+      message: "album auto-publish skipped: missing AI title/summary",
+      meta: { source: "album-publish", slug },
+    });
+    return "skipped";
+  }
+  try {
+    const { pickId } = await publishSubmission(env, sub, fields, { albumId: albumRow.id });
+    await logEvent(env, sub.id, "pipeline", "ok", {
+      message: `auto-published into album '${slug}'`,
+      meta: { source: "album-publish", slug, pickId },
+    });
+    return "published";
+  } catch (err) {
+    await logEvent(env, sub.id, "pipeline", "failed", {
+      message: `album auto-publish failed: ${(err as Error).message}`,
+      meta: { source: "album-publish", slug },
+    });
+    return "skipped";
+  }
+}
+
 /**
  * Build publish fields from a submission's stored AI output (no human review).
  * Returns null when the core bilingual copy is missing — such a row isn't
@@ -258,10 +336,14 @@ export async function autoPublishReady(
   limit = 3,
 ): Promise<{ published: string[]; skipped: number }> {
   const drizzleDb = db(env.DB);
+  // Exclude album-import rows (source "album:<slug>"): they auto-publish into
+  // their album, never the daily stream. Without this, an album row stranded in
+  // 'ready' (album missing / publish errored) would leak into the daily feed
+  // with no album_id. See docs/adr/0002.
   const ready = await drizzleDb
     .select()
     .from(submissions)
-    .where(eq(submissions.status, "ready"))
+    .where(and(eq(submissions.status, "ready"), notLike(submissions.source, "album:%")))
     .orderBy(desc(submissions.createdAt))
     .limit(limit);
 

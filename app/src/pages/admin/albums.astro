@@ -1,0 +1,83 @@
+---
+export const prerender = false;
+import Admin from "~/layouts/Admin.astro";
+import { db } from "~/db/client";
+import { allAlbumsAdmin } from "~/lib/queries";
+
+const env = Astro.locals.runtime.env;
+const albums = await allAlbumsAdmin(db(env.DB));
+---
+<Admin title={`专辑 · ${albums.length}`}>
+  <div style="max-width: 900px; margin: 0 auto; padding: 16px">
+    <h1 style="margin-bottom: 8px">专辑 · Albums</h1>
+    <p style="color: var(--c-muted); margin-bottom: 24px">
+      订阅一个 feed，把整源批量导入并自动发布进专辑（不过分数门槛）。专辑为草稿时对读者不可见。
+    </p>
+
+    <details style="margin-bottom: 28px; border: 1px solid var(--c-border, #ddd); border-radius: 8px; padding: 12px 16px">
+      <summary style="cursor: pointer; font-weight: 600">＋ 新建专辑</summary>
+      <form method="POST" action="/api/admin/albums/create" style="display: grid; gap: 10px; margin-top: 14px">
+        <label>中文标题<input name="title_zh" required style="width: 100%" /></label>
+        <label>English title<input name="title_en" required style="width: 100%" /></label>
+        <label>Feed URL（RSS/Atom，可留空稍后再填）<input name="feed_url" type="url" placeholder="http://www.aaronsw.com/2002/feeds/pgessays.rss" style="width: 100%" /></label>
+        <label>中文导语（可选）<textarea name="intro_zh" rows="2" style="width: 100%"></textarea></label>
+        <label>English intro (optional)<textarea name="intro_en" rows="2" style="width: 100%"></textarea></label>
+        <button type="submit" class="btn btn-primary" style="justify-self: start">创建</button>
+      </form>
+    </details>
+
+    {albums.length === 0 && <p>还没有专辑。</p>}
+
+    <div style="display: grid; gap: 20px">
+      {albums.map((a) => (
+        <div style="border: 1px solid var(--c-border, #ddd); border-radius: 8px; padding: 16px">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
+            <div>
+              <strong style="font-size: 17px">{a.titleZh}</strong>
+              <span style="color: var(--c-muted)"> · {a.titleEn}</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center">
+              <span style={`font-size: 12px; padding: 2px 8px; border-radius: 999px; ${a.status === "published" ? "background:#e6f6ea;color:#1a7f37" : "background:#fff4e5;color:#a15c00"}`}>
+                {a.status === "published" ? "已发布" : "草稿"}
+              </span>
+              <span style="font-size: 13px; color: var(--c-muted)">{a.count} 篇</span>
+            </div>
+          </div>
+          <div style="font-size: 12px; color: var(--c-muted); margin: 6px 0">
+            /album/{a.slug}
+            {a.draftStatus === "drafting" && <span style="color:#a15c00"> · AI 起草中…</span>}
+            {a.draftStatus === "failed" && <span style="color:#c0392b"> · AI 起草失败：{a.draftError}</span>}
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0">
+            <form method="POST" action={`/api/admin/albums/${a.id}/import`}>
+              <button type="submit" class="btn btn-secondary" disabled={!a.feedUrl} title={a.feedUrl ? "" : "先填 Feed URL"}>导入 feed</button>
+            </form>
+            {a.status === "published" ? (
+              <form method="POST" action={`/api/admin/albums/${a.id}/unpublish`}>
+                <button type="submit" class="btn btn-secondary">取消发布</button>
+              </form>
+            ) : (
+              <form method="POST" action={`/api/admin/albums/${a.id}/publish`}>
+                <button type="submit" class="btn btn-primary">发布专辑</button>
+              </form>
+            )}
+            <a class="btn btn-secondary" href={`/album/${a.slug}`} target="_blank" rel="noreferrer">预览</a>
+          </div>
+
+          <details>
+            <summary style="cursor: pointer; font-size: 13px; color: var(--c-muted)">编辑标题 / 导语 / Feed</summary>
+            <form method="POST" action={`/api/admin/albums/${a.id}/save`} style="display: grid; gap: 8px; margin-top: 10px">
+              <label>中文标题<input name="title_zh" value={a.titleZh} required style="width: 100%" /></label>
+              <label>English title<input name="title_en" value={a.titleEn} required style="width: 100%" /></label>
+              <label>Feed URL<input name="feed_url" type="url" value={a.feedUrl ?? ""} style="width: 100%" /></label>
+              <label>中文导语<textarea name="intro_zh" rows="2" style="width: 100%">{a.introZh ?? ""}</textarea></label>
+              <label>English intro<textarea name="intro_en" rows="2" style="width: 100%">{a.introEn ?? ""}</textarea></label>
+              <button type="submit" class="btn btn-secondary" style="justify-self: start">保存</button>
+            </form>
+          </details>
+        </div>
+      ))}
+    </div>
+  </div>
+</Admin>

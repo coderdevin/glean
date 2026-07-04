@@ -36,6 +36,8 @@ export const cacheKeys = {
   pick: (slug: string, lang: "zh" | "en") => `v1:pick:${slug}:${lang}`,
   rssDaily: (lang: "zh" | "en") => `v1:rss:daily:${lang}`,
   rssWeekly: (lang: "zh" | "en") => `v1:rss:weekly:${lang}`,
+  albumArchive: (lang: "zh" | "en") => `v1:album:archive:${lang}`,
+  album: (slug: string, lang: "zh" | "en") => `v1:album:${slug}:${lang}`,
 };
 
 /** Best-effort fan-out bust on publish / depublish of a single pick. */
@@ -59,6 +61,24 @@ export async function bustForPick(
       // 24h TTL on issue pages.
     }
     for (const slug of tagSlugs) keys.push(cacheKeys.tag(slug, lang));
+  }
+  await bust(kv, keys);
+}
+
+/** Fan-out bust on album import / publish / edit. `memberSlugs` are the album's
+ *  member pick slugs — busted so their /a/<slug> pages re-render once the album
+ *  publishes (they were 404 while it was a draft). */
+export async function bustAlbum(
+  kv: KVNamespace,
+  slug: string,
+  memberSlugs: string[] = [],
+): Promise<void> {
+  const langs: ("zh" | "en")[] = ["zh", "en"];
+  const keys: string[] = [];
+  for (const lang of langs) {
+    keys.push(cacheKeys.albumArchive(lang));
+    keys.push(cacheKeys.album(slug, lang));
+    for (const m of memberSlugs) keys.push(cacheKeys.pick(m, lang));
   }
   await bust(kv, keys);
 }

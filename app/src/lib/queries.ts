@@ -3,7 +3,7 @@
  * components (ArticleCard etc) so pages don't have to do their own joins.
  */
 
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { DB } from "~/db/client";
 import {
   pickTags,
@@ -16,8 +16,11 @@ import {
   articleAnnotations,
   wikiIndex,
   submissionEvents,
+  albums,
   type CategoryRow,
+  type Album,
 } from "~/db/schema";
+import { isPickPubliclyVisible } from "~/lib/albums";
 import type { WikiIndexView, WikiTopic } from "./wiki";
 import type { ArticleCardPick } from "~/components/ArticleCard.astro";
 import type { WeeklyCoverIssue } from "~/components/WeeklyCover.astro";
@@ -171,7 +174,7 @@ async function hydrate(db: DB, rows: { id: string; row: PickRow }[]): Promise<Ar
 export async function dailyPicksForDate(db: DB, date: string): Promise<ArticleCardPick[]> {
   const rows = await rawPicks(
     db,
-    and(eq(picks.status, "published"), eq(picks.dailyDate, date)),
+    and(eq(picks.status, "published"), isNull(picks.albumId), eq(picks.dailyDate, date)),
     [desc(picks.positionInDay)],
   );
   return hydrate(db, rows);
@@ -182,7 +185,7 @@ export async function recentDailyDates(db: DB, limit = 30): Promise<string[]> {
   const result = await db
     .select({ d: picks.dailyDate })
     .from(picks)
-    .where(eq(picks.status, "published"))
+    .where(and(eq(picks.status, "published"), isNull(picks.albumId)))
     .groupBy(picks.dailyDate)
     .orderBy(desc(picks.dailyDate))
     .limit(limit);
@@ -277,7 +280,7 @@ export async function picksForTag(db: DB, tagSlug: string, limit = 100): Promise
   if (ids.length === 0) return [];
   const rows = await rawPicks(
     db,
-    and(eq(picks.status, "published"), inArray(picks.id, ids)),
+    and(eq(picks.status, "published"), isNull(picks.albumId), inArray(picks.id, ids)),
     [desc(picks.publishedAt)],
     limit,
   );
@@ -316,7 +319,7 @@ export async function searchPicks(db: DB, params: SearchPicksParams): Promise<Ar
   const limit = Math.min(Math.max(params.limit ?? PICKS_DEFAULT_LIMIT, 1), PICKS_MAX_LIMIT);
   const offset = Math.max(params.offset ?? 0, 0);
 
-  const conds = [eq(picks.status, "published")];
+  const conds = [eq(picks.status, "published"), isNull(picks.albumId)];
   if (params.category) conds.push(eq(picks.category, params.category));
   if (params.date) conds.push(eq(picks.dailyDate, params.date));
   const q = params.q?.trim();
@@ -378,6 +381,15 @@ export async function pickBySlug(db: DB, slug: string): Promise<
     .limit(1);
   const row = result[0];
   if (!row) return null;
+
+  // Album picks are gated behind their album's publication — a pick in a draft
+  // album is not publicly reachable (fail-closed). Normal picks pass straight
+  // through. See docs/adr/0002 and lib/albums.isPickPubliclyVisible.
+  if (row.albumId) {
+    const a = (await db.select({ status: albums.status }).from(albums).where(eq(albums.id, row.albumId)).limit(1))[0];
+    if (!isPickPubliclyVisible({ albumId: row.albumId, albumStatus: a?.status })) return null;
+  }
+
   const tagMap = await attachTags(db, [row.id]);
   const ann = await db
     .select()
@@ -458,6 +470,7 @@ export async function adjacentPicks(
     .where(
       and(
         eq(picks.status, "published"),
+        isNull(picks.albumId),
         or(
           lt(picks.dailyDate, d),
           and(eq(picks.dailyDate, d), lt(picks.positionInDay, p)),
@@ -473,6 +486,7 @@ export async function adjacentPicks(
     .where(
       and(
         eq(picks.status, "published"),
+        isNull(picks.albumId),
         or(
           gt(picks.dailyDate, d),
           and(eq(picks.dailyDate, d), gt(picks.positionInDay, p)),
@@ -695,6 +709,74 @@ export async function homeFeed(db: DB, today: string): Promise<{
   }
 
   return { date, picks: picksList.slice(0, 3), weekly, weeklyToc };
+}
+
+// --- Albums ---------------------------------------------------------------
+
+export interface AlbumCard {
+  id: string;
+  slug: string;
+  title_zh: string;
+  title_en: string;
+  cover_image_key: string | null;
+  count: number;
+  published_at: Date | null;
+}
+
+/** Published albums for the /album index, with member counts. Newest first. */
+export async function publishedAlbums(db: DB): Promise<AlbumCard[]> {
+  const rows = await db
+    .select({
+      id: albums.id,
+      slug: albums.slug,
+      title_zh: albums.titleZh,
+      title_en: albums.titleEn,
+      cover_image_key: albums.coverImageKey,
+      published_at: albums.publishedAt,
+      count: sql<number>`(select count(*) from picks p where p.album_id = ${albums.id} and p.status = 'published')`,
+    })
+    .from(albums)
+    .where(eq(albums.status, "published"))
+    .orderBy(desc(albums.publishedAt));
+  return rows as AlbumCard[];
+}
+
+/** A published album by slug (reader-facing — drafts return null). */
+export async function albumBySlugPublic(db: DB, slug: string): Promise<Album | null> {
+  const r = await db
+    .select()
+    .from(albums)
+    .where(and(eq(albums.slug, slug), eq(albums.status, "published")))
+    .limit(1);
+  return r[0] ?? null;
+}
+
+/** Published member picks of an album, in album order. */
+export async function picksForAlbum(db: DB, albumId: string): Promise<ArticleCardPick[]> {
+  const rows = await rawPicks(
+    db,
+    and(eq(picks.status, "published"), eq(picks.albumId, albumId)),
+    [asc(picks.positionInAlbum)],
+  );
+  return hydrate(db, rows);
+}
+
+/** All albums for the admin list, with total member counts (any status). */
+export async function allAlbumsAdmin(db: DB): Promise<(Album & { count: number })[]> {
+  const rows = await db
+    .select({
+      ...getTableColumns(albums),
+      count: sql<number>`(select count(*) from picks p where p.album_id = ${albums.id})`,
+    })
+    .from(albums)
+    .orderBy(desc(albums.createdAt));
+  return rows as (Album & { count: number })[];
+}
+
+/** A single album by id (admin). */
+export async function albumById(db: DB, id: string): Promise<Album | null> {
+  const r = await db.select().from(albums).where(eq(albums.id, id)).limit(1);
+  return r[0] ?? null;
 }
 
 // --- Newsletter delivery --------------------------------------------------

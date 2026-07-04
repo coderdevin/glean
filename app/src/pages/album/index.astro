@@ -1,0 +1,64 @@
+---
+export const prerender = false;
+import Site from "~/layouts/Site.astro";
+import Lang from "~/components/Lang.astro";
+import { db } from "~/db/client";
+import { publishedAlbums } from "~/lib/queries";
+import { localizedPath } from "~/lib/i18n";
+
+const lang = Astro.locals.lang ?? "zh";
+const L = (p: string): string => localizedPath(p, lang);
+const env = Astro.locals.runtime.env;
+const list = await publishedAlbums(db(env.DB));
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, max-age=60, s-maxage=300, stale-while-revalidate=600",
+);
+---
+<Site
+  title="专辑 · Albums — Glean · 拾遗"
+  description="Albums — a whole source, curated and read in order, in both languages."
+>
+  <section class="page-banner">
+    <div class="container">
+      <span class="eyebrow">
+        {list.length > 0 ? (
+          <Lang><Fragment slot="zh">{list.length} 个专辑</Fragment><Fragment slot="en">{list.length} {list.length === 1 ? "album" : "albums"}</Fragment></Lang>
+        ) : (
+          <Lang zh="专辑筹备中" en="Albums coming soon" />
+        )}
+      </span>
+      <h1 style="margin-top: 12px">
+        <Lang zh="成套的专辑 · 按主题通读" en="Albums · read a whole source in order" />
+      </h1>
+    </div>
+  </section>
+
+  <section class="section--tight" style="padding-top: 16px">
+    <div class="container">
+      {list.length === 0 && (
+        <div class="prose-block" style="text-align: center; padding: 48px 0">
+          <p>
+            <Lang zh="还没有发布的专辑。" en="No albums published yet." />
+          </p>
+        </div>
+      )}
+      <div class="issue-list">
+        {list.map((a) => (
+          <a class="issue-list-card" href={L(`/album/${a.slug}`)}>
+            <div class="issue-list-card__body">
+              <h2 class="issue-list-card__title">
+                <Lang zh={a.title_zh} en={a.title_en} />
+              </h2>
+              <div class="issue-list-card__meta">
+                <span>
+                  <Lang><Fragment slot="zh">{a.count} 篇</Fragment><Fragment slot="en">{a.count} {a.count === 1 ? "piece" : "pieces"}</Fragment></Lang>
+                </span>
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Site>
