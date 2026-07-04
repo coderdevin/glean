@@ -156,7 +156,10 @@ export async function publishSubmission(
         nextHintsJson: sub.aiNextHintsJson,
         sectionsJson: sub.aiSectionsJson,
         lang: sub.extractedLang,
-        albumId,
+        // album_id/position_in_album are deliberately NOT in the update set: a
+        // re-publish (admin edit, sections re-run) must preserve an album pick's
+        // membership, never eject it. New picks get album_id via the insert
+        // branch; adoption is a separate direct update (lib/albums).
         status: "published",
         publishedAt: now,
       },

@@ -16,6 +16,7 @@ import {
   articleAnnotations,
   wikiIndex,
   submissionEvents,
+  submissions,
   albums,
   type CategoryRow,
   type Album,
@@ -777,6 +778,79 @@ export async function allAlbumsAdmin(db: DB): Promise<(Album & { count: number }
 export async function albumById(db: DB, id: string): Promise<Album | null> {
   const r = await db.select().from(albums).where(eq(albums.id, id)).limit(1);
   return r[0] ?? null;
+}
+
+export interface AlbumMemberAdmin {
+  pick_id: string;
+  slug: string;
+  title_zh: string;
+  title_en: string;
+  position_in_album: number;
+  /** The submission this pick was published from, for the edit link (may be
+   *  null for a pick adopted without a linked submission). */
+  submission_id: string | null;
+}
+
+/** Member picks of an album for the admin detail page, in order, each with its
+ *  originating submission id (for the per-pick edit link). */
+export async function albumMembersAdmin(db: DB, albumId: string): Promise<AlbumMemberAdmin[]> {
+  const rows = await db
+    .select({
+      pick_id: picks.id,
+      slug: picks.slug,
+      title_zh: picks.titleZh,
+      title_en: picks.titleEn,
+      position_in_album: picks.positionInAlbum,
+      submission_id: submissions.id,
+    })
+    .from(picks)
+    .leftJoin(submissions, eq(submissions.linkedPickId, picks.id))
+    .where(and(eq(picks.albumId, albumId), eq(picks.status, "published")))
+    .orderBy(asc(picks.positionInAlbum));
+  return rows as AlbumMemberAdmin[];
+}
+
+export interface AlbumImportStats {
+  in_flight: number; // pending / analyzing / composing
+  ready: number; //     awaiting auto-publish
+  failed: number; //    extract/LLM failures (retriable from admin)
+  published: number; // live members (incl. adopted)
+}
+
+/** Import progress for an album: submission counts by bucket (source
+ *  album:<slug>) + published member count. */
+export async function albumImportStats(db: DB, slug: string, albumId: string): Promise<AlbumImportStats> {
+  const subCounts = await db
+    .select({ status: submissions.status, c: sql<number>`count(*)` })
+    .from(submissions)
+    .where(eq(submissions.source, `album:${slug}`))
+    .groupBy(submissions.status);
+  let in_flight = 0;
+  let ready = 0;
+  let failed = 0;
+  for (const r of subCounts) {
+    if (r.status === "pending" || r.status === "analyzing" || r.status === "composing") in_flight += r.c;
+    else if (r.status === "ready") ready += r.c;
+    else if (r.status === "failed") failed += r.c;
+  }
+  const pub = await db
+    .select({ c: sql<number>`count(*)` })
+    .from(picks)
+    .where(and(eq(picks.albumId, albumId), eq(picks.status, "published")));
+  return { in_flight, ready, failed, published: pub[0]?.c ?? 0 };
+}
+
+/** Failed album-import submissions, for the admin detail page's retry list. */
+export async function albumFailedSubmissions(
+  db: DB,
+  slug: string,
+): Promise<{ id: string; url: string; reject_reason: string | null }[]> {
+  return db
+    .select({ id: submissions.id, url: submissions.url, reject_reason: submissions.rejectReason })
+    .from(submissions)
+    .where(and(eq(submissions.source, `album:${slug}`), eq(submissions.status, "failed")))
+    .orderBy(desc(submissions.createdAt))
+    .limit(50);
 }
 
 // --- Newsletter delivery --------------------------------------------------

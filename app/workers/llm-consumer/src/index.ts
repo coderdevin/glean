@@ -27,11 +27,13 @@ import {
   runWeeklyDraft,
   runWeeklyRefine,
   runWeeklyReview,
+  runAlbumDraft,
   markFailed,
   reapStaleLlmQueueWait,
   reapStalledSubmissions,
   reapStalledWeeklyDrafts,
   reapStalledWeeklyReviews,
+  reapStalledAlbumDrafts,
   logEvent,
   type IngestEnv,
 } from "../../../src/lib/ingest";
@@ -57,13 +59,15 @@ export interface Env extends IngestEnv {
   INGEST_LLM: Queue<string>;
 }
 
-type WorkKind = "weekly" | "weekly-review" | "weekly-refine" | "wiki";
+type WorkKind = "weekly" | "weekly-review" | "weekly-refine" | "album" | "wiki";
 
 /** Normalize a raw kind string to a known WorkKind (or undefined). Shared by
  *  the queue parser and the dev /process handler so they can't drift. */
 function parseKind(kindRaw: string | null | undefined): WorkKind | undefined {
   const k = (kindRaw ?? "").trim();
-  return k === "weekly" || k === "weekly-review" || k === "weekly-refine" || k === "wiki" ? k : undefined;
+  return k === "weekly" || k === "weekly-review" || k === "weekly-refine" || k === "album" || k === "wiki"
+    ? k
+    : undefined;
 }
 
 function parseMessage(raw: string): {
@@ -228,6 +232,24 @@ export default {
         continue;
       }
 
+      // Album title/intro draft. Non-throwing; writes its own terminal
+      // draft_status onto the album row, so we ack regardless.
+      if (kind === "album") {
+        try {
+          const result = await runAlbumDraft(env, id);
+          console.log("album draft", { id, ...result });
+        } catch (err) {
+          const reason = (err as Error).message ?? "unknown album draft error";
+          console.error("album draft fail", { id, reason });
+          await logEvent(env, id, "llm", "failed", {
+            message: reason,
+            meta: { kind: "album", source: "album-throw" },
+          });
+        }
+        msg.ack();
+        continue;
+      }
+
       // Sections-only retry path. runSectionsPhase swallows its own errors
       // and sets status='failed' on the row, so we just ack regardless. No
       // markFailed here — analysis already succeeded; only sections failed.
@@ -308,6 +330,8 @@ export default {
     if (w > 0) console.log(`reaper: marked ${w} stalled weekly draft(s) failed`);
     const wr = await reapStalledWeeklyReviews(env);
     if (wr > 0) console.log(`reaper: marked ${wr} stalled weekly review(s) failed`);
+    const ad = await reapStalledAlbumDrafts(env);
+    if (ad > 0) console.log(`reaper: marked ${ad} stalled album draft(s) failed`);
 
     // Daily-only: auto-publish the newest N 'ready' submissions. Gated on the
     // exact cron so it never fires on the */5 reaper tick.
@@ -365,6 +389,11 @@ export default {
         if (!explicitId) return json({ ok: false, error: "kind=weekly-review requires id" }, 400);
         const result = await runWeeklyReview(env, explicitId);
         return json({ ok: result.status === "ready", stage: "weekly-review", id: explicitId, result });
+      }
+      if (kind === "album") {
+        if (!explicitId) return json({ ok: false, error: "kind=album requires id" }, 400);
+        const result = await runAlbumDraft(env, explicitId);
+        return json({ ok: result.status === "ready", stage: "album", id: explicitId, result });
       }
 
       let targetId = explicitId;

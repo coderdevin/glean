@@ -1,0 +1,68 @@
+---
+export const prerender = false;
+import Admin from "~/layouts/Admin.astro";
+import { db } from "~/db/client";
+import { albumById, albumMembersAdmin, albumImportStats, albumFailedSubmissions } from "~/lib/queries";
+
+const env = Astro.locals.runtime.env;
+const id = Astro.params.id;
+if (!id) return new Response("missing id", { status: 400 });
+const drizzleDb = db(env.DB);
+const album = await albumById(drizzleDb, id);
+if (!album) return new Response("not found", { status: 404 });
+
+const members = await albumMembersAdmin(drizzleDb, id);
+const stats = await albumImportStats(drizzleDb, album.slug, id);
+const failed = await albumFailedSubmissions(drizzleDb, album.slug);
+---
+<Admin title={`专辑 · ${album.titleZh}`}>
+  <div style="max-width: 900px; margin: 0 auto; padding: 16px">
+    <p style="margin-bottom: 4px"><a href="/admin/albums">← 所有专辑</a></p>
+    <h1 style="margin-bottom: 4px">{album.titleZh} <span style="color: var(--c-muted); font-weight: 400">· {album.titleEn}</span></h1>
+    <p style="font-size: 13px; color: var(--c-muted); margin-bottom: 20px">
+      /album/{album.slug} · {album.status === "published" ? "已发布" : "草稿"}
+    </p>
+
+    <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; font-size: 14px">
+      <span>处理中 <strong>{stats.in_flight}</strong></span>
+      <span>待发布 <strong>{stats.ready}</strong></span>
+      <span>已发布 <strong>{stats.published}</strong></span>
+      <span style={stats.failed > 0 ? "color:#c0392b" : ""}>失败 <strong>{stats.failed}</strong></span>
+    </div>
+
+    {failed.length > 0 && (
+      <div style="border: 1px solid #f0c0c0; background: #fdf3f3; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px">
+        <strong style="color:#c0392b">导入失败（{failed.length}）</strong>
+        <p style="font-size: 12px; color: var(--c-muted); margin: 4px 0 10px">在各自的审核页里重试（重新抓取 / 重跑 AI）。</p>
+        <ul style="margin: 0; padding-left: 18px">
+          {failed.map((f) => (
+            <li style="margin-bottom: 6px; font-size: 13px">
+              <a href={`/admin/${f.id}`}>{f.url}</a>
+              {f.reject_reason && <span style="color: var(--c-muted)"> — {f.reject_reason}</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+
+    <h2 style="font-size: 16px; margin-bottom: 8px">成员文章 · 排序</h2>
+    {members.length === 0 ? (
+      <p style="color: var(--c-muted)">还没有已发布的成员。导入后文章处理完会自动出现在这里。</p>
+    ) : (
+      <form method="POST" action={`/api/admin/albums/${id}/reorder`}>
+        <p style="font-size: 12px; color: var(--c-muted); margin-bottom: 10px">改左侧数字后点「保存顺序」（小的在前）。</p>
+        <div style="display: grid; gap: 6px">
+          {members.map((m) => (
+            <div style="display: flex; gap: 10px; align-items: center; border-bottom: 1px solid var(--c-border, #eee); padding: 6px 0">
+              <input type="number" name={`pos_${m.pick_id}`} value={m.position_in_album} style="width: 64px" aria-label="顺序" />
+              <span style="flex: 1">{m.title_zh} <span style="color: var(--c-muted)">· {m.title_en}</span></span>
+              <a href={`/a/${m.slug}`} target="_blank" rel="noreferrer" style="font-size: 12px">预览</a>
+              {m.submission_id && <a href={`/admin/${m.submission_id}`} style="font-size: 12px">编辑</a>}
+            </div>
+          ))}
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top: 14px">保存顺序</button>
+      </form>
+    )}
+  </div>
+</Admin>

@@ -33,7 +33,7 @@ const albums = await allAlbumsAdmin(db(env.DB));
         <div style="border: 1px solid var(--c-border, #ddd); border-radius: 8px; padding: 16px">
           <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
             <div>
-              <strong style="font-size: 17px">{a.titleZh}</strong>
+              <a href={`/admin/albums/${a.id}`} style="font-size: 17px; font-weight: 700">{a.titleZh}</a>
               <span style="color: var(--c-muted)"> · {a.titleEn}</span>
             </div>
             <div style="display: flex; gap: 8px; align-items: center">
@@ -52,6 +52,9 @@ const albums = await allAlbumsAdmin(db(env.DB));
           <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0">
             <form method="POST" action={`/api/admin/albums/${a.id}/import`}>
               <button type="submit" class="btn btn-secondary" disabled={!a.feedUrl} title={a.feedUrl ? "" : "先填 Feed URL"}>导入 feed</button>
+            </form>
+            <form method="POST" action={`/api/admin/albums/${a.id}/draft`}>
+              <button type="submit" class="btn btn-secondary" disabled={a.count === 0 || a.draftStatus === "drafting"} title={a.count === 0 ? "专辑还没有文章" : ""}>AI 起草标题/导语</button>
             </form>
             {a.status === "published" ? (
               <form method="POST" action={`/api/admin/albums/${a.id}/unpublish`}>

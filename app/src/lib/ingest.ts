@@ -29,6 +29,7 @@ import {
   tags as tagsTable,
   categories as categoriesTable,
   weeklyIssues,
+  albums,
   type EventStage,
   type EventStatus,
 } from "~/db/schema";
@@ -37,6 +38,7 @@ import {
   callLlmSections,
   callLlmWeekly,
   callLlmWeeklyReview,
+  callLlmAlbum,
   toWeeklyPickInput,
   defaultProviderName,
   resolveProviderSpec,
@@ -47,7 +49,7 @@ import {
 import { extractFromUrl } from "./extract";
 import { sanitizeProposedTags } from "./tags";
 import { sanitizeCategory } from "./category";
-import { bustForPick, bustForWeekly } from "./cache";
+import { bustForPick, bustForWeekly, bustAlbum } from "./cache";
 import { repairWeeklyDraft } from "./weekly";
 import { ulid } from "./ulid";
 
@@ -1049,6 +1051,96 @@ export async function runWeeklyRefine(
 }
 
 /**
+ * Draft (or re-draft) an album's bilingual title + intro with the LLM. Mirrors
+ * runWeeklyDraft: runs in a queue worker, is non-throwing, and writes its own
+ * terminal draft_status ('ready' | 'failed') onto the album row. No layout to
+ * repair — an album is a flat ordered list. The caller sets draft_status =
+ * 'drafting' before enqueueing.
+ */
+export async function runAlbumDraft(
+  env: IngestEnv,
+  albumId: string,
+): Promise<{ status: "ready" | "failed"; reason?: string }> {
+  const db = drizzle(env.DB, { schema });
+
+  const albRows = await db.select().from(albums).where(eq(albums.id, albumId)).limit(1);
+  const album = albRows[0];
+  if (!album) {
+    await logEvent(env, albumId, "llm", "failed", {
+      message: `album ${albumId} not found`,
+      meta: { kind: "album" },
+    });
+    return { status: "failed", reason: "not found" };
+  }
+
+  const members = await db
+    .select()
+    .from(picks)
+    .where(and(eq(picks.albumId, albumId), eq(picks.status, "published")))
+    .orderBy(picks.positionInAlbum);
+  if (members.length === 0) {
+    const reason = "专辑还没有已发布的文章 · no published picks in this album";
+    await db
+      .update(albums)
+      .set({ draftStatus: "failed", draftError: reason })
+      .where(eq(albums.id, albumId));
+    await logEvent(env, albumId, "llm", "failed", { message: reason, meta: { kind: "album" } });
+    return { status: "failed", reason };
+  }
+
+  await logEvent(env, albumId, "llm", "started", {
+    meta: { kind: "album", picks: members.length },
+  });
+
+  try {
+    const res = await callLlmAlbum(env, {
+      title: "",
+      body: "",
+      picks: members.map(toWeeklyPickInput),
+      currentTitleZh: album.titleZh,
+      currentTitleEn: album.titleEn,
+    });
+    const ai = res.output;
+
+    await db
+      .update(albums)
+      .set({
+        titleZh: ai.title_zh,
+        titleEn: ai.title_en,
+        introZh: ai.intro_zh,
+        introEn: ai.intro_en,
+        draftStatus: "ready",
+        draftError: null,
+      })
+      .where(eq(albums.id, albumId));
+
+    // A published album's title/intro just changed — bust its public pages.
+    if (env.CACHE && album.status === "published") await bustAlbum(env.CACHE, album.slug);
+
+    await logEvent(env, albumId, "llm", "ok", {
+      meta: {
+        kind: "album",
+        model: res.provider.model,
+        latencyMs: res.latencyMs,
+        tokens: res.totalTokens,
+      },
+    });
+    return { status: "ready" };
+  } catch (err) {
+    const reason = (err as Error).message ?? "unknown album draft error";
+    await db
+      .update(albums)
+      .set({ draftStatus: "failed", draftError: reason.slice(0, 500) })
+      .where(eq(albums.id, albumId));
+    await logEvent(env, albumId, "llm", "failed", {
+      message: reason.slice(0, 500),
+      meta: { kind: "album" },
+    });
+    return { status: "failed", reason };
+  }
+}
+
+/**
  * On-demand editorial self-review of a weekly draft. Writes review_json /
  * review_status / review_error and seeds review_feedback with the model's
  * suggestions. INDEPENDENT of draftStatus — never touches the draft itself, so
@@ -1161,6 +1253,35 @@ export async function reapStalledWeeklyDrafts(
     await logEvent(env, r.id, "pipeline", "failed", {
       message,
       meta: { kind: "weekly", source: "weekly-draft-watchdog" },
+    });
+  }
+  return reaped.length;
+}
+
+/** Reap album drafts stranded in 'drafting' past the wall-time ceiling — same
+ *  eviction scenario as reapStalledWeeklyDrafts. Run from the worker's cron. */
+export async function reapStalledAlbumDrafts(
+  env: { DB: D1Database },
+  now: Date = new Date(),
+): Promise<number> {
+  const db = drizzle(env.DB, { schema });
+  const cutoff = new Date(now.getTime() - STALL_WINDOW_MS);
+  const message = `album draft exceeded ${STALL_WINDOW_MS / 60_000}min — re-draft from the admin UI`;
+  const reaped = await db
+    .update(albums)
+    .set({ draftStatus: "failed", draftError: message })
+    .where(
+      and(
+        eq(albums.draftStatus, "drafting"),
+        isNotNull(albums.draftStartedAt),
+        lt(albums.draftStartedAt, cutoff),
+      ),
+    )
+    .returning({ id: albums.id });
+  for (const r of reaped) {
+    await logEvent(env, r.id, "pipeline", "failed", {
+      message,
+      meta: { kind: "album", source: "album-draft-watchdog" },
     });
   }
   return reaped.length;

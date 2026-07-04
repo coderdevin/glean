@@ -15,6 +15,12 @@
 
 2b、3、4 只依赖 2a，彼此独立，可并行。
 
+## 实现状态（2026-07）
+
+- 切片 1 / 2a / 2b / 3 / 4：**已实现**（typecheck 0 error、全套单测通过、reader + admin 路由本地实测）。
+- **未做（切片 4 内唯一缺口）**：专辑封面上传/展示（`cover_image_key` 列已存在，但没有上传端点/表单/渲染）——单独留作后续，需要 R2 图片上传 + 服务链路。
+- **未真实跑通**：feed 导入全链路（`fetch(源站)`→extract→LLM→自动发布）与 album AI 起草，都需要 `pnpm worker:dev` + `pnpm llm:dev` + 真实 LLM key 才能端到端验证。
+
 ## 清单
 
 1. [切片 1 · 专辑骨架](./01-album-skeleton.md)

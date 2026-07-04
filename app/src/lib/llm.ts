@@ -71,7 +71,7 @@ export interface LlmEnv {
  */
 export const NO_RETRY_MARKER = "[no-retry]";
 
-export type LlmPhase = "analysis" | "sections" | "weekly" | "weekly_review";
+export type LlmPhase = "analysis" | "sections" | "weekly" | "weekly_review" | "album";
 
 /** Best-effort dump of the raw LLM stream output to R2. */
 async function dumpLlmFailure(
@@ -338,6 +338,16 @@ const WeeklyResponseSchema = z.object({
     .default([]),
 });
 export type LlmWeeklyOutput = z.infer<typeof WeeklyResponseSchema>;
+
+// Album draft: bilingual title + intro for a persistent, source/theme-based
+// collection. No sections — an album is a flat ordered list, unlike a weekly.
+const AlbumResponseSchema = z.object({
+  title_zh: z.string(),
+  title_en: z.string(),
+  intro_zh: z.string(),
+  intro_en: z.string(),
+});
+export type LlmAlbumOutput = z.infer<typeof AlbumResponseSchema>;
 
 // Editorial self-review of a weekly draft. Internal tool for the (Chinese)
 // editor — kept Chinese-only, not bilingual. `suggestions` is the actionable
@@ -829,6 +839,16 @@ const WEEKLY_SYSTEM_PROMPT = `你是一名有 10 年经验的双语技术编辑�
 
 输出必须是英文 key 的 JSON 对象，符合给定 schema。`;
 
+const ALBUM_SYSTEM_PROMPT = `你是一名有 10 年经验的双语技术编辑，给精品技术刊物 **Glean / 拾遗** 策划**专辑（Album）**——一个围绕某个来源或主题、长期沉淀的文章合辑（不是按周分期的合辑）。
+
+你会收到这个专辑的当前工作标题，以及它已收录的若干篇 picks（每篇有中英标题、中英摘要、分类）。你的任务：
+
+1. 给这个专辑定一个**有主题、有编辑品味**的中英标题（title_zh / title_en）。当前工作标题仅供参考：够好就沿用或微调，否则重拟——要概括整个专辑的内容气质，而不是泛泛的"技术文章合集"。
+2. 写一段**导语**（intro_zh / intro_en），中文约 200 字（180–220 字）、英文约 120–150 words：说清这个专辑收录的是什么、为什么值得成套通读、贯穿其中的主线是什么，像一个有观点的编辑在开篇引读者入门。
+3. 不要罗列或逐篇点评文章，也不要编造文章里没有的信息；只根据我给你的 picks 归纳整体气质。
+
+输出必须是英文 key 的 JSON 对象，符合给定 schema。`;
+
 // PLACEHOLDER — 措辞交编辑定稿。这是周刊「自我评审」的提示词：让模型以资深双语
 // 技术编辑的视角，审视一份已经起草好的周刊（标题/导语/分章），指出做得好的地方、
 // 做得不好的地方、以及具体的改进方向。改进方向会被编辑修改后用于「按建议重做」。
@@ -891,6 +911,7 @@ export type PromptKey =
   | "github_sections"
   | "weekly"
   | "weekly_review"
+  | "album"
   | "wiki"
   | "wiki_incremental";
 
@@ -909,6 +930,7 @@ export const PROMPT_REGISTRY: PromptEntry[] = [
   { key: "github_sections", label: "GitHub · 项目讲解文", default: GITHUB_SECTIONS_SYSTEM_PROMPT },
   { key: "weekly", label: "周刊 · 合辑", default: WEEKLY_SYSTEM_PROMPT },
   { key: "weekly_review", label: "周刊 · 自我评审", default: WEEKLY_REVIEW_SYSTEM_PROMPT },
+  { key: "album", label: "专辑 · 标题 / 导语", default: ALBUM_SYSTEM_PROMPT },
   { key: "wiki", label: "导览 · 全量重建", default: WIKI_SYSTEM_PROMPT },
   { key: "wiki_incremental", label: "导览 · 增量折入", default: WIKI_INCREMENTAL_SYSTEM_PROMPT },
 ];
@@ -1172,6 +1194,36 @@ export async function callLlmWeekly(
   });
 }
 
+export interface CallLlmAlbumArgs extends CallLlmArgs {
+  picks: WeeklyPickInput[];
+  /** The album's current working title, fed as a hint the model may keep or refine. */
+  currentTitleZh: string;
+  currentTitleEn: string;
+}
+
+/**
+ * Album draft: bilingual title + intro from an album's member picks. Same
+ * plumbing as the weekly draft (callWithFallback, schema retry), minus the
+ * layout — an album is a flat ordered list, so there are no sections to repair.
+ */
+export async function callLlmAlbum(
+  env: LlmEnv,
+  args: CallLlmAlbumArgs,
+): Promise<LlmCallResult<LlmAlbumOutput>> {
+  const systemPrompt = await getPrompt(env, "album");
+  return callWithFallback(env, args, {
+    phase: "album",
+    schema: AlbumResponseSchema,
+    systemPrompt,
+    buildMessage: () =>
+      buildAlbumUserMessage({
+        picks: args.picks,
+        currentTitleZh: args.currentTitleZh,
+        currentTitleEn: args.currentTitleEn,
+      }),
+  });
+}
+
 /**
  * Weekly self-review: critique an existing draft. Same plumbing as the draft
  * call; small JSON output (strengths/weaknesses/suggestions). Read-only — never
@@ -1414,6 +1466,12 @@ async function callOnce<S extends z.ZodTypeAny>(
         dateStart: (args as CallLlmWeeklyReviewArgs).dateStart,
         dateEnd: (args as CallLlmWeeklyReviewArgs).dateEnd,
         draft: (args as CallLlmWeeklyReviewArgs).draft,
+      })
+    : cfg.phase === "album"
+    ? buildAlbumUserMessage({
+        picks: (args as CallLlmAlbumArgs).picks,
+        currentTitleZh: (args as CallLlmAlbumArgs).currentTitleZh,
+        currentTitleEn: (args as CallLlmAlbumArgs).currentTitleEn,
       })
     : buildSectionsUserMessage({
         title: args.title,
@@ -1806,6 +1864,14 @@ function buildWeeklyUserMessage(args: {
     return `${base}\n\n这是上一版草稿（同一批篇目，请在此基础上修订，不要增删 picks）：\n${renderWeeklyDraftSnapshot(args.priorDraft)}\n\n编辑给出的改进方向（请据此重做标题/导语/分章）：\n${args.feedback.trim()}`;
   }
   return base;
+}
+
+function buildAlbumUserMessage(args: {
+  picks: WeeklyPickInput[];
+  currentTitleZh: string;
+  currentTitleEn: string;
+}): string {
+  return `专辑当前工作标题：${args.currentTitleZh} / ${args.currentTitleEn}\n已收录的 picks（共 ${args.picks.length} 篇）：\n${weeklyPickLines(args.picks)}`;
 }
 
 function buildWeeklyReviewUserMessage(args: {
