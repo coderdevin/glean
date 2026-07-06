@@ -47,6 +47,7 @@ import {
   type WeeklyDraftSnapshot,
 } from "./llm";
 import { extractFromUrl } from "./extract";
+import { getSetting } from "./settings";
 import { sanitizeProposedTags } from "./tags";
 import { sanitizeCategory } from "./category";
 import { bustForPick, bustForWeekly, bustAlbum } from "./cache";
@@ -291,6 +292,30 @@ export function shouldScreenAuto(
   return (source ?? "manual").startsWith("auto:") && score < threshold;
 }
 
+/** Topic-relevance gate. A submission whose phase-1 `relevance` (fit to the
+ *  site's theme charter) falls below this is held at 'screened' — NOT
+ *  auto-published, but visible in /admin so a mis-screen is recoverable.
+ *  Unlike the quality gate (auto rows only), the topic gate applies to EVERY
+ *  source: an off-theme link is off-theme whether a human or discovery found
+ *  it. Editable per-site via app_settings ("relevance_threshold"). */
+export const RELEVANCE_SCORE_THRESHOLD = 0.6;
+
+/** app_settings key for the editable relevance threshold. */
+export const RELEVANCE_THRESHOLD_KEY = "relevance_threshold";
+
+/** Resolve the relevance threshold: admin override (app_settings) ?? default.
+ *  A missing / malformed / out-of-range value falls back to the default so the
+ *  gate is never accidentally disabled or made nonsensical by a bad setting. */
+export async function getRelevanceThreshold(db: D1Database): Promise<number> {
+  try {
+    const raw = await getSetting(db, RELEVANCE_THRESHOLD_KEY);
+    const n = raw == null ? NaN : Number(raw);
+    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : RELEVANCE_SCORE_THRESHOLD;
+  } catch {
+    return RELEVANCE_SCORE_THRESHOLD;
+  }
+}
+
 export async function processLlm(
   env: IngestEnv,
   id: string,
@@ -439,7 +464,26 @@ export async function processLlm(
   }
   const tagsKept = proposedTags.map((t) => t.slug);
 
-  const screened = shouldScreenAuto(row.source, analysis.output.score);
+  // Two independent screening gates, both landing a row at 'screened' (held for
+  // human, never auto-published). Topic gate applies to every source; quality
+  // gate applies to auto-discovered rows only (a human submitter vouches for
+  // quality, not topic). Topic failure is reported first — it's the more
+  // actionable reason and the one manual submitters trip.
+  const relevance = analysis.output.relevance;
+  const relevanceThreshold = await getRelevanceThreshold(env.DB);
+  const offTopic = relevance < relevanceThreshold;
+  const lowQualityAuto = shouldScreenAuto(row.source, analysis.output.score);
+  const screened = offTopic || lowQualityAuto;
+  const screenReason = offTopic
+    ? `auto-screened: 跑题 relevance ${relevance.toFixed(2)} < ${relevanceThreshold}${
+        analysis.output.relevance_reason ? ` — ${analysis.output.relevance_reason}` : ""
+      }`
+    : lowQualityAuto
+      ? `auto-screened: phase-1 score ${analysis.output.score.toFixed(2)} < ${AUTO_PUBLISH_SCORE_THRESHOLD}`
+      : null;
+  // Persist relevance alongside the quality subscores (additive, no migration)
+  // so it's visible in /admin for tuning even on rows that passed the gate.
+  const subscoresOut = { ...(analysis.output.subscores ?? {}), relevance };
 
   await db
     .update(submissions)
@@ -458,7 +502,7 @@ export async function processLlm(
       aiTagsJson: JSON.stringify(tagsKept),
       aiCategory: category.slug,
       aiScore: analysis.output.score,
-      aiSubscoresJson: analysis.output.subscores ? JSON.stringify(analysis.output.subscores) : null,
+      aiSubscoresJson: JSON.stringify(subscoresOut),
       aiGlossaryJson: analysis.output.glossary.length ? JSON.stringify(analysis.output.glossary) : null,
       aiNextHintsJson: analysis.output.next_hints.length ? JSON.stringify(analysis.output.next_hints) : null,
       aiModel: `${analysis.provider.name}/${analysis.provider.model}`,
@@ -466,9 +510,7 @@ export async function processLlm(
       aiTokens: analysis.totalTokens,
       processingModel: null,
       processedAt: new Date(),
-      rejectReason: screened
-        ? `auto-screened: phase-1 score ${analysis.output.score.toFixed(2)} < ${AUTO_PUBLISH_SCORE_THRESHOLD}`
-        : null,
+      rejectReason: screenReason,
     })
     .where(eq(submissions.id, id));
   await logEvent(env, id, "llm", "ok", {
@@ -486,8 +528,14 @@ export async function processLlm(
 
   if (screened) {
     await logEvent(env, id, "pipeline", "skipped", {
-      message: `screened: score ${analysis.output.score.toFixed(2)} < ${AUTO_PUBLISH_SCORE_THRESHOLD} — phase 2 not run`,
-      meta: { phase: "gate2", source: row.source, score: analysis.output.score },
+      message: `${screenReason} — phase 2 not run`,
+      meta: {
+        phase: offTopic ? "relevance-gate" : "gate2",
+        source: row.source,
+        score: analysis.output.score,
+        relevance,
+        relevance_threshold: relevanceThreshold,
+      },
     });
   }
 

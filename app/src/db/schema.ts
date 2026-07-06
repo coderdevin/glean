@@ -15,7 +15,7 @@ export const SUBMISSION_STATUSES = [
   "published",
   "rejected",   // editor decision (human)
   "failed",     // AI failed at some stage (retriable)
-  "screened",   // auto-discovered, phase-1 score < threshold — held for human, never auto-published
+  "screened",   // held for human, never auto-published: off-topic (relevance < threshold, any source) OR low-quality auto-discovered (score < threshold)
 ] as const;
 export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
 

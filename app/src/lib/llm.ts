@@ -292,6 +292,14 @@ const AnalysisResponseSchema = z.object({
       bias: z.number().min(0).max(1).default(0.0),
     })
     .nullish(),
+  // Topic-relevance gate signal — how well the piece fits the site's theme
+  // (the injected 【本刊主题】 charter). Deliberately INDEPENDENT of the
+  // quality `score`: a rigorous but off-theme article scores high here on
+  // quality yet must score low on relevance. Fail-open — `.catch(1)` makes a
+  // missing / unparseable value read as 1 (on-topic), so an LLM slip never
+  // screens legitimate content; the gate fires only on a confident low.
+  relevance: z.number().min(0).max(1).catch(1),
+  relevance_reason: z.string().catch(""),
   glossary: z
     .array(
       z.object({
@@ -961,6 +969,56 @@ export async function getPrompt(env: LlmEnv, key: PromptKey): Promise<string> {
 }
 
 /* ============================================================
+ * Topic-relevance charter (选题闸门判据)
+ * ============================================================ */
+
+/** app_settings key holding the editable theme charter. Editing it in /admin
+ *  retunes the relevance gate with no deploy. */
+export const RELEVANCE_CHARTER_KEY = "relevance_charter";
+
+/** Baked-in default charter. What Glean/拾遗 accepts, and what it refuses.
+ *  Injected verbatim into the phase-1 analysis prompt as 【本刊主题】 so the
+ *  model can rate topic fit. Overridable per-site via app_settings. */
+export const DEFAULT_RELEVANCE_CHARTER = `本刊只收 **AI / 前沿技术工程** 内容：大模型与 AI 系统、软件工程与系统设计、工具链、基础设施、编程语言与编译器、数据/检索、以及有第一手证据的前沿技术研究。
+明确**不收**：生活方式、园艺、健康养生、泛科普软文、财经八卦、与技术工程无关的话题，以及虽属科技但无工程/技术深度的消费资讯。`;
+
+/** Resolve the relevance charter: admin override (app_settings) ?? default.
+ *  Any DB miss / error falls back to the default — the gate must never break
+ *  the pipeline. */
+export async function getRelevanceCharter(env: LlmEnv): Promise<string> {
+  if (!env.DB) return DEFAULT_RELEVANCE_CHARTER;
+  try {
+    const v = await getSetting(env.DB, RELEVANCE_CHARTER_KEY);
+    return v && v.trim() ? v.trim() : DEFAULT_RELEVANCE_CHARTER;
+  } catch {
+    return DEFAULT_RELEVANCE_CHARTER;
+  }
+}
+
+/** The relevance-scoring instruction appended to BOTH phase-1 analysis prompts
+ *  (article + github). Kept out of the editable prompt bodies so the two
+ *  variants can't drift and the (dynamic) charter is injected in one place. */
+function relevanceAddendum(charter: string): string {
+  return `
+
+============================================================
+# 附加字段 · 主题相关性（选题闸门，务必输出）
+============================================================
+除上面要求的所有字段外，你必须在**同一个 JSON 对象**里**额外**输出这两个字段：
+
+  "relevance": 0.0-1.0,          // 本内容与下方【本刊主题】的契合度
+  "relevance_reason": "≤40 个中文字符，一句话说明为何切题 / 跑题"
+
+【本刊主题】
+${charter}
+
+判定规则：
+- relevance 与质量分 score **完全独立**：一篇写得很好但不属于本刊主题的内容，score 可以高，relevance 必须低。
+- ≥ 0.8：正中主题；0.6-0.8：沾边、可收；< 0.6：跑题（即使质量再高也给低 relevance）。
+- 只判断"是不是本刊主题范围内的内容"，不判断质量好坏。`;
+}
+
+/* ============================================================
  * Budget
  * ============================================================ */
 
@@ -1113,10 +1171,14 @@ export async function callLlmAnalysis(
   env: LlmEnv,
   args: CallLlmAnalysisArgs,
 ): Promise<LlmCallResult<LlmAnalysisOutput>> {
-  const systemPrompt = await getPrompt(
-    env,
-    isGithubHost(args.sourceHost) ? "github_analysis" : "article_analysis",
-  );
+  const [basePrompt, charter] = await Promise.all([
+    getPrompt(env, isGithubHost(args.sourceHost) ? "github_analysis" : "article_analysis"),
+    getRelevanceCharter(env),
+  ]);
+  // Charter + relevance-field instruction injected here (not baked into the
+  // editable prompt bodies) so both analysis variants stay in lockstep and the
+  // theme definition lives in one editable place.
+  const systemPrompt = basePrompt + relevanceAddendum(charter);
   return callWithFallback(env, args, {
     phase: "analysis",
     schema: AnalysisResponseSchema,

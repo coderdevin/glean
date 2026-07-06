@@ -2,9 +2,20 @@
 export const prerender = false;
 import Admin from "~/layouts/Admin.astro";
 import { getLlmProviderSetting, getSetting } from "~/lib/settings";
-import { defaultProviderName, PROMPT_REGISTRY } from "~/lib/llm";
+import { defaultProviderName, PROMPT_REGISTRY, RELEVANCE_CHARTER_KEY, DEFAULT_RELEVANCE_CHARTER } from "~/lib/llm";
+import { RELEVANCE_THRESHOLD_KEY, RELEVANCE_SCORE_THRESHOLD } from "~/lib/ingest";
 
 const env = Astro.locals.runtime.env;
+
+// Topic-relevance gate: editable charter (what counts as on-theme) + threshold.
+// Off-theme submissions (relevance < threshold) are held at 'screened', never
+// auto-published. Both fall back to baked-in defaults when unset.
+const charterOverride = await getSetting(env.DB, RELEVANCE_CHARTER_KEY);
+const charterOverridden = !!charterOverride?.trim();
+const charterValue = charterOverridden ? charterOverride! : DEFAULT_RELEVANCE_CHARTER;
+const thresholdOverride = await getSetting(env.DB, RELEVANCE_THRESHOLD_KEY);
+const thresholdOverridden = !!thresholdOverride?.trim();
+const thresholdValue = thresholdOverridden ? thresholdOverride! : String(RELEVANCE_SCORE_THRESHOLD);
 
 // Default-provider toggle (moved here from the queue page). "auto" follows the
 // env default; show which provider that resolves to.
@@ -54,6 +65,65 @@ Astro.response.headers.set("Cache-Control", "no-store");
           ))}
           <span class="q2-provider__note">新投稿自动处理用此引擎；ModelScope 失败时自动回退 DeepSeek。</span>
         </div>
+      </section>
+
+      <section style="margin-block: 1.5rem">
+        <h2 class="t-body" style="margin-bottom: .5rem">选题闸门 · 主题相关性</h2>
+        <p class="t-body-sm text-muted" style="margin-bottom: 1rem">
+          跑题的投稿（relevance 低于阈值）会停在 <span class="t-code">screened</span>，不进入每日自动发布，但仍在 /admin 可见——误判可人工发回。宪章即"什么算切题"的判据，注入 phase-1 分析。改动立即对新投稿生效。
+        </p>
+        <form
+          action="/api/admin/settings/relevance"
+          method="post"
+          style="border: 1px solid var(--rule, #e5e0d8); border-radius: 8px; padding: 1rem"
+        >
+          <div class="row row--between" style="align-items: center; margin-bottom: .5rem; gap: 8px">
+            <label for="rel-charter" class="t-body" style="font-weight: 600">
+              主题宪章
+              <span class="t-code text-muted-soft" style="font-size: 11px; margin-left: 8px">{RELEVANCE_CHARTER_KEY}</span>
+            </label>
+            <span
+              class="t-body-sm"
+              style={`color: ${charterOverridden ? "var(--accent, #b25b2e)" : "var(--text-muted, #8a8275)"}`}
+            >
+              {charterOverridden ? "已自定义" : "默认"}
+            </span>
+          </div>
+          <textarea
+            id="rel-charter"
+            name="charter"
+            rows="8"
+            spellcheck="false"
+            style="width: 100%; font-family: var(--font-mono, monospace); font-size: 12px; line-height: 1.5; padding: .6rem; border: 1px solid var(--rule, #e5e0d8); border-radius: 6px; resize: vertical; white-space: pre-wrap"
+          >{charterValue}</textarea>
+          <div class="row" style="align-items: center; gap: 10px; margin-top: .8rem">
+            <label for="rel-threshold" class="t-body" style="font-weight: 600">阈值</label>
+            <input
+              id="rel-threshold"
+              name="threshold"
+              type="number"
+              min="0"
+              max="1"
+              step="0.05"
+              value={thresholdValue}
+              style="width: 90px; font-family: var(--font-mono, monospace); padding: .4rem .5rem; border: 1px solid var(--rule, #e5e0d8); border-radius: 6px"
+            />
+            <span class="t-body-sm text-muted">0–1，低于此值判为跑题。默认 {RELEVANCE_SCORE_THRESHOLD}{thresholdOverridden ? "" : "（当前默认）"}</span>
+          </div>
+          <div class="row" style="gap: 8px; margin-top: .8rem">
+            <button type="submit" class="btn btn-primary">保存</button>
+            <button
+              type="submit"
+              name="action"
+              value="reset"
+              class="btn btn-secondary"
+              disabled={!charterOverridden && !thresholdOverridden}
+              title={charterOverridden || thresholdOverridden ? "删除覆盖，回落默认" : "当前已是默认"}
+            >
+              重置为默认
+            </button>
+          </div>
+        </form>
       </section>
 
       <section>
