@@ -4,7 +4,7 @@ import Site from "~/layouts/Site.astro";
 import Lang from "~/components/Lang.astro";
 import { localizedPath } from "~/lib/i18n";
 import { db } from "~/db/client";
-import { pickBySlug, adjacentPicks } from "~/lib/queries";
+import { pickBySlug, adjacentPicks, adjacentAlbumPicks, albumById } from "~/lib/queries";
 import { categoryBadge } from "~/lib/category";
 import { formatDateISO, formatTimeHM, siteTz } from "~/lib/datetime";
 import { renderMarkdown } from "~/lib/markdown";
@@ -28,14 +28,25 @@ const tz = siteTz(env);
 const publishedDate = formatDateISO(pick.published_at, tz);
 const publishedTime = formatTimeHM(pick.published_at, tz);
 
-// Prev/next on the global timeline (by daily_date, position_in_day).
-const { prev, next } = await adjacentPicks(db(env.DB), {
-  dailyDate: pick.daily_date,
-  positionInDay: pick.position_in_day,
-});
-// "· 同日" when the neighbor shares this pick's day, else show its date (MM-DD).
-const neighborLabel = (d: string) =>
-  d === pick.daily_date ? null : d.slice(5);
+// Reading context: album members stay INSIDE their album (breadcrumb +
+// prev/next by position_in_album); everything else uses the global daily
+// timeline. Album picks carry a daily_date too (set at publish), so we must
+// branch on album membership, not fall through to the daily path.
+const album = pick.album_id ? await albumById(db(env.DB), pick.album_id) : null;
+const { prev, next } = album
+  ? await adjacentAlbumPicks(db(env.DB), {
+      albumId: pick.album_id!,
+      positionInAlbum: pick.position_in_album,
+      id: pick.id,
+    })
+  : await adjacentPicks(db(env.DB), {
+      dailyDate: pick.daily_date,
+      positionInDay: pick.position_in_day,
+    });
+// Neighbor suffix after "上一条/下一条": in an album it's a fixed marker; on the
+// daily timeline it's the neighbor's date ("· MM-DD") or "· 同日".
+const neighborSuffixZh = (d: string) => (album ? "专辑" : d === pick.daily_date ? "同日" : d.slice(5));
+const neighborSuffixEn = (d: string) => (album ? "in album" : d === pick.daily_date ? "same day" : d.slice(5));
 
 /** Per-section count of editor annotations anchored to it. */
 const annotationsByAnchor = new Map<string, number>();
@@ -153,8 +164,18 @@ const breadcrumbLd = {
       <article class="av2">
         <header class="av2-head">
           <div class="av2-crumbs">
-            <a href={L("/daily")}><Lang zh="日刊" en="Daily" /></a>
-            {publishedDate && (<><span class="sep">/</span><a href={L(`/daily/${publishedDate}`)}>{publishedDate}</a></>)}
+            {album ? (
+              <>
+                <a href={L("/album")}><Lang zh="专辑" en="Albums" /></a>
+                <span class="sep">/</span>
+                <a href={L(`/album/${album.slug}`)}><Lang zh={album.titleZh} en={album.titleEn} /></a>
+              </>
+            ) : (
+              <>
+                <a href={L("/daily")}><Lang zh="日刊" en="Daily" /></a>
+                {publishedDate && (<><span class="sep">/</span><a href={L(`/daily/${publishedDate}`)}>{publishedDate}</a></>)}
+              </>
+            )}
             <span class="sep">/</span>
             <span>
               <Lang zh={pick.title_zh} en={pick.title_en} />
@@ -339,8 +360,8 @@ const breadcrumbLd = {
             <a class="pn-card pn-card--prev" href={L(`/a/${prev.slug}`)}>
               <span class="pn-card__dir">
                 ← <Lang>
-                  <Fragment slot="zh">上一条{neighborLabel(prev.daily_date) ? ` · ${neighborLabel(prev.daily_date)}` : " · 同日"}</Fragment>
-                  <Fragment slot="en">Previous{neighborLabel(prev.daily_date) ? ` · ${neighborLabel(prev.daily_date)}` : " · same day"}</Fragment>
+                  <Fragment slot="zh">上一条 · {neighborSuffixZh(prev.daily_date)}</Fragment>
+                  <Fragment slot="en">Previous · {neighborSuffixEn(prev.daily_date)}</Fragment>
                 </Lang>
               </span>
               <span class="pn-card__title">
@@ -352,8 +373,8 @@ const breadcrumbLd = {
             <a class="pn-card pn-card--next" href={L(`/a/${next.slug}`)}>
               <span class="pn-card__dir">
                 <Lang>
-                  <Fragment slot="zh">下一条{neighborLabel(next.daily_date) ? ` · ${neighborLabel(next.daily_date)}` : " · 同日"}</Fragment>
-                  <Fragment slot="en">Next{neighborLabel(next.daily_date) ? ` · ${neighborLabel(next.daily_date)}` : " · same day"}</Fragment>
+                  <Fragment slot="zh">下一条 · {neighborSuffixZh(next.daily_date)}</Fragment>
+                  <Fragment slot="en">Next · {neighborSuffixEn(next.daily_date)}</Fragment>
                 </Lang> →
               </span>
               <span class="pn-card__title">

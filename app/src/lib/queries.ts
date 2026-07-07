@@ -368,6 +368,8 @@ export async function pickBySlug(db: DB, slug: string): Promise<
       published_at: Date | null;
       daily_date: string;
       position_in_day: number;
+      album_id: string | null;
+      position_in_album: number;
       lang: "zh" | "en" | "other" | null;
       annotations: { id: string; anchor: string; body_zh: string; body_en: string; position: number }[];
       glossary: { en: string; zh: string; meaning: string; anchor?: string }[];
@@ -435,6 +437,8 @@ export async function pickBySlug(db: DB, slug: string): Promise<
     published_at: row.publishedAt,
     daily_date: row.dailyDate,
     position_in_day: row.positionInDay,
+    album_id: row.albumId,
+    position_in_album: row.positionInAlbum,
     lang: (row.lang ?? null) as "zh" | "en" | "other" | null,
   };
 }
@@ -495,6 +499,60 @@ export async function adjacentPicks(
       ),
     )
     .orderBy(asc(picks.dailyDate), asc(picks.positionInDay))
+    .limit(1);
+
+  return { prev: prevRows[0] ?? null, next: nextRows[0] ?? null };
+}
+
+/**
+ * Previous/next published picks WITHIN a single album, ordered by
+ * (position_in_album, id). Mirrors adjacentPicks but scoped to one album so an
+ * album article's prev/next stay inside the album instead of jumping to the
+ * daily timeline. `id` is the tiebreak — freshly imported members can share
+ * position_in_album=0 until reordered.
+ */
+export async function adjacentAlbumPicks(
+  db: DB,
+  current: { albumId: string; positionInAlbum: number; id: string },
+): Promise<{ prev: AdjacentPick | null; next: AdjacentPick | null }> {
+  const cols = {
+    slug: picks.slug,
+    title_zh: picks.titleZh,
+    title_en: picks.titleEn,
+    daily_date: picks.dailyDate,
+  };
+  const { albumId, positionInAlbum: p, id } = current;
+
+  const prevRows = await db
+    .select(cols)
+    .from(picks)
+    .where(
+      and(
+        eq(picks.status, "published"),
+        eq(picks.albumId, albumId),
+        or(
+          lt(picks.positionInAlbum, p),
+          and(eq(picks.positionInAlbum, p), lt(picks.id, id)),
+        ),
+      ),
+    )
+    .orderBy(desc(picks.positionInAlbum), desc(picks.id))
+    .limit(1);
+
+  const nextRows = await db
+    .select(cols)
+    .from(picks)
+    .where(
+      and(
+        eq(picks.status, "published"),
+        eq(picks.albumId, albumId),
+        or(
+          gt(picks.positionInAlbum, p),
+          and(eq(picks.positionInAlbum, p), gt(picks.id, id)),
+        ),
+      ),
+    )
+    .orderBy(asc(picks.positionInAlbum), asc(picks.id))
     .limit(1);
 
   return { prev: prevRows[0] ?? null, next: nextRows[0] ?? null };
