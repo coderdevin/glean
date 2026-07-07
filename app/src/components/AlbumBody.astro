@@ -1,0 +1,72 @@
+---
+/**
+ * Reader-facing album body (banner + ordered feed). Shared by the public
+ * /album/[slug] page and the admin draft-preview page so the two never drift.
+ * Layout-agnostic: the caller wraps this in <Site>.
+ */
+import Lang from "~/components/Lang.astro";
+import { localizedPath, type Lang as LangCode } from "~/lib/i18n";
+import type { Album } from "~/db/schema";
+import type { ArticleCardPick } from "~/components/ArticleCard.astro";
+
+interface Props {
+  album: Album;
+  picks: ArticleCardPick[];
+  lang: LangCode;
+}
+
+const { album, picks, lang } = Astro.props;
+const L = (p: string): string => localizedPath(p, lang);
+---
+<section class="page-banner">
+  <div class="container">
+    <span class="eyebrow">
+      <Lang zh="专辑" en="Album" />
+      {" · "}
+      <Lang><Fragment slot="zh">{picks.length} 篇</Fragment><Fragment slot="en">{picks.length} {picks.length === 1 ? "piece" : "pieces"}</Fragment></Lang>
+    </span>
+    <h1 style="margin-top: 12px">
+      <Lang zh={album.titleZh} en={album.titleEn} />
+    </h1>
+    {(album.introZh || album.introEn) && (
+      <p class="prose-block" style="margin-top: 12px; max-width: 60ch">
+        <Lang zh={album.introZh ?? ""} en={album.introEn ?? ""} />
+      </p>
+    )}
+  </div>
+</section>
+
+<section class="section--tight" style="padding-top: 8px">
+  <div class="container">
+    {picks.length === 0 && (
+      <div class="prose-block" style="text-align: center; padding: 48px 0">
+        <p><Lang zh="这个专辑还没有文章。" en="This album has no pieces yet." /></p>
+      </div>
+    )}
+    <div class="feed">
+      {picks.map((pick, i) => (
+        <article class="feed-row">
+          <div class="feed-row__time">{String(i + 1).padStart(2, "0")}</div>
+          <div class="feed-row__main">
+            <h2 class="feed-row__title">
+              <a href={L(`/a/${pick.slug}`)}>
+                <Lang zh={pick.title_zh} en={pick.title_en} />
+              </a>
+            </h2>
+            <div class="feed-row__alt">
+              <Lang zh={pick.title_en} en={pick.title_zh} />
+            </div>
+            <p class="feed-row__summary">
+              <Lang zh={pick.summary_zh} en={pick.summary_en} />
+            </p>
+            <div class="feed-row__bar">
+              <span class="feed-domain">{pick.source_host}</span>
+              <span>·</span>
+              <span>{pick.read_minutes} min</span>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>

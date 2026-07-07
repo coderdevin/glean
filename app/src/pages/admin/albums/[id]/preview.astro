@@ -1,0 +1,41 @@
+---
+/**
+ * Admin draft-preview for an album. Renders the reader-facing layout for an
+ * album of ANY status (albumById), so an editor can preview a `draft` album
+ * that the public /album/[slug] route (published-only) 404s. Gated by the
+ * admin auth in middleware.ts — it lives under /admin/*.
+ */
+export const prerender = false;
+import Site from "~/layouts/Site.astro";
+import AlbumBody from "~/components/AlbumBody.astro";
+import { db } from "~/db/client";
+import { albumById, picksForAlbum } from "~/lib/queries";
+
+const lang = Astro.locals.lang ?? "zh";
+const id = Astro.params.id;
+if (!id) return new Response("missing id", { status: 400 });
+
+const env = Astro.locals.runtime.env;
+const drizzleDb = db(env.DB);
+const album = await albumById(drizzleDb, id);
+if (!album) return new Response("not found", { status: 404 });
+
+const picks = await picksForAlbum(drizzleDb, album.id);
+// Never let a preview be cached/served publicly.
+Astro.response.headers.set("Cache-Control", "no-store");
+---
+<Site
+  title={`[预览] ${lang === "en" ? album.titleEn : album.titleZh} · 专辑 — Glean · 拾遗`}
+  description={(lang === "en" ? album.introEn : album.introZh) ?? "A curated collection."}
+>
+  <div style="background: var(--c-surface-soft); border-bottom: 1px solid var(--c-hairline); padding: 8px 0; font-size: 13px; color: var(--c-muted)">
+    <div class="container" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+      <span>
+        预览 · {album.status === "published" ? "已发布" : "草稿"}
+        {album.status !== "published" && "（读者尚不可见）"}
+      </span>
+      <a href={`/admin/albums/${album.id}`}>← 返回编辑</a>
+    </div>
+  </div>
+  <AlbumBody album={album} picks={picks} lang={lang} />
+</Site>

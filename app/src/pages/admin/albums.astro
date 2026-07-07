@@ -65,7 +65,9 @@ const albums = await allAlbumsAdmin(db(env.DB));
                 <button type="submit" class="btn btn-primary">发布专辑</button>
               </form>
             )}
-            <a class="btn btn-secondary" href={`/album/${a.slug}`} target="_blank" rel="noreferrer">预览</a>
+            {/* Preview via the admin route — the public /album/[slug] page is
+                published-only and 404s a draft. Works for any status. */}
+            <a class="btn btn-secondary" href={`/admin/albums/${a.id}/preview`} target="_blank" rel="noreferrer">预览</a>
           </div>
 
           <details>
