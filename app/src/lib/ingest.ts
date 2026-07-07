@@ -491,10 +491,17 @@ export async function processLlm(
   // gate applies to auto-discovered rows only (a human submitter vouches for
   // quality, not topic). Topic failure is reported first — it's the more
   // actionable reason and the one manual submitters trip.
+  //
+  // EXCEPTION — album imports (source "album:<slug>"): the editor deliberately
+  // subscribed a feed to bulk-import the WHOLE source and auto-publish it into
+  // the album ("不过分数门槛"). That is an explicit curation decision, so album
+  // rows bypass BOTH gates — otherwise an off-theme-but-wanted piece lands in
+  // 'screened' and never auto-publishes. (see albumSlugFromSource in publish.ts)
+  const isAlbumSource = (row.source ?? "").startsWith("album:");
   const relevance = analysis.output.relevance;
   const relevanceThreshold = await getRelevanceThreshold(env.DB);
-  const offTopic = relevance < relevanceThreshold;
-  const lowQualityAuto = shouldScreenAuto(row.source, analysis.output.score);
+  const offTopic = !isAlbumSource && relevance < relevanceThreshold;
+  const lowQualityAuto = !isAlbumSource && shouldScreenAuto(row.source, analysis.output.score);
   const screened = offTopic || lowQualityAuto;
   const screenReason = offTopic
     ? `auto-screened: 跑题 relevance ${relevance.toFixed(2)} < ${relevanceThreshold}${
