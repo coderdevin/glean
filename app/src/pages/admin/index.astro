@@ -239,7 +239,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
               data-q={q}
             >
               <input type="hidden" name="q" value={q} />
-              <button type="submit" class="q2-bulk__btn" title="把全部 failed 重新抓取并入队">
+              <button type="submit" class="q2-bulk__btn" title="重试全部 failed，每条从失败的阶段继续（不重做已完成步骤）">
                 ↻ 重试全部 {q ? `匹配的 ${totalRows}` : totalRows}
               </button>
             </form>
@@ -519,7 +519,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
           const n = bulk.getAttribute("data-count") || "?";
           const q = bulk.getAttribute("data-q");
           const scope = q ? `匹配“${q}”的 ${n} 条 failed` : `全部 ${n} 条 failed`;
-          if (!confirm(`重试${scope}？将重新抓取并重新入队，处理可能需要数分钟。`)) {
+          if (!confirm(`重试${scope}？每条从各自失败的阶段继续（已抓取/已分析的不会重做），处理可能需要数分钟。`)) {
             e.preventDefault();
             return;
           }
