@@ -55,6 +55,13 @@ export interface LlmEnv {
    *  analysis phase uses. Same provider-spec syntax as LLM_FALLBACK_MODEL
    *  (e.g. "modelscope:deepseek-ai/DeepSeek-V4-Flash"). */
   LLM_SECTIONS_MODEL?: string;
+  /** Optional cross-provider fallback model for the SECTIONS phase only. The
+   *  sections phase resolves a concrete default model (so it can't use the
+   *  modelOverride-gated LLM_FALLBACK_MODEL), and its fallback should be a
+   *  cheap Flash model, not the V4-Pro reasoning model analysis falls back to.
+   *  Defaults to "deepseek-v4-flash" when the primary provider is ModelScope
+   *  (see sectionsFallbackModel in ingest.ts). */
+  LLM_SECTIONS_FALLBACK_MODEL?: string;
   /** Optional R2 bucket for dumping raw LLM stream output on parse failure
    *  (so the editor can debug / hand-repair without re-running the model). */
   RAW?: R2Bucket;
@@ -1072,8 +1079,17 @@ export interface CallLlmArgs {
   title: string;
   body: string;
   /** Override the model for this call. When set, fallback retries are
-   *  skipped (caller picked this model on purpose). */
+   *  skipped by default (caller picked this model on purpose) — unless
+   *  suppressFallback is set explicitly. */
   modelOverride?: string;
+  /** Explicit control over the fallback retry, independent of modelOverride.
+   *  Undefined → legacy behavior (suppress iff modelOverride is set). The
+   *  sections phase sets this so a *default* model spec (not an operator
+   *  choice) can still fall back cross-provider on a quota/transient error. */
+  suppressFallback?: boolean;
+  /** Per-call override for LLM_FALLBACK_MODEL. Lets the sections phase fall
+   *  back to a cheap Flash model instead of the analysis V4-Pro. */
+  fallbackModel?: string;
   /** Submission ID — propagated into R2 dump key on parse failure. */
   submissionId?: string;
   sourceHost?: string;
@@ -1388,10 +1404,33 @@ interface PhaseConfig<S extends z.ZodTypeAny> {
  * Top-level wrapper. Tries the primary (with a same-provider retry on
  * ModelScope's transient 429 insufficient_quota — see
  * withModelScopeQuotaRetry); on transient failures (429, 5xx, timeout,
- * fetch error) AND if `LLM_FALLBACK_MODEL` is set AND the caller did not
- * pass `modelOverride`, retries once with the fallback model. Any other
+ * fetch error) AND a fallback spec resolves (args.fallbackModel ??
+ * LLM_FALLBACK_MODEL) AND fallback is not suppressed (args.suppressFallback ??
+ * Boolean(modelOverride)), retries once with the fallback model. Any other
  * error (schema, auth, malformed) propagates immediately.
  */
+/**
+ * Decide the fallback model for a transiently-failed primary call, or null if
+ * fallback is suppressed. Pure (the transient-error test stays in the caller)
+ * so the decision — the crux of the "sections never fell back on quota" bug —
+ * is unit-testable.
+ *
+ *   suppress = args.suppressFallback ?? Boolean(args.modelOverride)
+ *
+ * Legacy callers leave suppressFallback undefined → suppress iff an explicit
+ * modelOverride was set (unchanged). The sections phase passes
+ * suppressFallback=false + a Flash fallbackModel, so its *default* model spec
+ * no longer masquerades as an operator choice and blocks the fallback.
+ */
+export function resolveFallbackModel(
+  args: Pick<CallLlmArgs, "modelOverride" | "suppressFallback" | "fallbackModel">,
+  env: Pick<LlmEnv, "LLM_FALLBACK_MODEL">,
+): string | null {
+  const suppress = args.suppressFallback ?? Boolean(args.modelOverride);
+  if (suppress) return null;
+  return args.fallbackModel ?? env.LLM_FALLBACK_MODEL ?? null;
+}
+
 async function callWithFallback<S extends z.ZodTypeAny>(
   env: LlmEnv,
   args: CallLlmArgs,
@@ -1405,15 +1444,18 @@ async function callWithFallback<S extends z.ZodTypeAny>(
     // explicit "Re-run ModelScope" must stay on ModelScope and surface its real
     // error (e.g. a quota/rate 429) — silently serving DeepSeek would hide the
     // provider's actual state and defeat the operator's explicit choice.
-    if (
-      env.LLM_FALLBACK_MODEL &&
-      !args.modelOverride &&
-      isTransientError(e)
-    ) {
+    //
+    // `suppressFallback` lets a caller decouple this from modelOverride: the
+    // sections phase passes a *default* model spec (so modelOverride is always
+    // set) yet still wants to fall back on quota exhaustion, so it sets
+    // suppressFallback=false + a Flash fallbackModel. Legacy callers leave both
+    // undefined → suppress iff modelOverride is set (unchanged behavior).
+    const fallbackSpec = resolveFallbackModel(args, env);
+    if (fallbackSpec && isTransientError(e)) {
       console.warn(
-        `LLM ${cfg.phase} primary failed (${e.message.slice(0, 120)}); falling back to ${env.LLM_FALLBACK_MODEL}`,
+        `LLM ${cfg.phase} primary failed (${e.message.slice(0, 120)}); falling back to ${fallbackSpec}`,
       );
-      return await withModelScopeQuotaRetry(cfg.phase, () => callOnce(env, args, cfg, env.LLM_FALLBACK_MODEL));
+      return await withModelScopeQuotaRetry(cfg.phase, () => callOnce(env, args, cfg, fallbackSpec));
     }
     throw err;
   }

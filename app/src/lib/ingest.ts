@@ -142,6 +142,28 @@ export function defaultSectionsModel(modelOverride: string | undefined, env: Llm
 }
 
 /**
+ * Cross-provider fallback model for the SECTIONS phase. Sections resolves a
+ * concrete default model (defaultSectionsModel), which means it always passes
+ * a modelOverride and therefore can't use the modelOverride-gated
+ * LLM_FALLBACK_MODEL — that's why a ModelScope free-quota 429 used to drop the
+ * whole batch to `failed` with no fallback. Return a DeepSeek *Flash* spec
+ * (cheap + fast, matching the Flash primary; NOT the V4-Pro reasoning model
+ * analysis falls back to) so quota exhaustion retries on paid DeepSeek.
+ *
+ * Only meaningful on the auto path with a ModelScope primary:
+ *   - explicit operator modelOverride ("Re-run ModelScope") → no fallback,
+ *     surface the provider's real error;
+ *   - non-ModelScope primary → no cross-provider quota story here.
+ * env.LLM_SECTIONS_FALLBACK_MODEL overrides the default spec.
+ */
+export function sectionsFallbackModel(modelOverride: string | undefined, env: LlmEnv): string | undefined {
+  if (modelOverride) return undefined;
+  const envSpec = env.LLM_SECTIONS_FALLBACK_MODEL?.trim();
+  if (envSpec) return envSpec;
+  return defaultProviderName(env) === "modelscope" ? DEFAULT_DEEPSEEK_SECTIONS_MODEL : undefined;
+}
+
+/**
  * Append one row to the submission_events log. Best-effort: a failure here
  * never breaks the pipeline — the underlying status writes on submissions
  * remain the source of truth.
@@ -620,6 +642,7 @@ export async function reapStaleLlmQueueWait(
       status: "failed",
       failureStage: "analysis",
       aiSectionsError: message,
+      rejectReason: message.slice(0, 200),
       processedAt: now,
     })
     .where(
@@ -659,6 +682,7 @@ export async function reapStalledSubmissions(
       // pre-update status decides the stage: composing → sections, else analysis.
       failureStage: sql`CASE WHEN ${submissions.status} = 'composing' THEN 'sections' ELSE 'analysis' END`,
       aiSectionsError: `pipeline stalled past ${STALL_WINDOW_MS / 60_000}min — the worker was likely evicted before it could record an error; re-run from the admin UI`,
+      rejectReason: `stalled past ${STALL_WINDOW_MS / 60_000}min — worker evicted before recording an error; re-run from admin`,
       processedAt: now,
     })
     .where(
@@ -726,6 +750,9 @@ export async function runSectionsPhase(
   // editor can't tell whether anything is happening. (We dropped the inline
   // dual-started events earlier; this is the surviving one per phase.)
   const sectionsModel = defaultSectionsModel(args.modelOverride, env);
+  // Cross-provider fallback for the sections phase (auto + ModelScope primary
+  // only). Non-null → allow fallback despite the resolved modelOverride.
+  const sectionsFallback = sectionsFallbackModel(args.modelOverride, env);
   // Reset the stall clock to NOW. The reaper measures staleness from
   // processing_started_at; sections runs in its own invocation (decoupled
   // pipeline) or hours after analysis (admin regenerate), so without this the
@@ -745,6 +772,10 @@ export async function runSectionsPhase(
       body: args.body,
       detectedLang: args.detectedLang,
       modelOverride: sectionsModel,
+      // A resolved default model (not an operator choice) must NOT suppress the
+      // fallback; suppress only when there's no sections fallback to use.
+      suppressFallback: !sectionsFallback,
+      fallbackModel: sectionsFallback,
       submissionId: args.id,
       sourceHost: args.sourceHost,
       submitterNote: args.submitterNote,
@@ -838,6 +869,9 @@ export async function runSectionsPhase(
         status: "failed",
         failureStage: "sections",
         aiSectionsError: msg.slice(0, 500),
+        // Short, list-visible reason (the full error stays in aiSectionsError).
+        // Without this the admin queue shows a failed row with no "why".
+        rejectReason: `sections: ${msg.replace(NO_RETRY_MARKER, "").replace(/\s+/g, " ").trim()}`.slice(0, 200),
       })
       .where(and(eq(submissions.id, args.id), ne(submissions.status, "published")));
     await logEvent(env, args.id, "llm", "failed", {
@@ -917,6 +951,9 @@ export async function markFailed(
       status: "failed",
       failureStage: stage,
       aiSectionsError: reason.slice(0, 500),
+      // Short, list-visible reason (full error in aiSectionsError) — the admin
+      // queue must never show a failed row with no "why".
+      rejectReason: `${stage}: ${reason.replace(NO_RETRY_MARKER, "").replace(/\s+/g, " ").trim()}`.slice(0, 200),
       processingModel: null,
       processedAt: new Date(),
     })

@@ -6112,6 +6112,22 @@ body[data-lang="zh"] em {
 .q2-sort a.is-active { color: var(--c-ink); background: var(--c-surface-soft); font-weight: 500; }
 .q2-sort a:hover:not(.is-active) { color: var(--c-ink); }
 
+/* Bulk-retry button on the failed view */
+.q2-bulk { margin: 0; }
+.q2-bulk__btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--c-ink);
+  background: var(--c-canvas);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.q2-bulk__btn:hover:not(:disabled) { border-color: var(--c-ink); background: var(--c-surface-soft); }
+.q2-bulk__btn:disabled { opacity: 0.6; cursor: default; }
+
 /* Up-next hero card */
 .q2-hero {
   background: var(--c-surface-card);

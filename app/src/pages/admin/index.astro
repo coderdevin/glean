@@ -229,6 +229,21 @@ Astro.response.headers.set("Cache-Control", "no-store");
             <a href={pageHref({ sort: "newest", page: 1 })} class={sortParam === "newest" ? "is-active" : ""}>最新</a>
             <a href={pageHref({ sort: "score", page: 1 })} class={sortParam === "score" ? "is-active" : ""}>分数</a>
           </div>
+          {filterKey === "failed" && totalRows > 0 && (
+            <form
+              id="bulk-retry-form"
+              method="post"
+              action="/api/admin/retry-failed"
+              class="q2-bulk"
+              data-count={totalRows}
+              data-q={q}
+            >
+              <input type="hidden" name="q" value={q} />
+              <button type="submit" class="q2-bulk__btn" title="把全部 failed 重新抓取并入队">
+                ↻ 重试全部 {q ? `匹配的 ${totalRows}` : totalRows}
+              </button>
+            </form>
+          )}
         </div>
       )}
 
@@ -401,12 +416,17 @@ Astro.response.headers.set("Cache-Control", "no-store");
                       <span class="q2-row__orig" title={r.originalTitle}>{r.originalTitle}</span>
                     )}
                   </span>
-                  <span class="q2-row__meta">
+                  <span
+                    class="q2-row__meta"
+                    title={r.status === "failed" && r.rejectReason ? r.rejectReason : undefined}
+                  >
                     {filterKey === "all" && <StatusPill status={r.status} />}
                     {r.source?.startsWith("auto:") && (
                       <span class="src-badge" title={r.source}>via {r.source.replace(/^auto:/, "")}</span>
                     )}
-                    <span>{host(r.url)}</span>
+                    {/* For failed rows the reason is far more useful than the
+                        host at a glance — show it inline (full text on hover). */}
+                    <span>{r.status === "failed" && r.rejectReason ? r.rejectReason : host(r.url)}</span>
                   </span>
                   <span class={`q2-row__score${scoreClass(r.aiScore)}`} title={scoreTitle(r.aiSubscoresJson)}>
                     {r.aiScore === null || r.aiScore === undefined ? "—" : Number(r.aiScore).toFixed(2)}
@@ -490,6 +510,23 @@ Astro.response.headers.set("Cache-Control", "no-store");
           if (href) location.href = href;
         });
       });
+
+      // Bulk-retry: confirm before re-queuing the whole failed set, and lock
+      // the button so a double-click can't fire two mass requeues.
+      const bulk = document.getElementById("bulk-retry-form");
+      if (bulk) {
+        bulk.addEventListener("submit", (e) => {
+          const n = bulk.getAttribute("data-count") || "?";
+          const q = bulk.getAttribute("data-q");
+          const scope = q ? `匹配“${q}”的 ${n} 条 failed` : `全部 ${n} 条 failed`;
+          if (!confirm(`重试${scope}？将重新抓取并重新入队，处理可能需要数分钟。`)) {
+            e.preventDefault();
+            return;
+          }
+          const btn = bulk.querySelector("button[type=submit]");
+          if (btn) { btn.disabled = true; btn.textContent = "重新入队中…"; }
+        });
+      }
 
       // Inline "copy link" buttons.
       document.querySelectorAll("[data-copy]").forEach((btn) => {
