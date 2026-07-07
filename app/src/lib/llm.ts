@@ -1052,22 +1052,23 @@ export function getLlmCallBudget(model: string, phase: LlmPhase = "analysis"): L
   const isSections = phase === "sections";
   return {
     // Sections runs in its own worker invocation (see processLlm), so it has a
-    // full 15-min ceiling — but cap the stream at 13min (reasoning) to leave
-    // ~2min for cleanup + the failure DB-write before the platform evicts the
-    // worker. Non-reasoning sections (Flash) is the common path now and still
-    // emits bulk bilingual output on long articles, so give it 8min — well
-    // past the 4min analysis budget but clear of the worker ceiling.
+    // full 15-min ceiling — cap the stream at 13min (BOTH tiers) to leave ~2min
+    // for cleanup + the failure DB-write before the platform evicts the worker.
+    // Flash sections was 8min, but the raised 50K token cap (below) can take a
+    // long bilingual article past 8min of streaming, so it gets the same 13min
+    // as reasoning — still clear of the worker ceiling.
     streamTimeoutMs: reasoning
       ? (isSections ? 780_000 : 420_000)
-      : (isSections ? 480_000 : 240_000),
+      : (isSections ? 780_000 : 240_000),
     chunkIdleMs: reasoning ? 180_000 : 60_000,
     bodyCap: 120_000,
     // DeepSeek V4-Pro/Flash advertised max output is 384K tokens, so these
     // numbers are well within provider limits. Analysis output is small
     // (title/summary/bullets/score), 12K is plenty. Sections output is bulk
-    // bilingual body — 32K gives ~60K chars of headroom, enough for the soft
-    // cap of 25 sections * ~1500 chars even on very long articles.
-    maxTokens: isSections ? 32_000 : 12_000,
+    // bilingual body — long articles were truncating at 32K (unterminated JSON),
+    // so bump to 50K (~150K chars of headroom). The 13min stream timeout above
+    // covers the extra generation time.
+    maxTokens: isSections ? 50_000 : 12_000,
   };
 }
 

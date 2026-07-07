@@ -14,7 +14,7 @@ const proSections = getLlmCallBudget("deepseek-v4-pro", "sections");
 assert.equal(proSections.streamTimeoutMs, 780_000);
 assert.equal(proSections.chunkIdleMs, 180_000);
 assert.equal(proSections.bodyCap, 120_000);
-assert.equal(proSections.maxTokens, 32_000);
+assert.equal(proSections.maxTokens, 50_000);
 
 // V4-Flash (non-reasoning) — same per-phase max_tokens, faster wall clock.
 const flashAnalysis = getLlmCallBudget("deepseek-v4-flash", "analysis");
@@ -24,12 +24,13 @@ assert.equal(flashAnalysis.bodyCap, 120_000);
 assert.equal(flashAnalysis.maxTokens, 12_000);
 
 // Non-reasoning sections is the common path now (Flash) and still emits bulk
-// bilingual output on long articles, so it gets 8min — not the 4min analysis budget.
+// bilingual output on long articles. It shares the 13min sections timeout and
+// 50K token cap with reasoning so long articles don't truncate.
 const flashSections = getLlmCallBudget("deepseek-v4-flash", "sections");
-assert.equal(flashSections.streamTimeoutMs, 480_000);
+assert.equal(flashSections.streamTimeoutMs, 780_000);
 assert.equal(flashSections.chunkIdleMs, 60_000);
 assert.equal(flashSections.bodyCap, 120_000);
-assert.equal(flashSections.maxTokens, 32_000);
+assert.equal(flashSections.maxTokens, 50_000);
 
 // Default phase argument should fall back to 'analysis' for back-compat.
 const proDefault = getLlmCallBudget("deepseek-v4-pro");
