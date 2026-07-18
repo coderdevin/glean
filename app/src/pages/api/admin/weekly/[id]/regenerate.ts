@@ -26,6 +26,14 @@ export const prerender = false;
 
 const LLM_WORKER_URL = "http://localhost:8788";
 
+/** Split into ≤`size` batches. D1 caps a query at 100 bound parameters, so
+ *  pick-link updates must be chunked before the `inArray(picks.id, …)` list. */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 export const POST: APIRoute = async (ctx) => {
   const env = ctx.locals.runtime.env;
   const id = ctx.params.id;
@@ -94,10 +102,15 @@ export const POST: APIRoute = async (ctx) => {
     })
     .where(eq(weeklyIssues.id, id));
 
-  if (unlinkIds.length > 0) {
-    await drizzleDb.update(picks).set({ weeklyIssueId: null }).where(inArray(picks.id, unlinkIds));
+  // Chunk both link syncs under D1's 100-bound-parameter cap — a wide re-draft
+  // range (e.g. a bulk-import week) can carry hundreds of ids, and one oversized
+  // UPDATE would throw and strand the issue in 'drafting'.
+  for (const part of chunk(unlinkIds, 90)) {
+    await drizzleDb.update(picks).set({ weeklyIssueId: null }).where(inArray(picks.id, part));
   }
-  await drizzleDb.update(picks).set({ weeklyIssueId: id }).where(inArray(picks.id, targetIds));
+  for (const part of chunk(targetIds, 90)) {
+    await drizzleDb.update(picks).set({ weeklyIssueId: id }).where(inArray(picks.id, part));
+  }
 
   await logEvent(env, id, "queue", "queued", {
     message: "weekly re-draft requested by admin",

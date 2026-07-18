@@ -25,6 +25,14 @@ export const prerender = false;
 
 const LLM_WORKER_URL = "http://localhost:8788";
 
+/** Split into ≤`size` batches. D1 caps a query at 100 bound parameters, so
+ *  pick-link updates must be chunked before the `inArray(picks.id, …)` list. */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 export const POST: APIRoute = async (ctx) => {
   const env = ctx.locals.runtime.env;
   const drizzleDb = db(env.DB);
@@ -89,10 +97,12 @@ export const POST: APIRoute = async (ctx) => {
 
   // Link the eligible picks now so runWeeklyDraft (which reads from the linked
   // set) sees them. repairWeeklyDraft guarantees each ends up in the layout.
-  await drizzleDb
-    .update(picks)
-    .set({ weeklyIssueId: id })
-    .where(inArray(picks.id, eligible.map((p) => p.id)));
+  // Chunk the link: inArray binds one parameter per id, and a busy week (e.g. a
+  // bulk import) can exceed D1's 100-parameter cap — one giant UPDATE would then
+  // throw and strand the issue in 'drafting' (reaped at 20min, HTTP 500 here).
+  for (const part of chunk(eligible.map((p) => p.id), 90)) {
+    await drizzleDb.update(picks).set({ weeklyIssueId: id }).where(inArray(picks.id, part));
+  }
 
   await logEvent(env, id, "queue", "queued", {
     message: "weekly draft requested by admin",

@@ -8,6 +8,14 @@ import { bustForWeekly } from "~/lib/cache";
 
 export const prerender = false;
 
+/** Split into ≤`size` batches. D1 caps a query at 100 bound parameters, so
+ *  pick-link updates must be chunked before the `inArray(picks.id, …)` list. */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 function parseLayout(raw: FormDataEntryValue | null): LayoutSection[] {
   if (typeof raw !== "string" || !raw.trim()) return [];
   try {
@@ -66,11 +74,13 @@ export const POST: APIRoute = async (ctx) => {
     })
     .where(eq(weeklyIssues.id, id));
 
-  if (unlinkIds.length > 0) {
-    await drizzleDb.update(picks).set({ weeklyIssueId: null }).where(inArray(picks.id, unlinkIds));
+  // Chunk both link syncs under D1's 100-bound-parameter cap — a big issue can
+  // carry hundreds of ids, and one oversized UPDATE would throw mid-save.
+  for (const part of chunk(unlinkIds, 90)) {
+    await drizzleDb.update(picks).set({ weeklyIssueId: null }).where(inArray(picks.id, part));
   }
-  if (linkIds.length > 0) {
-    await drizzleDb.update(picks).set({ weeklyIssueId: id }).where(inArray(picks.id, linkIds));
+  for (const part of chunk(linkIds, 90)) {
+    await drizzleDb.update(picks).set({ weeklyIssueId: id }).where(inArray(picks.id, part));
   }
 
   await bustForWeekly(env.CACHE, { number });
