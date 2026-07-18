@@ -54,6 +54,10 @@ export const POST: APIRoute = async (ctx) => {
     .where(
       and(
         eq(picks.status, "published"),
+        // Album picks carry a daily_date but belong only to their album — like
+        // daily/home/RSS (ADR-0002), a weekly must exclude them or it vacuums a
+        // whole bulk-imported album into one issue.
+        isNull(picks.albumId),
         isNull(picks.weeklyIssueId),
         gte(picks.dailyDate, dateStart),
         lte(picks.dailyDate, dateEnd),

@@ -68,6 +68,9 @@ export const POST: APIRoute = async (ctx) => {
     .where(
       and(
         eq(picks.status, "published"),
+        // Exclude album picks — they belong only to their album, never a weekly
+        // (same rule as generate.ts / daily / RSS, ADR-0002).
+        isNull(picks.albumId),
         gte(picks.dailyDate, dateStart),
         lte(picks.dailyDate, dateEnd),
         or(isNull(picks.weeklyIssueId), eq(picks.weeklyIssueId, id)),
