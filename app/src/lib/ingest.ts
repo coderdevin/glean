@@ -409,15 +409,18 @@ export async function processLlm(
     meta: { provider: resolved.name, model: processingModel, body_chars: body.length },
   });
 
-  // Existing tags shown to the model as reuse hints (most-used first, capped so
-  // a large taxonomy doesn't blow the prompt budget). NOT a whitelist — the
-  // model proposes tags freely; sanitizeProposedTags + the upsert below grow
-  // the table with any new slugs it mints.
+  // The FULL existing tag table, shown to the model as reuse hints. A top-N
+  // cap here caused tag churn: long-tail topics never saw their existing tag,
+  // so the model minted near-duplicates (agent-loop/agent-loops) whose old
+  // pages later 404'd. Rendered slug-only in the prompt (~20 bytes/tag), so
+  // even thousands of tags stay within budget; alphabetical order clusters
+  // near-duplicates. NOT a whitelist — the model proposes tags freely;
+  // sanitizeProposedTags + the upsert below grow the table with new slugs.
   const taxonomy = await db
     .select({ slug: tagsTable.slug, nameZh: tagsTable.nameZh, nameEn: tagsTable.nameEn })
     .from(tagsTable)
-    .orderBy(sql`(select count(*) from pick_tags pt where pt.tag_slug = ${tagsTable.slug}) desc`)
-    .limit(60);
+    .orderBy(tagsTable.slug)
+    .limit(4000);
 
   // Existing categories shown to the model as reuse hints (same soft-reuse as
   // tags; categories are few so no count ordering needed).

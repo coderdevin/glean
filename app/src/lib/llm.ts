@@ -1873,8 +1873,12 @@ function buildAnalysisUserMessage(args: {
   submitterNote?: string;
   submittedDate?: string;
 }): string {
+  // Full tag table, slug-only and comma-joined: bilingual names would triple
+  // the block at 1000+ tags for little matching gain (slugs are descriptive
+  // English kebab-case), and reused slugs never overwrite stored names anyway
+  // (onConflictDoNothing in ingest.ts).
   const taxonomyBlock = args.taxonomy.length
-    ? args.taxonomy.map((t) => `- ${t.slug} (${t.nameZh} / ${t.nameEn})`).join("\n")
+    ? args.taxonomy.map((t) => t.slug).join(", ")
     : "(暂无已有 tag)";
   const categoryBlock = args.categories.length
     ? args.categories.map((c) => `- ${c.slug} (${c.nameZh} / ${c.nameEn})`).join("\n")
@@ -1888,7 +1892,7 @@ function buildAnalysisUserMessage(args: {
     `# 已有 category（优先复用契合的；都不贴切时才新建并补全 slug/中英名）`,
     categoryBlock,
     ``,
-    `# 已有 tag（优先复用契合的；都不贴切时才新建并补全 slug/中英名/family）`,
+    `# 已有 tag（全量 slug 列表。优先复用契合的 slug——原样使用，不要改写；这份列表覆盖了站内全部标签，新建应当罕见，只有确实没有贴切的才新建并补全 slug/中英名/family）`,
     taxonomyBlock,
     ``,
     `# Article title (raw)`,
