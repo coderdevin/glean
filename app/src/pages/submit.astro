@@ -11,7 +11,7 @@ Astro.response.headers.set("Cache-Control", "no-store");
 const submitError = Astro.url.searchParams.get("error");
 const errorLabels: Record<string, { zh: string; en: string }> = {
   bad_url:     { zh: "URL 看起来不太对。",                en: "That URL didn't look right." },
-  rate_limit:  { zh: "提交太频繁了。每小时最多 10 条。",  en: "Too many submissions. 10 per hour, per IP." },
+  rate_limit:  { zh: "提交太频繁了。每小时最多 50 条。",  en: "Too many submissions. 50 per hour, per IP." },
   turnstile:   { zh: "人类验证失败。请刷新重试。",         en: "Human check failed. Please refresh and retry." },
   honeypot:    { zh: "看起来像 bot。",                    en: "Bot detected." },
   server:      { zh: "服务器出错。请稍后重试。",           en: "Server error. Try again later." },
@@ -101,7 +101,7 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
                 <Lang zh="提交 →" en="Submit →" />
               </button>
               <span class="t-body-sm text-muted-soft">
-                <Lang zh="无需登录 · 每 IP 每小时 10 条" en="No login · 10 per IP per hour" />
+                <Lang zh="无需登录 · 每 IP 每小时 50 条" en="No login · 50 per IP per hour" />
               </span>
             </div>
           </div>
@@ -172,7 +172,7 @@ const apiHost = new URL(Astro.site?.toString() ?? "https://your-domain.example")
     -H <span style="color: var(--c-accent-teal)">"Content-Type: application/json"</span> <span style="color: var(--c-muted-soft)">\</span>
     -d <span style="color: var(--c-accent-teal)">'&#123;"url":"https://example.com/article"&#125;'</span></pre>
             <p class="t-body-sm" style="margin: 10px 0 0; color: var(--c-on-dark-soft)">
-              <Lang zh="无需登录 · 每 IP 每小时 10 条" en="No auth · 10 per IP per hour" />
+              <Lang zh="无需登录 · 每 IP 每小时 50 条" en="No auth · 50 per IP per hour" />
             </p>
           </div>
         </aside>

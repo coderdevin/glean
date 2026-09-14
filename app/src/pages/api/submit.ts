@@ -98,7 +98,7 @@ async function handleSubmit(ctx: Parameters<APIRoute>[0]): Promise<Response> {
     if (!tsOk) return redirectTo(buildSubmitError("turnstile", { url, note }), 303);
   }
 
-  const rl = await rateLimit(env.CACHE, "submit", 10, 3600, ip);
+  const rl = await rateLimit(env.CACHE, "submit", 50, 3600, ip);
   if (!rl.ok) return redirectTo(buildSubmitError("rate_limit", { url, note }), 303);
 
   const normalized = normalizeUrl(url);

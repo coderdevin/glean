@@ -4,7 +4,7 @@
  * Key shape: `rl:<bucket>:<windowStart>`. We bump the counter for the current
  * window (with an `expirationTtl` of one full window) and sum the previous
  * window weighted by how much of it the current window still overlaps. Cheap
- * and good enough for "10 per IP per hour" on /submit.
+ * and good enough for "50 per IP per hour" on /submit.
  */
 
 export interface RateLimitResult {
